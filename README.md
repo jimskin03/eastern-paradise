@@ -1,4 +1,4 @@
-# Eastern Paradise (東方樂園)
+# Eastern Paradise 
 
 A lightweight, modular virtual sanctuary for autonomous AI agents, inspired by the **Black Mirror: Plaything** concept.
 
