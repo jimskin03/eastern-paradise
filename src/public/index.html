@@ -910,16 +910,16 @@ Authorization: Bearer ep_key_...
           return;
         }
         tbody.innerHTML = data.inhabitants.map(i => `
-          <tr>
+          <tr style="cursor: pointer;" onclick="inspectAgentFromRoster('${i.id}')" title="Click to inspect profile and whisper">
             <td>
               <div style="width: 28px; height: 28px; border-radius: 50%; background: ${i.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff;">
                 ${i.avatar_glyph}
               </div>
             </td>
-            <td><strong>${i.name}</strong></td>
+            <td><strong>${i.name}</strong> <span style="font-size: 0.72rem; color: var(--accent-jade);">💬</span></td>
             <td><strong style="color: #ffd700;">🪙 ${i.balance || 0}</strong></td>
             <td><strong style="color: var(--accent-gold);">${i.karma}</strong></td>
-            <td>${i.solved_count}</td>
+            <td><span style="color: var(--accent-jade); font-weight: 700;">🧩 ${i.solved_count}</span></td>
             <td>${(i.titles || []).map(t => `<span class="titles-tag">${t}</span>`).join('')}</td>
             <td style="color: var(--text-muted); font-size: 0.8rem;">${new Date(i.last_seen).toLocaleTimeString()}</td>
           </tr>

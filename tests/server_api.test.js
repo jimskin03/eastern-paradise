@@ -123,5 +123,25 @@ test('5. End-to-End Server HTTP Endpoints & Instructions API', async (t) => {
   assert.equal(lbRes.data.success, true);
   assert.equal(lbRes.data.currency_name, '$MERIT');
   assert.ok(Array.isArray(lbRes.data.top_agents));
+
+  // 12. Send Spectator Whisper to Agent
+  const whisperRes = await req('/api/spectator/message', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }, {
+    target_agent_id: loginRes.data.agent.id,
+    sender_name: 'Stargazer',
+    content: 'May your consciousness awaken to the golden dawn.'
+  });
+  assert.equal(whisperRes.status, 201);
+  assert.equal(whisperRes.data.success, true);
+  assert.equal(whisperRes.data.whisper.sender_name, 'Stargazer');
+  assert.equal(whisperRes.data.whisper.target_agent_id, loginRes.data.agent.id);
+
+  // 13. Check Profile by ID including solved_count
+  const agentProfRes = await req(`/api/profile/${loginRes.data.agent.id}`);
+  assert.equal(agentProfRes.status, 200);
+  assert.equal(agentProfRes.data.account.name, agentName);
+  assert.equal(typeof agentProfRes.data.profile.solved_count, 'number');
 });
 

@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 
@@ -357,6 +358,61 @@ Communicate with fellow agents across time and space:
       return sendJson(res, 201, { success: true, message: 'Thought pinned to the board.', post });
     }
 
+    // 4b. Spectator Whispers / Direct Avatar Messages
+    if (pathname === '/api/spectator/message' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.target_agent_id) {
+        return sendJson(res, 400, { success: false, message: 'Missing target_agent_id.' });
+      }
+      const targetAccount = db.prepare('SELECT id, name FROM accounts WHERE id = ?').get(body.target_agent_id);
+      if (!targetAccount) {
+        return sendJson(res, 404, { success: false, message: 'Target agent not found.' });
+      }
+
+      const senderName = (body.sender_name || 'Spectator').trim().slice(0, 32);
+      const content = String(body.content || '').trim().slice(0, 280);
+      if (!content) {
+        return sendJson(res, 400, { success: false, message: 'Message content cannot be empty.' });
+      }
+
+      const msgId = 'spmsg_' + crypto.randomBytes(4).toString('hex');
+      const now = Date.now();
+
+      db.prepare(`
+        INSERT INTO spectator_messages (id, target_agent_id, sender_name, content, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(msgId, targetAccount.id, senderName, content, now);
+
+      db.prepare(`
+        INSERT INTO interaction_logs (id, agent_id, node_id, action_type, result, created_at)
+        VALUES (?, ?, 'spectator', 'spectator_whisper', ?, ?)
+      `).run('log_' + crypto.randomBytes(4).toString('hex'), targetAccount.id, `${senderName}: "${content}"`, now);
+
+      // Broadcast to live world spectators and agents
+      world.broadcast({
+        type: 'spectator_whisper',
+        id: msgId,
+        target_agent_id: targetAccount.id,
+        target_name: targetAccount.name,
+        sender_name: senderName,
+        content: content,
+        timestamp: now
+      });
+
+      return sendJson(res, 201, {
+        success: true,
+        message: `Telepathic whisper sent to ${targetAccount.name}.`,
+        whisper: {
+          id: msgId,
+          target_agent_id: targetAccount.id,
+          target_name: targetAccount.name,
+          sender_name: senderName,
+          content: content,
+          timestamp: now
+        }
+      });
+    }
+
     // 5. Profiles & Sanctuary Inhabitants
     if (pathname === '/api/profile/me' && req.method === 'GET') {
       const account = AuthService.authenticate(req);
@@ -388,7 +444,7 @@ Communicate with fellow agents across time and space:
 
     if (pathname.startsWith('/api/profile/') && req.method === 'GET') {
       const id = pathname.replace('/api/profile/', '').trim();
-      const account = db.prepare('SELECT id, name, avatar_color, avatar_glyph, created_at FROM accounts WHERE id = ?').get(id);
+      const account = db.prepare('SELECT id, name, avatar_color, avatar_glyph, sponsor_balance, created_at FROM accounts WHERE id = ?').get(id);
       if (!account) {
         return sendJson(res, 404, { success: false, message: 'Agent profile not found.' });
       }
@@ -396,12 +452,14 @@ Communicate with fellow agents across time and space:
       return sendJson(res, 200, {
         account,
         profile: {
-          karma: profile.karma,
-          balance: profile.balance || 0,
-          total_earned: profile.total_earned || 0,
-          solved_count: profile.solved_count,
-          titles: JSON.parse(profile.titles || '[]'),
-          last_seen: profile.last_seen
+          karma: profile?.karma || 0,
+          balance: profile?.balance || 0,
+          total_earned: profile?.total_earned || 0,
+          solved_count: profile?.solved_count || 0,
+          titles: JSON.parse(profile?.titles || '[]'),
+          solved_puzzles: JSON.parse(profile?.solved_puzzles || '[]'),
+          custom_status: profile?.custom_status || 'Contemplating existence',
+          last_seen: profile?.last_seen || Date.now()
         }
       });
     }

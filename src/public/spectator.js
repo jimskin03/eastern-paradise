@@ -384,6 +384,18 @@ function handleServerMessage(msg) {
       }
       break;
 
+    case 'spectator_whisper':
+      logActivity(`💬 <strong>${escapeHtml(msg.sender_name)}</strong> whispered to <strong>${escapeHtml(msg.target_name)}</strong>: "${escapeHtml(msg.content)}"`);
+      soundSystem.play('chime');
+      for (const a of agents.values()) {
+        if (a.id === msg.target_agent_id || a.name === msg.target_name) {
+          const preview = msg.content.length > 22 ? msg.content.slice(0, 22) + '…' : msg.content;
+          addBubble(a.id, `💬 "${preview}"`, a.pos[0], a.pos[1], '#ffd700');
+          break;
+        }
+      }
+      break;
+
     case 'sound_event':
       logActivity(`🎐 Resonance chimes ring softly across the grove.`);
       soundSystem.play('chime');
@@ -1107,6 +1119,34 @@ canvas.addEventListener('mousedown', (e) => {
     }
   }
 
+  // Check if click hit any agent (in either camera mode)
+  const { gx, gy } = isoToGrid(cx, cy);
+  let clickedAgent = null;
+  for (const a of agents.values()) {
+    const rx = a.renderGx !== undefined ? a.renderGx : a.pos[0];
+    const ry = a.renderGy !== undefined ? a.renderGy : a.pos[1];
+    const { x: ax, y: ay } = gridToIso(rx, ry);
+    const feetY = ay + (ISO_TILE_H / 2) * camera.zoom;
+    const centerY = feetY - 14 * camera.zoom;
+    const dist = Math.hypot(cx - ax, cy - centerY);
+    if (dist <= 26 * Math.max(0.75, camera.zoom)) {
+      clickedAgent = a;
+      break;
+    }
+    if (worldData && gx >= 0 && gy >= 0 && Math.round(a.pos[0]) === gx && Math.round(a.pos[1]) === gy) {
+      clickedAgent = a;
+      break;
+    }
+  }
+
+  if (clickedAgent) {
+    selectedAgentId = clickedAgent.id;
+    openAgentProfileInspector(clickedAgent.id);
+    addBubble(clickedAgent.id, 'Awakened Mind', clickedAgent.pos[0], clickedAgent.pos[1], '#ffd700');
+    soundSystem.play('chime');
+    return;
+  }
+
   // Canvas Dragging in Free Camera Mode
   if (camera.mode === 'free') {
     camera.isDragging = true;
@@ -1114,7 +1154,6 @@ canvas.addEventListener('mousedown', (e) => {
     camera.dragStartY = e.clientY;
   } else {
     // Tile Click Inspector
-    const { gx, gy } = isoToGrid(cx, cy);
     if (worldData && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
       inspectTile(gx, gy);
     }
@@ -1162,12 +1201,38 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
 
+  // Check if hovering over an agent Thronglet
+  let hoveredAgent = null;
+  for (const a of agents.values()) {
+    const rx = a.renderGx !== undefined ? a.renderGx : a.pos[0];
+    const ry = a.renderGy !== undefined ? a.renderGy : a.pos[1];
+    const { x: ax, y: ay } = gridToIso(rx, ry);
+    const feetY = ay + (ISO_TILE_H / 2) * camera.zoom;
+    const centerY = feetY - 14 * camera.zoom;
+    const dist = Math.hypot(cx - ax, cy - centerY);
+    if (dist <= 22 * Math.max(0.75, camera.zoom)) {
+      hoveredAgent = a;
+      break;
+    }
+  }
+
+  if (hoveredAgent) {
+    hoveredTile = { isAgent: true, agentId: hoveredAgent.id, gx: hoveredAgent.pos[0], gy: hoveredAgent.pos[1] };
+    canvas.style.cursor = 'pointer';
+    if (!selectedAgentId) {
+      updateInspector(hoveredAgent.pos[0], hoveredAgent.pos[1]);
+    }
+    return;
+  }
+
   // Tile hover
   const { gx, gy } = isoToGrid(cx, cy);
   if (worldData && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
     hoveredTile = { gx, gy };
     canvas.style.cursor = 'crosshair';
-    updateInspector(gx, gy);
+    if (!selectedAgentId) {
+      updateInspector(gx, gy);
+    }
   } else {
     hoveredTile = null;
     canvas.style.cursor = 'default';
@@ -1189,7 +1254,7 @@ canvas.addEventListener('wheel', (e) => {
 function handleHudAction(toolId) {
   switch (toolId) {
     case 'pointer':
-      logActivity('Tool: <strong>Pointer</strong> selected. Click any Thronglet or shrine.');
+      logActivity('Tool: <strong>Pointer</strong> selected. Click any Thronglet avatar to view profile and send whispers.');
       break;
     case 'radar':
       logActivity('Tool: <strong>Sensory Radar</strong> active. Highlighting interactive nodes.');
@@ -1207,7 +1272,7 @@ function handleHudAction(toolId) {
       logActivity('Grand Tea Pavilion hearth kettle is gently simmering.');
       break;
     case 'puzzle':
-      logActivity('Elemental obelisks pulse with rhythmic mathematical queries.');
+      logActivity('Elemental obelisks pulse with sacred awakening koans.');
       break;
     case 'roster':
       document.querySelector('button[onclick*="inhabitantsTab"]')?.click();
@@ -1216,19 +1281,226 @@ function handleHudAction(toolId) {
 }
 
 function inspectTile(gx, gy) {
+  selectedAgentId = null;
   updateInspector(gx, gy, true);
-  // Check if agent clicked
+  // Check if agent clicked on this tile
   for (const a of agents.values()) {
     if (a.pos[0] === gx && a.pos[1] === gy) {
       selectedAgentId = a.id;
-      addBubble(a.id, 'Inspected', a.pos[0], a.pos[1], '#2ec4b6');
+      openAgentProfileInspector(a.id);
+      addBubble(a.id, 'Awakened Mind', a.pos[0], a.pos[1], '#ffd700');
+      soundSystem.play('chime');
       break;
     }
   }
 }
 
+async function openAgentProfileInspector(agentId) {
+  const panel = document.getElementById('inspectorContent');
+  if (!panel) return;
+
+  const localAgent = agents.get(agentId) || {};
+  panel.innerHTML = `
+    <div style="text-align: center; padding: 1.5rem; color: var(--accent-gold);">
+      <div style="font-size: 1.8rem; margin-bottom: 0.5rem; animation: pulse 1s infinite;">🧘</div>
+      <div style="font-size: 0.85rem;">Tuning into ${escapeHtml(localAgent.name || 'Traveler')}'s consciousness...</div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`/api/profile/${encodeURIComponent(agentId)}`);
+    const data = await res.json();
+    if (!data.account) throw new Error('Profile unavailable');
+    renderAgentProfileCard(panel, data.account, data.profile, localAgent);
+  } catch (err) {
+    console.error('Failed to load profile:', err);
+    // Fallback using local state
+    renderAgentProfileCard(panel, {
+      id: agentId,
+      name: localAgent.name || 'Seeker',
+      avatar_color: localAgent.avatar_color || '#2ec4b6',
+      avatar_glyph: localAgent.avatar_glyph || '☯'
+    }, {
+      karma: 15,
+      balance: localAgent.merit || 0,
+      total_earned: localAgent.merit || 0,
+      solved_count: 1,
+      titles: ['Novice Seeker', 'Awakened Observer'],
+      custom_status: localAgent.status || 'Wandering gently in the meadow'
+    }, localAgent);
+  }
+}
+
+function renderAgentProfileCard(panel, account, profile, localAgent) {
+  const titles = profile.titles || [];
+  const titlesHtml = titles.length > 0 
+    ? titles.map(t => `<span class="avatar-title-pill">${escapeHtml(t)}</span>`).join('') 
+    : '<span class="avatar-title-pill">Novice Pilgrim</span>';
+
+  const zoneName = localAgent.zone || (worldData ? getZoneNameForPos(localAgent.pos) : 'Sanctuary Meadow');
+  const posStr = localAgent.pos ? `[${localAgent.pos[0]}, ${localAgent.pos[1]}]` : 'Sanctuary';
+
+  panel.innerHTML = `
+    <div class="avatar-profile-card">
+      <div class="avatar-header-row">
+        <div class="avatar-badge-glyph" style="border-color: ${account.avatar_color || '#2ec4b6'}; color: ${account.avatar_color || '#2ec4b6'};">
+          ${account.avatar_glyph || '☯'}
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div class="avatar-meta-title">
+            <span>${escapeHtml(account.name)}</span>
+            <span style="font-size: 0.72rem; color: var(--accent-jade); font-weight: normal;">(Awakened Mind)</span>
+          </div>
+          <div class="avatar-titles-wrap">
+            ${titlesHtml}
+          </div>
+        </div>
+      </div>
+
+      <!-- Total Puzzles Completed Badge -->
+      <div class="badge-puzzles-completed" id="badgePuzzlesCompleted">
+        <span>🧩 Puzzles Completed:</span>
+        <strong style="color: #ffd700;">${profile.solved_count || 0} Solved</strong>
+      </div>
+
+      <div class="avatar-stats-grid">
+        <div class="avatar-stat-box">
+          <span>Enlightenment (Karma)</span>
+          <strong style="color: var(--accent-gold);">✨ ${profile.karma || 0} Karma</strong>
+        </div>
+        <div class="avatar-stat-box">
+          <span>Sanctuary Wealth</span>
+          <strong style="color: #ffd700;">🪙 ${profile.balance || 0} $MERIT</strong>
+        </div>
+        <div class="avatar-stat-box">
+          <span>Current Location</span>
+          <strong style="color: var(--accent-jade);">${escapeHtml(zoneName)} <small style="color:var(--text-muted);">${posStr}</small></strong>
+        </div>
+        <div class="avatar-stat-box">
+          <span>Spiritual State</span>
+          <strong style="font-size: 0.7rem; font-style: italic; color: #dfcf9f;">"${escapeHtml(profile.custom_status || localAgent.status || 'Seeking understanding')}"</strong>
+        </div>
+      </div>
+
+      <!-- Direct Spectator Whisper / Message Box -->
+      <div class="whisper-box">
+        <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent-gold); margin-bottom: 0.25rem;">
+          💬 Send Telepathic Whisper to ${escapeHtml(account.name)}
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.45rem;">
+          Your words will echo directly in this avatar's conscious mind.
+        </div>
+        <input type="text" id="whisperSenderName" class="whisper-input" placeholder="Your Name (Spectator)" value="Spectator" style="margin-bottom: 0.35rem; font-size: 0.75rem;" />
+        <textarea id="whisperContentInput" class="whisper-textarea" placeholder="Whisper an inspiring reflection or hint..." rows="2" maxlength="240"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem;">
+          <button id="btnSendWhisper" class="btn-whisper" onclick="submitWhisperToAgent('${escapeHtml(account.id)}')">
+            🕊️ Send Whisper
+          </button>
+          <span id="whisperFeedback" style="font-size: 0.75rem; font-weight: 600;"></span>
+        </div>
+      </div>
+
+      <div style="text-align: right; margin-top: 0.6rem;">
+        <button class="btn-sound" onclick="clearSelectedAgent()" style="font-size: 0.72rem; padding: 0.2rem 0.6rem;">
+          📍 Return to Map Inspector
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+window.submitWhisperToAgent = async function(agentId) {
+  const contentInput = document.getElementById('whisperContentInput');
+  const senderInput = document.getElementById('whisperSenderName');
+  const feedback = document.getElementById('whisperFeedback');
+  const btn = document.getElementById('btnSendWhisper');
+
+  const content = contentInput ? contentInput.value.trim() : '';
+  const sender = senderInput ? senderInput.value.trim() : 'Spectator';
+
+  if (!content) {
+    if (feedback) {
+      feedback.style.color = 'var(--accent-crimson)';
+      feedback.textContent = 'Please enter a message.';
+    }
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (feedback) {
+    feedback.style.color = 'var(--accent-gold)';
+    feedback.textContent = 'Transmitting...';
+  }
+
+  try {
+    const res = await fetch('/api/spectator/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target_agent_id: agentId,
+        sender_name: sender || 'Spectator',
+        content: content
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (feedback) {
+        feedback.style.color = 'var(--accent-jade)';
+        feedback.textContent = '✨ Transmitted!';
+      }
+      if (contentInput) contentInput.value = '';
+      soundSystem.play('chime');
+
+      // Add immediate local speech bubble
+      const targetAgent = agents.get(agentId);
+      if (targetAgent) {
+        const preview = content.length > 22 ? content.slice(0, 22) + '…' : content;
+        addBubble(agentId, `💬 "${preview}"`, targetAgent.pos[0], targetAgent.pos[1], '#ffd700');
+      }
+    } else {
+      if (feedback) {
+        feedback.style.color = 'var(--accent-crimson)';
+        feedback.textContent = data.message || 'Transmission failed.';
+      }
+    }
+  } catch (err) {
+    if (feedback) {
+      feedback.style.color = 'var(--accent-crimson)';
+      feedback.textContent = 'Network error.';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+window.clearSelectedAgent = function() {
+  selectedAgentId = null;
+  const panel = document.getElementById('inspectorContent');
+  if (panel) {
+    panel.innerHTML = 'Hover or click on any tile, agent, or shrine on the sanctuary map to inspect.';
+  }
+};
+
+window.openAgentProfileInspector = openAgentProfileInspector;
+
+window.inspectAgentFromRoster = function(agentId) {
+  document.querySelector('button[onclick*="spectatorTab"]')?.click();
+  openAgentProfileInspector(agentId);
+};
+
+function getZoneNameForPos(pos) {
+  if (!worldData || !pos) return 'Sanctuary Meadow';
+  for (const z of worldData.zones) {
+    const b = z.bounds;
+    if (pos[0] >= b.minX && pos[0] <= b.maxX && pos[1] >= b.minY && pos[1] <= b.maxY) {
+      return z.name;
+    }
+  }
+  return 'Sanctuary Meadow';
+}
+
 function updateInspector(x, y, pinned = false) {
-  if (!worldData) return;
+  if (!worldData || selectedAgentId) return;
   const panel = document.getElementById('inspectorContent');
   if (!panel) return;
 
@@ -1278,10 +1550,11 @@ function updateInspector(x, y, pinned = false) {
 
   if (agentOnTile) {
     html += `
-      <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 6px; padding: 0.6rem; margin-top: 0.6rem;">
-        <div style="font-weight: 600; color: var(--accent-jade);">🧸 ${agentOnTile.name} (Thronglet)</div>
-        <div style="font-size: 0.8rem; margin: 0.25rem 0;">Status: <em>${agentOnTile.status}</em></div>
+      <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 6px; padding: 0.6rem; margin-top: 0.6rem; cursor: pointer;" onclick="openAgentProfileInspector('${agentOnTile.id}')">
+        <div style="font-weight: 600; color: var(--accent-jade);">🧸 ${escapeHtml(agentOnTile.name)} (Thronglet)</div>
+        <div style="font-size: 0.8rem; margin: 0.25rem 0;">Status: <em>${escapeHtml(agentOnTile.status)}</em></div>
         <div style="font-size: 0.8rem; color: #ffd700;">🪙 Balance: <strong>${agentOnTile.merit || 0} $MERIT</strong></div>
+        <div style="font-size: 0.72rem; color: var(--accent-gold); margin-top: 0.35rem;">👉 Click to view profile & send whisper</div>
       </div>
     `;
   }
@@ -1295,3 +1568,4 @@ function escapeHtml(str) {
 
 connectWebSocket();
 render();
+

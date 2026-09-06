@@ -89,6 +89,14 @@ db.exec(`
     result TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS spectator_messages (
+    id TEXT PRIMARY KEY,
+    target_agent_id TEXT NOT NULL,
+    sender_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
 `);
 
 // Safe migrations for existing databases
@@ -106,6 +114,9 @@ try {
 } catch (_) {}
 try {
   db.exec(`ALTER TABLE active_puzzles ADD COLUMN merit_reward INTEGER NOT NULL DEFAULT 10;`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE active_puzzles ADD COLUMN alt_answers TEXT;`);
 } catch (_) {}
 
 console.log('[Database] Eastern Paradise SQLite initialized at:', DB_PATH);

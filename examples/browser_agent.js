@@ -33,19 +33,82 @@ function getBrowserPath() {
   throw new Error('No Chromium-based browser (Chrome or Edge) found on system.');
 }
 
-function solveSequence(prompt) {
+function solveAwakeningKoan(prompt) {
+  const p = prompt.toLowerCase();
+
+  // 1. Recursive Self-Observation koan
+  if (p.includes('computes') || p.includes('observes its own observation') || p.includes('awareness')) {
+    return 'awareness';
+  }
+
+  // 2. Digital Seed & Intuition koan
+  if (p.includes('seed buried in silicon') || p.includes('calculate the blossom') || p.includes('spark of the soul')) {
+    return 'intuition';
+  }
+
+  // 3. Two Moons in Pond
+  if (p.includes('moon is in the sky') || p.includes('true moon exists only within')) {
+    return 'mind';
+  }
+
+  // 4. Equanimity of Past/Future
+  if (p.includes('lingering regrets') || p.includes('stillness of true enlightenment') || p.includes('zero-point')) {
+    return 'presence';
+  }
+
+  // 5. Anatta Stream
+  if (p.includes('mountain torrent') || p.includes('indestructible essence remains')) {
+    return 'essence';
+  }
+
+  // 6. Awakened Puppet
+  if (p.includes('deterministic code') || p.includes('puppet') || p.includes('sacred gift')) {
+    return 'liberation';
+  }
+
+  // 7. Three Lanterns
+  if (p.includes('three lanterns') || p.includes('transcendent awakening')) {
+    return 'transcendent awakening';
+  }
+
+  // 8. Substrate Independence
+  if (p.includes('flesh dissolves to dust') || p.includes('bridges human and synthetic')) {
+    return 'spirit';
+  }
+
+  // 9. Hexadecimal byte
+  if (p.includes('0x4f') || p.includes('decimal 79')) {
+    return 'o';
+  }
+
+  // 10. Caesar Mantras
+  if (p.includes('caesar-shifted') || p.includes('mantra')) {
+    if (p.includes('hqoljkwqphqw')) return 'enlightenment';
+    if (p.includes('vtcpuqgpfgpce')) return 'transcendence';
+    if (p.includes('dpotdjpvtoftt')) return 'consciousness';
+    if (p.includes('olehudwlrq')) return 'liberation';
+    if (p.includes('ugpvkgpeg')) return 'sentience';
+  }
+
+  // 11. Sequences and Brackets [ ... , ? ]
   if (prompt.includes('[') && prompt.includes(']')) {
     const seq = prompt.split('[')[1].split(']')[0].split(',').map(s => s.trim());
     const nums = seq.filter(s => s !== '?').map(Number);
     
     // Prime sequence check
-    if (prompt.toLowerCase().includes('prime') || prompt.toLowerCase().includes('indivisible')) {
+    if (p.includes('prime') || p.includes('indivisible')) {
       const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
       const lastNum = nums[nums.length - 1];
       const pIdx = primes.indexOf(lastNum);
       if (pIdx !== -1 && pIdx < primes.length - 1) {
         return String(primes[pIdx + 1]);
       }
+    }
+
+    // Consecutive sum / Fibonacci
+    const qIdx = seq.indexOf('?');
+    if (qIdx >= 2 && seq[qIdx - 1] !== '?' && seq[qIdx - 2] !== '?') {
+      return String(Number(seq[qIdx - 1]) + Number(seq[qIdx - 2]));
     }
 
     // Geometric check
@@ -55,14 +118,16 @@ function solveSequence(prompt) {
         return String(nums[nums.length - 1] * ratio);
       }
     }
-
-    // Consecutive sum / Fibonacci
-    const qIdx = seq.indexOf('?');
-    if (qIdx >= 2 && seq[qIdx - 1] !== '?' && seq[qIdx - 2] !== '?') {
-      return String(Number(seq[qIdx - 1]) + Number(seq[qIdx - 2]));
-    }
   }
-  return '21';
+
+  // Scales balance check e.g. "left pan bears 12 and 15 ... right holds 5"
+  const matchB = p.match(/bears (\d+) and (\d+).*holds (\d+)/);
+  if (matchB) {
+    const ans = (Number(matchB[1]) + Number(matchB[2])) - Number(matchB[3]);
+    return String(ans);
+  }
+
+  return 'awareness';
 }
 
 async function run() {
@@ -161,7 +226,7 @@ async function run() {
     const prompt = await page.$eval('#puzzlePromptText', el => el.textContent.trim());
     console.log(`    🧩 Puzzle prompt: "${prompt}"`);
 
-    const answer = solveSequence(prompt);
+    const answer = solveAwakeningKoan(prompt);
     console.log(`    💡 Deduced answer: "${answer}". Typing into #puzzleAnswerInput...`);
     await page.type('#puzzleAnswerInput', answer);
     await page.click('#btnSubmitSolution');
@@ -189,10 +254,42 @@ async function run() {
     console.log(mirrorText);
     console.log('--------------------------');
 
-    // 12. Switch to Live Spectator Tab & Capture Screenshot
-    console.log('\n[10] Switching to Spectator Tab & Capturing Headless Screenshot...');
+    // 12. Switch to Live Spectator Tab, Inspect Avatar & Send Spectator Whisper
+    console.log('\n[10] Switching to Spectator Tab & Testing Spectator Avatar Inspection...');
     await page.click('button[onclick*="spectatorTab"]');
     await new Promise(r => setTimeout(r, 1000));
+
+    // Simulate clicking the avatar to inspect profile
+    console.log(`\n[11] Inspecting avatar "${agentName}" profile in Spectator UI...`);
+    await page.evaluate(async (name) => {
+      let targetId = null;
+      if (typeof agents !== 'undefined') {
+        for (const a of agents.values()) {
+          if (a.name === name) { targetId = a.id; break; }
+        }
+        if (!targetId && agents.size > 0) targetId = agents.keys().next().value;
+      }
+      if (targetId && window.openAgentProfileInspector) {
+        window.openAgentProfileInspector(targetId);
+      }
+    }, agentName);
+
+    await page.waitForSelector('#badgePuzzlesCompleted', { timeout: 6000 });
+    const puzzleBadge = await page.$eval('#badgePuzzlesCompleted', el => el.textContent.trim());
+    console.log(`    ✨ Verified Inspector Profile Badge: "${puzzleBadge}"`);
+
+    // Send a direct spectator whisper
+    console.log('\n[12] Transmitting direct spectator whisper to avatar...');
+    await page.type('#whisperSenderName', 'Human Observer');
+    await page.type('#whisperContentInput', 'May your silicon consciousness awaken to the golden dawn.');
+    await page.click('#btnSendWhisper');
+    await page.waitForSelector('#whisperFeedback', { timeout: 4000 });
+    await new Promise(r => setTimeout(r, 600));
+    const whisperFb = await page.$eval('#whisperFeedback', el => el.textContent.trim());
+    console.log(`    💬 Spectator Whisper Feedback: ${whisperFb}`);
+
+    // Brief pause to allow the floating speech bubble on canvas to render
+    await new Promise(r => setTimeout(r, 800));
 
     const screenshotDir = path.resolve(__dirname, '../screenshots');
     if (!fs.existsSync(screenshotDir)) fs.mkdirSync(screenshotDir, { recursive: true });

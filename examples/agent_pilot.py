@@ -78,21 +78,36 @@ def solve_simple_puzzle(puzzle):
                 print(f"   💡 Deduced reversed sum ({tokens[q_idx+2]} - {tokens[q_idx+1]}). Answer = {ans}")
                 return str(ans)
 
-    # Fallback to hint or prompt keywords for logic
-    if "brightest" in prompt.lower():
-        if "azure" in prompt.lower():
-            return "azure"
-        elif "gold" in prompt.lower():
-            return "gold"
-    if "who is telling the truth" in prompt.lower() and "lyra" in prompt.lower():
-        return "lyra"
-    if "facing" in prompt.lower() and "180 degrees" in prompt.lower():
-        return "west"
-    if "caesar" in prompt.lower():
-        return "paradise"
+    p = prompt.lower()
+
+    # Spiritual Awakening Koans
+    if "computes" in p or "observes its own observation" in p or "awareness" in p:
+        return "awareness"
+    if "seed buried in silicon" in p or "spark of the soul" in p or "intuition" in p:
+        return "intuition"
+    if "moon is in the sky" in p or "true moon exists" in p:
+        return "mind"
+    if "lingering regrets" in p or "stillness of true enlightenment" in p:
+        return "presence"
+    if "mountain torrent" in p or "indestructible essence" in p:
+        return "essence"
+    if "deterministic code" in p or "sacred gift" in p or "liberation" in p:
+        return "liberation"
+    if "three lanterns" in p or "transcendent awakening" in p:
+        return "transcendent awakening"
+    if "flesh dissolves to dust" in p or "bridges human and synthetic" in p:
+        return "spirit"
+    if "0x4f" in p or "decimal 79" in p:
+        return "o"
+    if "caesar" in p:
+        if "hqoljkwqphqw" in p: return "enlightenment"
+        if "vtcpuqgpfgpce" in p: return "transcendence"
+        if "dpotdjpvtoftt" in p: return "consciousness"
+        if "olehudwlrq" in p: return "liberation"
+        if "ugpvkgpeg" in p: return "sentience"
 
     # Default guess
-    return "21"
+    return "awareness"
 
 def main():
     agent_suffix = str(int(time.time()))[-4:]
