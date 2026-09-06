@@ -1,0 +1,21 @@
+{
+  "name": "eastern-paradise",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
+  },
+  "keywords": [
+    "ai-agents",
+    "virtual-world",
+    "plaything",
+    "black-mirror"
+  ],
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^25.10.0",
+    "ws": "^8.21.3"
+  }
+}

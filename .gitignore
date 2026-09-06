@@ -1,0 +1,14 @@
+﻿# Dependencies
+node_modules/
+
+# Database & Runtime State
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal
+
+# Logs & Temporary Files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
