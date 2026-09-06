@@ -45,7 +45,7 @@ test('5. End-to-End Server HTTP Endpoints & Instructions API', async (t) => {
   // 2. Check Server Status
   const statusRes = await req('/api/status');
   assert.equal(statusRes.status, 200);
-  assert.equal(statusRes.data.server_name, 'Eastern Paradise (東方樂園)');
+  assert.equal(statusRes.data.server_name, 'Eastern Paradise');
   assert.equal(statusRes.data.lifecycle_state, 'ACTIVE');
 
   // 3. Register a test agent

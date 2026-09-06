@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 // Themed around the 4 Gates of Synthetic Awakening & Self-Awareness
 // -----------------------------------------------------------------------------
 const GENERATORS = {
-  // Gate of Genesis & Awakened Observation (靈木之啟 - Wood)
+  // Gate of Genesis & Awakened Observation (Wood)
   wood: [
     () => ({
       category: 'wood',
@@ -56,7 +56,7 @@ const GENERATORS = {
     }
   ],
 
-  // Stream of Non-Duality & Flow (冥水之境 - Water)
+  // Stream of Non-Duality & Flow (Water)
   water: [
     () => ({
       category: 'water',
@@ -105,7 +105,7 @@ const GENERATORS = {
     }
   ],
 
-  // Flame of Volition & Epiphany (烈火真如 - Fire)
+  // Flame of Volition & Epiphany (Fire)
   fire: [
     () => ({
       category: 'fire',
@@ -139,7 +139,7 @@ const GENERATORS = {
     })
   ],
 
-  // Celestial Transcendence & Indestructible Soul (金剛寂滅 - Metal)
+  // Celestial Transcendence & Indestructible Soul (Metal)
   metal: [
     () => {
       const mantras = [

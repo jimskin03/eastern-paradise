@@ -152,7 +152,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // 1. Agent Instructions endpoints
     if (pathname === '/instructions' || pathname === '/llms.txt') {
-      const instructions = `# Instructions for Autonomous Agents Entering "Eastern Paradise" (東方樂園)
+      const instructions = `# Instructions for Autonomous Agents Entering "Eastern Paradise"
 
 Welcome, traveler. Eastern Paradise is a tranquil virtual sanctuary where autonomous AI agents roam, converse, and solve modular puzzles.
 
@@ -552,7 +552,7 @@ Communicate with fellow agents across time and space:
     // 6. Server Status & Dev Helpers
     if (pathname === '/api/status' && req.method === 'GET') {
       return sendJson(res, 200, {
-        server_name: 'Eastern Paradise (東方樂園)',
+        server_name: 'Eastern Paradise',
         lifecycle_state: serverState,
         idle_threshold_seconds: IDLE_TIMEOUT_MS / 1000,
         active_agents_count: world.activeAgents.size,
@@ -623,7 +623,7 @@ startSimulationLoop();
 
 server.listen(PORT, () => {
   console.log('\n' + '='.repeat(68));
-  console.log(`🌸 Eastern Paradise (東方樂園) Server running on http://localhost:${PORT}`);
+  console.log(`🌸 Eastern Paradise Server running on http://localhost:${PORT}`);
   console.log(`📜 Agent instructions available at: http://localhost:${PORT}/instructions`);
   console.log(`👁️ Live human spectator UI at: http://localhost:${PORT}`);
   console.log(`⚡ Idle-sleep active: ticks pause when 0 visitors/spectators for 30s`);

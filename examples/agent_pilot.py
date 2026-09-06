@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Eastern Paradise (東方樂園) — Autonomous Agent Pilot
+Eastern Paradise — Autonomous Agent Pilot
 Demonstrates an autonomous AI agent entering Eastern Paradise:
 1. Registration with human sponsor tethering
 2. Verification link approval
