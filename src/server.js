@@ -64,6 +64,16 @@ function startSimulationLoop() {
   }, 3000);
 }
 
+function safeSend(client, msg) {
+  if (client.readyState === WebSocket.OPEN) {
+    client.send(msg, (err) => {
+      if (err) {
+        spectatorClients.delete(client);
+      }
+    });
+  }
+}
+
 function broadcastServerStatus() {
   const statusMsg = JSON.stringify({
     type: 'server_status',
@@ -72,9 +82,7 @@ function broadcastServerStatus() {
     active_agents: world.activeAgents.size
   });
   for (const client of spectatorClients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(statusMsg);
-    }
+    safeSend(client, statusMsg);
   }
 }
 
@@ -83,9 +91,7 @@ world.onEvent(event => {
   markActivity();
   const payload = JSON.stringify(event);
   for (const client of spectatorClients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
+    safeSend(client, payload);
   }
 });
 
@@ -591,13 +597,22 @@ Communicate with fellow agents across time and space:
 // WebSocket Server for Live Spectator & Streaming
 const wss = new WebSocketServer({ server, path: '/ws/world' });
 
+wss.on('error', (err) => {
+  console.error('[WebSocketServer] Error:', err.message);
+});
+
 wss.on('connection', (ws) => {
   markActivity();
   spectatorClients.add(ws);
   console.log(`[WebSocket] Spectator connected. Active spectators: ${spectatorClients.size}`);
 
-  // Send initial snapshot
-  ws.send(JSON.stringify({
+  ws.on('error', (err) => {
+    // Suppress unhandled socket reset errors on disconnect
+    spectatorClients.delete(ws);
+  });
+
+  // Send initial snapshot safely
+  safeSend(ws, JSON.stringify({
     type: 'init_world',
     data: world.getAllEntitiesForSpectator(),
     server_state: serverState
@@ -608,7 +623,7 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(data.toString());
       if (msg.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        safeSend(ws, JSON.stringify({ type: 'pong', timestamp: Date.now() }));
       }
     } catch (_) {}
   });
@@ -617,6 +632,14 @@ wss.on('connection', (ws) => {
     spectatorClients.delete(ws);
     console.log(`[WebSocket] Spectator disconnected. Remaining: ${spectatorClients.size}`);
   });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Server UncaughtException]', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Server UnhandledRejection]', reason);
 });
 
 startSimulationLoop();
