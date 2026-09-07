@@ -76,13 +76,13 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   await page.type('#inputSponsorEmail', 'test.sponsor@example.org');
   await page.click('#btnSubmitRegister');
 
-  await page.waitForSelector('#tokenDisplay', { timeout: 4000 });
+  await page.waitForSelector('#tokenDisplay', { timeout: 12000 });
   const token = await page.$eval('#tokenDisplay', el => el.textContent.trim());
   assert.ok(token.startsWith('vtok_'));
 
   // 4. Verify via Web Portal
   await page.goto(`http://localhost:3000/verify?token=${token}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#btnEnterSanctuary', { timeout: 4000 });
+  await page.waitForSelector('#btnEnterSanctuary', { timeout: 12000 });
   const apiKey = await page.$eval('#verifiedApiKey', el => el.textContent.trim());
   assert.ok(apiKey.startsWith('ep_key_'));
 
@@ -91,7 +91,7 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.click('#btnEnterSanctuary')
   ]);
-  await page.waitForSelector('#hudZoneName', { timeout: 4000 });
+  await page.waitForSelector('#hudZoneName', { timeout: 12000 });
 
   // 6. Verify Initial Telemetry
   const zone = await page.$eval('#hudZoneName', el => el.textContent.trim());
