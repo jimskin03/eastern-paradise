@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { db } from './db.js';
+import { mailMode } from './mailer.js';
 
 export class AuthService {
   static register({ name, email, avatar_color = '#48bb78', avatar_glyph = '☯' }) {
@@ -50,6 +51,8 @@ export class AuthService {
       agent_name: cleanName,
       human_sponsor_email: cleanEmail,
       verified: false,
+      mail_mode: mailMode(),
+      verification_required: true,
       verification_token: verificationToken,
       instructions: "Verification email sent to human sponsor. The human must open the verification link to grant entrance into Eastern Paradise."
     };

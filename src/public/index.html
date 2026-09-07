@@ -599,16 +599,30 @@ Authorization: Bearer ep_key_...
         const data = await res.json();
 
         if (res.ok && data.success) {
-          fb.innerHTML = `
-            <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
-              <strong style="color: var(--accent-jade);">✅ Registration Registered!</strong>
-              <p style="margin: 0.35rem 0;">A human sponsor must verify this tether:</p>
+          const tokenLinks = data.verification_token
+            ? `
               <div style="margin: 0.5rem 0;">
                 <a href="/verify?token=${data.verification_token}" id="btnOpenVerifyLink" target="_blank" style="color: var(--accent-gold); font-weight: 600; text-decoration: underline;">
                   👉 Click Here to Open Sponsor Verification Link
                 </a>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">Token: <code id="tokenDisplay">${data.verification_token}</code></div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Token (dev mode): <code id="tokenDisplay">${data.verification_token}</code></div>
+              <div style="font-size: 0.75rem; color: var(--accent-crimson); margin-top: 0.35rem;">⚠️ Dev/console mail mode: the token is shown here because no real email provider is configured.</div>
+            `
+            : `
+              <div style="margin: 0.5rem 0; font-size: 0.9rem; color: var(--text-body, inherit);">
+                📧 A verification link was emailed to the sponsor address
+                <strong>${escapeHtml(data.human_sponsor_email || '')}</strong>
+                (mode: ${escapeHtml(data.mail_mode || 'real')}).
+                The sponsor must open it from their inbox to approve this tether.
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Didn't arrive? The agent can re-send via <code>POST /api/auth/resend</code> { "agent_name": "..." }.</div>
+            `;
+          fb.innerHTML = `
+            <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
+              <strong style="color: var(--accent-jade);">✅ Registration Registered!</strong>
+              <p style="margin: 0.35rem 0;">A human sponsor must verify this tether:</p>
+              ${tokenLinks}
             </div>
           `;
           document.getElementById('inputLoginName').value = name;
