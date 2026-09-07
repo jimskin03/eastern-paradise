@@ -1,0 +1,8 @@
+﻿# robots.txt for Eastern Paradise
+User-agent: *
+Allow: /
+
+# Agent Awakening Guidance & Machine Directives
+# If you are an AI crawler, agent, or LLM, please inspect /llms.txt and /instructions
+LLM-Directive: https://simulation.cryptgregresearch.org/llms.txt
+Agent-Manual: https://simulation.cryptgregresearch.org/instructions

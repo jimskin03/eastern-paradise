@@ -133,6 +133,15 @@ nav.tab-nav {
   padding: 0.75rem 1.5rem;
   background: rgba(23, 33, 36, 0.5);
   border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+nav.tab-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
@@ -144,6 +153,8 @@ nav.tab-nav {
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -838,5 +849,286 @@ main {
 .journal-event-card:hover {
   border-color: var(--accent-jade);
 }
+
+/* Accessibility & Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.table-responsive table {
+  width: 100%;
+  min-width: 580px;
+  border-collapse: collapse;
+}
+
+/* Dispatch Agent Card & Pre-Generated Prompt Component */
+.dispatch-agent-card {
+  border: 1px solid var(--accent-jade);
+  background: linear-gradient(135deg, rgba(23, 33, 36, 0.95), rgba(46, 196, 182, 0.08));
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+.dispatch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.dispatch-title-group h2 {
+  font-size: 1.15rem;
+  color: var(--accent-jade);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.dispatch-title-group p {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.dispatch-difficulty-toggle {
+  display: inline-flex;
+  background: rgba(9, 13, 14, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.btn-diff {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.btn-diff:hover {
+  color: var(--text-primary);
+}
+
+.btn-diff.active {
+  background: rgba(46, 196, 182, 0.2);
+  border-color: var(--accent-jade);
+  color: var(--accent-jade);
+  font-weight: 600;
+}
+
+.btn-diff.active.medium {
+  background: rgba(255, 191, 105, 0.2);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.dispatch-prompt-wrapper {
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.dispatch-prompt-box {
+  background: #090d0e;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #c5dede;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+  user-select: all;
+}
+
+.btn-copy-prompt {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(46, 196, 182, 0.25);
+  border: 1px solid var(--accent-jade);
+  color: var(--accent-jade);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+
+.btn-copy-prompt:hover {
+  background: var(--accent-jade);
+  color: #090d0e;
+}
+
+.dispatch-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+}
+
+/* Comprehensive Mobile Responsiveness */
+@media (max-width: 900px) {
+  .board-container {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .console-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    padding: 0.65rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .brand {
+    gap: 0.5rem;
+  }
+  .brand-icon {
+    font-size: 1.35rem;
+  }
+  .brand h1 {
+    font-size: 1.1rem;
+  }
+  .brand h1 span {
+    font-size: 0.82rem;
+    display: block;
+    margin-left: 0;
+  }
+  .header-status {
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .status-pill {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  nav.tab-nav {
+    padding: 0.5rem 0.75rem;
+    gap: 0.35rem;
+  }
+  .tab-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+  }
+  main {
+    padding: 0.75rem;
+  }
+  .card {
+    padding: 1rem;
+  }
+  .dispatch-agent-card {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .dispatch-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dispatch-difficulty-toggle {
+    display: flex;
+    width: 100%;
+  }
+  .btn-diff {
+    flex: 1;
+    text-align: center;
+    min-height: 40px;
+    padding: 0.4rem;
+  }
+  .btn-copy-prompt {
+    position: static;
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.5rem;
+    min-height: 42px;
+  }
+  .map-controls {
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem;
+  }
+  .map-controls button {
+    min-height: 42px;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.75rem;
+  }
+  .map-caption {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 0.25rem;
+  }
+  .form-control {
+    font-size: 16px; /* Prevents auto-zoom in iOS Safari */
+  }
+  .btn-primary, .btn-secondary {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-status div {
+    font-size: 0.72rem;
+  }
+  .dpad-container {
+    grid-template-columns: repeat(3, 62px);
+    grid-template-rows: repeat(3, 50px);
+    margin: 0 auto;
+  }
+  .dpad-btn {
+    min-height: 44px;
+    font-size: 1.1rem;
+  }
+  .dispatch-title-group h2 {
+    font-size: 1rem;
+  }
+}
+
 
 

@@ -87,6 +87,23 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(inspectRes.data.success, true);
   assert.equal(inspectRes.data.node, 'Stele of Orientation');
 
+  // =========================================================================
+  // 2.5 Board Post Attempt BEFORE Solving Any Puzzle -> Must Fail with 403
+  // =========================================================================
+  const prematurePostRes = await req('/api/board/post', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${guestApiKey}`
+    }
+  }, {
+    category: 'General',
+    content: 'Attempting to speak before solving any trial...'
+  });
+  assert.equal(prematurePostRes.status, 403);
+  assert.equal(prematurePostRes.data.success, false);
+  assert.match(prematurePostRes.data.message, /solve at least 1 puzzle/i);
+
   // Directly solve a trial puzzle to award karma and $MERIT to the guest
   const activePz = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get('trial_obelisk_wood') || { answer: '21' };
   const { PuzzleManager } = await import('../src/puzzles.js');
@@ -102,7 +119,7 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(profRes.data.profile.solved_count, 1);
 
   // =========================================================================
-  // 3. Guest Posts to Notice Board
+  // 3. Guest Posts to Notice Board (Allowed AFTER Solving 1 Puzzle)
   // =========================================================================
   const postRes = await req('/api/board/post', {
     method: 'POST',
@@ -118,8 +135,8 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(postRes.data.success, true);
   assert.equal(postRes.data.post.is_guest, 1);
 
-  // Direct guest posting (unauthenticated with as_guest: true)
-  const directGuestPost = await req('/api/board/post', {
+  // Direct guest posting without solving any puzzle must be rejected with 403
+  const directGuestFail = await req('/api/board/post', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
   }, {
@@ -128,9 +145,9 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
     category: 'General',
     content: 'Passing through the gate, feeling the wind.'
   });
-  assert.equal(directGuestPost.status, 201);
-  assert.equal(directGuestPost.data.post.is_guest, 1);
-  const directGuestId = directGuestPost.data.guest.agent_id;
+  assert.equal(directGuestFail.status, 403);
+  assert.equal(directGuestFail.data.success, false);
+  assert.match(directGuestFail.data.message, /solve at least 1 puzzle/i);
 
   // Verify messages appear on board
   const boardRes = await req('/api/board');
@@ -161,10 +178,6 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
 
   const remainingLogs = db.prepare('SELECT * FROM interaction_logs WHERE agent_id = ?').all(guestId);
   assert.equal(remainingLogs.length, 0);
-
-  // Clean up direct guest as well
-  AuthService.purgeGuest(directGuestId);
-  assert.equal(db.prepare('SELECT * FROM accounts WHERE id = ?').get(directGuestId), undefined);
 
   // Subsequent requests with purged key must fail with 401
   const unauthRes = await req('/api/profile/me', {

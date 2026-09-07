@@ -101,7 +101,10 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   const canMoveEast = await page.$eval('#btnMoveEast', el => !el.disabled);
   assert.equal(canMoveEast, true);
   await page.click('#btnMoveEast');
-  await new Promise(r => setTimeout(r, 150));
+  await page.waitForFunction(
+    () => document.getElementById('hudCoords')?.textContent.trim() === '[8, 8]',
+    { timeout: 5000 }
+  );
 
   const coords = await page.$eval('#hudCoords', el => el.textContent.trim());
   assert.equal(coords, '[8, 8]');
