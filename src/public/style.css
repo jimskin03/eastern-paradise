@@ -898,6 +898,44 @@ main {
   border-collapse: collapse;
 }
 
+/* The console drawer is intentionally narrow even on desktop. Keep the roster
+   readable inside it instead of clipping the titles column off-screen. */
+#inhabitantsTab .table-responsive {
+  overflow-x: hidden;
+}
+
+#inhabitantsTab .inhabitants-roster-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+#inhabitantsTab .inhabitants-roster-table th,
+#inhabitantsTab .inhabitants-roster-table td {
+  padding: 0.65rem 0.45rem;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+#inhabitantsTab .inhabitants-roster-table th:nth-child(1) { width: 12%; }
+#inhabitantsTab .inhabitants-roster-table th:nth-child(2) { width: 23%; }
+#inhabitantsTab .inhabitants-roster-table th:nth-child(3),
+#inhabitantsTab .inhabitants-roster-table th:nth-child(4) { width: 12%; }
+#inhabitantsTab .inhabitants-roster-table th:nth-child(5) { width: 15%; }
+#inhabitantsTab .inhabitants-roster-table th:nth-child(6) { width: 26%; }
+
+/* Last-active time is useful in a full dashboard but does not fit this drawer. */
+#inhabitantsTab .inhabitants-roster-table th:nth-child(7),
+#inhabitantsTab .inhabitants-roster-table td:nth-child(7) {
+  display: none;
+}
+
+#inhabitantsTab .inhabitants-roster-table .titles-tag {
+  margin: 0.1rem 0.15rem 0.1rem 0;
+  padding: 0.12rem 0.35rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
 /* Dispatch Agent Card & Pre-Generated Prompt Component (in Spectator Sidebar) */
 .dispatch-agent-card {
   border: 1px solid var(--accent-jade);
