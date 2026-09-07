@@ -162,7 +162,7 @@ nav.tab-nav {
 main {
   flex: 1;
   padding: 1.5rem;
-  max-width: 1400px;
+  max-width: 1900px;
   margin: 0 auto;
   width: 100%;
 }
@@ -178,7 +178,7 @@ main {
 /* Spectator Grid View */
 .spectator-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 1.5rem;
   align-items: start;
 }
@@ -197,6 +197,49 @@ main {
   width: 100%;
   height: auto;
   cursor: crosshair;
+  touch-action: none;
+}
+
+.map-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  background: #102c20;
+  border-top: 1px solid #355442;
+}
+
+.map-caption {
+  color: #d7c78f;
+  font-size: 0.8rem;
+  margin-right: auto;
+}
+
+.map-controls button {
+  border: 1px solid #8d7850;
+  border-radius: 3px;
+  background: #dfcf9f;
+  color: #3d2b1f;
+  padding: 0.45rem 0.65rem;
+  min-width: 34px;
+  font: 600 0.78rem inherit;
+  cursor: pointer;
+}
+
+.map-controls button:hover { background: #eeddb0; }
+.map-controls button:focus-visible, #worldCanvas:focus-visible { outline: 2px solid #ffe79c; outline-offset: -3px; }
+.expanded-map .spectator-layout { grid-template-columns: minmax(0, 1fr); }
+.expanded-map .spectator-panel { display: none; }
+
+@media (max-width: 1100px) {
+  .spectator-layout { grid-template-columns: minmax(0, 1fr); }
+  .spectator-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
+
+@media (pointer: coarse) {
+  .map-controls button { min-height: 44px; min-width: 44px; }
 }
 
 .spectator-panel {

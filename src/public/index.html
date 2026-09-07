@@ -41,7 +41,16 @@
     <div id="spectatorTab" class="tab-pane active">
       <div class="spectator-layout">
         <div class="canvas-container">
-          <canvas id="worldCanvas" width="960" height="720"></canvas>
+          <canvas id="worldCanvas" width="1440" height="960" tabindex="0" aria-label="Eastern Paradise sanctuary map. Use the controls below to explore or find A.Ilicia."></canvas>
+          <div class="map-controls" role="group" aria-label="Sanctuary camera">
+            <span class="map-caption">Explore Eastern Paradise</span>
+            <button type="button" onclick="setSanctuaryCamera('overview')">Overview</button>
+            <button type="button" onclick="setSanctuaryCamera('free')">Pan &amp; zoom</button>
+            <button type="button" onclick="zoomSanctuary(1.25)" aria-label="Zoom in">+</button>
+            <button type="button" onclick="zoomSanctuary(0.8)" aria-label="Zoom out">−</button>
+            <button type="button" onclick="focusAilicia()">Find A.Ilicia</button>
+            <button id="btnExpandMap" type="button" onclick="toggleSanctuaryExpanded()" aria-pressed="false">Expand map</button>
+          </div>
         </div>
 
         <div class="spectator-panel">
@@ -600,6 +609,8 @@ Authorization: Bearer ep_key_...
     </div>
   </main>
 
+  <script src="/scenery.js"></script>
+  <script src="/landscape.js"></script>
   <script src="/spectator.js"></script>
   <script>
     function switchTab(tabId, btn) {
@@ -680,7 +691,7 @@ Authorization: Bearer ep_key_...
           const contributors = chime.contributors || [];
           const contribNames = contributors.length > 0
             ? contributors.map(c => escapeHtml(c.name)).join(', ')
-            : 'Jun, Lin, and Mei';
+            : 'No contributions yet';
 
           if (chimeDetails) {
             chimeDetails.innerHTML = `

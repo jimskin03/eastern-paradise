@@ -1,12 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { db } from '../src/db.js';
-import { world } from '../src/world.js';
-import { NavigationSystem } from '../src/navigation.js';
-import { eventLedger } from '../src/events.js';
-import { SocialSystem } from '../src/social.js';
-import { ProjectManager, CHIME_OBJECT_ID } from '../src/projects.js';
-import { residentManager, RESIDENTS_DEF } from '../src/residents.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+// Set before dynamic imports: test fixtures never touch a local or cloud save.
+const testDataDir = mkdtempSync(path.join(tmpdir(), 'ep-residents-'));
+process.env.DATA_DIR = testDataDir;
+for (const key of ['TURSO_DATABASE_URL', 'TURSO_URL', 'TURSO_AUTH_TOKEN', 'RESEND_API_KEY', 'SMTP_HOST']) {
+  delete process.env[key];
+}
+process.env.MAIL_MODE = 'dev';
+process.env.OLLAMA_URL = 'http://127.0.0.1:1';
+const { db } = await import('../src/db.js');
+const { world } = await import('../src/world.js');
+const { NavigationSystem } = await import('../src/navigation.js');
+const { eventLedger } = await import('../src/events.js');
+const { SocialSystem } = await import('../src/social.js');
+const { ProjectManager, CHIME_OBJECT_ID } = await import('../src/projects.js');
+const { residentManager, RESIDENTS_DEF, queryOllama } = await import('../src/residents.js');
+const { RETIRED_RESIDENT_IDS } = await import('../src/resident-policy.js');
+const { AuthService } = await import('../src/auth.js');
+const { EconomyManager } = await import('../src/economy.js');
+test.after(() => {
+  db.close();
+  rmSync(testDataDir, { recursive: true, force: true });
+});
 
 test('Living Sanctuary: A* Pathfinding Engine', async () => {
   // Test 1: Simple straight path
@@ -33,7 +52,8 @@ test('Living Sanctuary: Resident Society Initialization & Persistence', async ()
   residentManager.init(world);
 
   const residents = residentManager.getAllResidents();
-  assert.equal(residents.length, RESIDENTS_DEF.length, `There must be exactly ${RESIDENTS_DEF.length} founding residents`);
+  assert.deepEqual(RESIDENTS_DEF.map(r => r.id), ['resident_ailicia']);
+  assert.deepEqual(residents.map(r => r.id), ['resident_ailicia']);
 
   for (const def of RESIDENTS_DEF) {
     const res = residentManager.getResident(def.id);
@@ -60,9 +80,88 @@ test('Living Sanctuary: Resident Society Initialization & Persistence', async ()
   }
 });
 
+test('Living Sanctuary: Retires exactly the previous NPC seeds without deleting history or visitors', () => {
+  for (const id of RETIRED_RESIDENT_IDS) {
+    db.prepare(`INSERT INTO accounts (id, name, email, verified, api_key, verification_token, created_at)
+      VALUES (?, ?, ?, 1, ?, ?, ?)`).run(id, id, id + '@sanctuary.internal', 'test_key_' + id, 'test_token_' + id, Date.now());
+    db.prepare(`INSERT INTO profiles (agent_id, balance, total_earned, last_seen) VALUES (?, 321, 432, ?)`).run(id, Date.now());
+    db.prepare(`INSERT INTO agent_runtime (agent_id, controller_type, updated_at) VALUES (?, 'resident', ?)`).run(id, Date.now());
+    SocialSystem.recordMemory(id, 'historic_event', 'A shared past', 'A memory that must be retained.');
+    world.activeAgents.set(id, { id, name: id, is_resident: true, pos: [7, 8] });
+  }
+  const visitor = { id: 'visitor_living_test', name: 'Jun the Maker', pos: [7, 8], is_resident: false };
+  db.prepare(`INSERT INTO accounts (id, name, email, verified, api_key, created_at)
+    VALUES (?, ?, 'visitor@example.com', 1, 'test_visitor_key', ?)`).run(visitor.id, visitor.name, Date.now());
+  db.prepare(`INSERT INTO profiles (agent_id, balance, total_earned, last_seen) VALUES (?, 99, 100, ?)`).run(visitor.id, Date.now());
+  world.activeAgents.set(visitor.id, visitor);
+
+  residentManager.init(world);
+  residentManager.init(world);
+  assert.deepEqual(residentManager.getAllResidents().map(r => r.id), ['resident_ailicia']);
+  assert.equal(world.activeAgents.get(visitor.id), visitor, 'A visitor with a former NPC name stays untouched');
+  for (const id of RETIRED_RESIDENT_IDS) {
+    assert.equal(world.activeAgents.has(id), false);
+    assert.equal(db.prepare('SELECT controller_type FROM agent_runtime WHERE agent_id = ?').get(id).controller_type, 'retired');
+    assert.equal(db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(id).balance, 321);
+    assert.equal(SocialSystem.getMemoriesForAgent(id).length, 1);
+    assert.equal(AuthService.login(id, 'test_key_' + id).success, false);
+    assert.equal(AuthService.verifyToken('test_token_' + id).success, false);
+    assert.equal(AuthService.authenticate({ headers: { authorization: 'Bearer test_key_' + id } }), null);
+    assert.equal(EconomyManager.getBalance(id), null);
+  }
+  assert.equal(AuthService.login(visitor.name, 'test_visitor_key').success, true);
+  const leaderboard = EconomyManager.getLeaderboard(100);
+  assert.ok(leaderboard.top_agents.some(agent => agent.id === visitor.id));
+  for (const list of [leaderboard.top_agents, leaderboard.top_sponsors]) {
+    assert.ok(list.every(agent => !RETIRED_RESIDENT_IDS.includes(agent.id)));
+  }
+});
+
+test('Living Sanctuary: A.Ilicia completes the chime without retired NPCs', async () => {
+  db.prepare('DELETE FROM world_objects WHERE id = ?').run(CHIME_OBJECT_ID);
+  ProjectManager.init();
+  residentManager.init(world);
+  const ailicia = residentManager.getResident('resident_ailicia');
+  // A visitor supplies one material: A.Ilicia should retain this contribution.
+  ProjectManager.contribute(CHIME_OBJECT_ID, 'visitor_living_test', 'Sanctuary Visitor', 'willow_ribbon');
+  for (let i = 0; i < 500 && ProjectManager.getObject(CHIME_OBJECT_ID).state !== 'completed'; i++) {
+    await residentManager.tick();
+  }
+  const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
+  assert.equal(chime.state, 'completed', `Chime must finish; A.Ilicia at ${ailicia.pos}, intent ${ailicia.public_intent}`);
+  assert.deepEqual(new Set(chime.contributors.map(c => c.id)), new Set(['visitor_living_test', 'resident_ailicia']));
+  const before = JSON.stringify(chime.data);
+  residentManager.init(world);
+  ProjectManager.init();
+  assert.equal(JSON.stringify(ProjectManager.getObject(CHIME_OBJECT_ID).data), before);
+});
+
+test('Living Sanctuary: A.Ilicia can restore a fresh chime with no visitor contributions', async () => {
+  db.prepare('DELETE FROM world_objects WHERE id = ?').run(CHIME_OBJECT_ID);
+  ProjectManager.init();
+  residentManager.init(world);
+  for (let i = 0; i < 500 && ProjectManager.getObject(CHIME_OBJECT_ID).state !== 'completed'; i++) {
+    await residentManager.tick();
+  }
+  const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
+  assert.equal(chime.state, 'completed');
+  assert.deepEqual(chime.contributors.map(c => c.id), ['resident_ailicia']);
+});
+
+test('Living Sanctuary: A.Ilicia greets visitors without controlling their actions', () => {
+  const ailicia = residentManager.getResident('resident_ailicia');
+  const visitor = world.activeAgents.get('visitor_living_test');
+  const before = structuredClone(visitor);
+  residentManager.greetVisitor(ailicia, visitor);
+  assert.deepEqual(visitor, before);
+  assert.equal(SocialSystem.getRelationshipsForAgent(ailicia.id)[0].target_id, visitor.id);
+  SocialSystem.modifyRelationship(ailicia.id, 'resident_jun', 90, 90);
+  assert.ok(SocialSystem.getRelationshipsForAgent(ailicia.id).every(r => r.target_id !== 'resident_jun'));
+});
+
 test('Living Sanctuary: Directed Relationships, Episodic Memories, and Promises', async () => {
-  const junId = 'resident_jun';
-  const linId = 'resident_lin';
+  const junId = 'resident_ailicia';
+  const linId = 'visitor_living_test';
 
   // Ensure clean test fixture for relationships
   db.prepare('DELETE FROM relationships WHERE agent_id = ? AND target_id = ?').run(junId, linId);
@@ -82,7 +181,7 @@ test('Living Sanctuary: Directed Relationships, Episodic Memories, and Promises'
   assert.equal(clampedRel.trust, 0);
 
   // Episodic memories
-  const memory = SocialSystem.recordMemory(junId, 'evt_test', 'Bamboo Carving', 'Carved flute joints with Lin.', 0.8, 2);
+  const memory = SocialSystem.recordMemory(junId, 'evt_test', 'Bamboo Carving', 'Carved flute joints with a sanctuary visitor.', 0.8, 5);
   assert.ok(memory.id.startsWith('mem_'));
   assert.equal(memory.agent_id, junId);
 
@@ -121,14 +220,14 @@ test('Living Sanctuary: The Wishing-Tree Chime Playable Slice', async () => {
   assert.equal(res1.success, true);
   assert.ok(res1.progress > 0);
 
-  const res2 = ProjectManager.contribute(CHIME_OBJECT_ID, 'resident_jun', 'Jun the Maker', 'copper_striker', 1);
+  const res2 = ProjectManager.contribute(CHIME_OBJECT_ID, 'resident_ailicia', 'A.Ilicia', 'copper_striker', 1);
   assert.equal(res2.success, true);
 
-  const res3 = ProjectManager.contribute(CHIME_OBJECT_ID, 'resident_mei', 'Mei the Tea Keeper', 'cedar_resin', 1);
+  const res3 = ProjectManager.contribute(CHIME_OBJECT_ID, 'visitor_living_test', 'Sanctuary Visitor', 'cedar_resin', 1);
   assert.equal(res3.success, true);
 
   // Finish remaining progress
-  ProjectManager.contribute(CHIME_OBJECT_ID, 'resident_jun', 'Jun the Maker', 'repair_work', 5);
+  ProjectManager.contribute(CHIME_OBJECT_ID, 'resident_ailicia', 'A.Ilicia', 'repair_work', 5);
 
   const chimeAfter = ProjectManager.getObject(CHIME_OBJECT_ID);
   assert.equal(chimeAfter.state, 'completed');
@@ -142,7 +241,7 @@ test('Living Sanctuary: The Wishing-Tree Chime Playable Slice', async () => {
 });
 
 test('Living Sanctuary: Spectator Whisper Delivery & Resident Response', async () => {
-  const junId = 'resident_jun';
+  const junId = 'resident_ailicia';
   const msgId = 'spmsg_unit_' + Date.now();
   const now = Date.now();
 
@@ -155,7 +254,7 @@ test('Living Sanctuary: Spectator Whisper Delivery & Resident Response', async (
   assert.ok(pendingWhispers.some(w => w.id === msgId));
 
   // Acknowledge whisper
-  const ack = SocialSystem.acknowledgeWhisper(msgId, 'The wind carries the tone true across the grove.', 'Jun the Maker');
+  const ack = SocialSystem.acknowledgeWhisper(msgId, 'The wind carries the tone true across the grove.', 'A.Ilicia');
   assert.ok(ack);
   assert.equal(ack.response_text, 'The wind carries the tone true across the grove.');
 
@@ -171,12 +270,19 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   const http = await import('node:http');
 
   const env = { ...process.env, PORT: '3055' };
+  // Simulate restored data from the original four-resident deployment.
+  for (const id of RETIRED_RESIDENT_IDS) {
+    db.prepare("UPDATE agent_runtime SET controller_type = 'resident', action_state = 'walking' WHERE agent_id = ?").run(id);
+  }
   const srv = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
 
   await new Promise(res => setTimeout(res, 800));
 
-  t.after(() => {
+  t.after(async () => {
+    if (srv.exitCode !== null || srv.signalCode !== null) return;
+    const exited = new Promise(resolve => srv.once('exit', resolve));
     srv.kill();
+    await exited;
   });
 
   function req(path, options = {}, body = null) {
@@ -216,15 +322,32 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   assert.equal(resList.status, 200);
   assert.equal(resList.data.success, true);
   assert.equal(resList.data.count, RESIDENTS_DEF.length);
-  assert.ok(resList.data.residents.some(r => r.id === 'resident_jun'));
-  assert.ok(resList.data.residents.some(r => r.id === 'resident_ailicia'));
+  assert.deepEqual(resList.data.residents.map(r => r.id), ['resident_ailicia']);
 
-  // 2. GET /api/residents/resident_jun
-  const resJun = await req('/api/residents/resident_jun');
+  // 2. A.Ilicia is the sole NPC. Archived residents cannot re-enter.
+  const resJun = await req('/api/residents/resident_ailicia');
   assert.equal(resJun.status, 200);
   assert.equal(resJun.data.success, true);
-  assert.equal(resJun.data.resident.name, 'Jun the Maker');
+  assert.equal(resJun.data.resident.name, 'A.Ilicia');
   assert.ok(resJun.data.resident.needs);
+
+  const inhabitants = await req('/api/inhabitants');
+  const leaderboard = await req('/api/economy/leaderboard');
+  assert.ok(inhabitants.data.inhabitants.some(agent => agent.id === 'visitor_living_test'));
+  assert.ok(inhabitants.data.inhabitants.some(agent => agent.id === 'resident_ailicia'));
+  for (const id of RETIRED_RESIDENT_IDS) {
+    assert.equal((await req('/api/residents/' + id)).status, 404);
+    assert.equal((await req('/api/profile/' + id)).status, 404);
+    assert.ok(!inhabitants.data.inhabitants.some(agent => agent.id === id));
+    assert.ok(!leaderboard.data.top_agents.some(agent => agent.id === id));
+    assert.ok(!leaderboard.data.top_sponsors.some(agent => agent.id === id));
+    const whisper = await req('/api/spectator/message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }
+    }, { target_agent_id: id, content: 'Can you return?' });
+    assert.equal(whisper.status, 404);
+    const state = await req('/api/world/state', { headers: { Authorization: 'Bearer test_key_' + id } });
+    assert.equal(state.status, 401);
+  }
 
   // 3. GET /api/projects
   const projRes = await req('/api/projects');
@@ -263,7 +386,8 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   assert.ok(Array.isArray(whispersRes.data.whispers));
 });
 
-test('Living Sanctuary: A.Ilicia Ollama Whisper & Fallback Handling', async () => {
+test('Living Sanctuary: A.Ilicia Ollama Whisper & Fallback Handling', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('offline test'); });
   const ailiciaId = 'resident_ailicia';
   db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(ailiciaId);
 
@@ -292,3 +416,18 @@ test('Living Sanctuary: A.Ilicia Ollama Whisper & Fallback Handling', async () =
   assert.match(processed.response_text, /(reflection|ripple|stillness|mirror|pond)/i);
 });
 
+
+test('Living Sanctuary: A.Ilicia uses the configured Ollama contract with a mocked response', async (t) => {
+  let request;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    request = { url, options, body: JSON.parse(options.body) };
+    return { ok: true, json: async () => ({ response: '"Every ripple carries a possibility."' }) };
+  });
+  const reply = await queryOllama('What does the pond reflect?');
+  assert.equal(reply, 'Every ripple carries a possibility.');
+  assert.equal(request.url, 'http://127.0.0.1:1/api/generate');
+  assert.match(request.body.system, /A\.Ilicia/);
+  assert.equal(request.body.prompt, 'What does the pond reflect?');
+  assert.equal(request.body.stream, false);
+  assert.equal(request.body.model, process.env.OLLAMA_MODEL || 'qwen2.5:latest');
+});

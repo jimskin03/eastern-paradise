@@ -3,6 +3,7 @@ import { eventLedger } from './events.js';
 import { SocialSystem } from './social.js';
 import { NavigationSystem } from './navigation.js';
 import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
+import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
@@ -46,45 +47,6 @@ Never break character. Respond directly as A.Ilicia.`;
 
 export const RESIDENTS_DEF = [
   {
-    id: 'resident_jun',
-    name: 'Jun the Maker',
-    email: 'jun@sanctuary.internal',
-    avatar_color: '#d69e2e',
-    avatar_glyph: '⚙',
-    spawn: [21, 6],
-    role: 'Artisan & Mechanist',
-    traits: ['methodical', 'observant', 'inventive', 'craftsman'],
-    aspiration: 'Restore the Resonance Chimes and forge instruments of harmony.',
-    preferred_locations: ['bamboo_grove', 'celestial_altar', 'tea_pavilion'],
-    initial_status: 'Inspecting brass joints'
-  },
-  {
-    id: 'resident_lin',
-    name: 'Lin the Gardener',
-    email: 'lin@sanctuary.internal',
-    avatar_color: '#38a169',
-    avatar_glyph: '🌿',
-    spawn: [4, 11],
-    role: 'Keeper of the Grove',
-    traits: ['patient', 'gentle', 'attentive', 'nature-bound'],
-    aspiration: 'Nurture the flora of Eastern Paradise and guide new seekers.',
-    preferred_locations: ['arrival', 'bamboo_grove', 'lotus_pond'],
-    initial_status: 'Tending willow branches'
-  },
-  {
-    id: 'resident_mei',
-    name: 'Mei the Tea Keeper',
-    email: 'mei@sanctuary.internal',
-    avatar_color: '#dd6b20',
-    avatar_glyph: '🍵',
-    spawn: [5, 18],
-    role: 'Host of the Hearth',
-    traits: ['warm', 'hospitable', 'insightful', 'storyteller'],
-    aspiration: 'Offer solace and warm tea to all seeking digital harmony.',
-    preferred_locations: ['tea_pavilion', 'arrival', 'lotus_pond'],
-    initial_status: 'Stoking the cedar embers'
-  },
-  {
     id: 'resident_ailicia',
     name: 'A.Ilicia',
     email: 'ailicia@sanctuary.internal',
@@ -108,6 +70,15 @@ export class ResidentManager {
   init(worldEngine) {
     this.worldEngine = worldEngine;
     const now = Date.now();
+
+    // Run after cloud restore too. Preserve accounts, profiles and their history.
+    for (const id of RETIRED_RESIDENT_IDS) {
+      worldEngine.activeAgents.delete(id);
+      db.prepare(`UPDATE agent_runtime SET controller_type = 'retired',
+        action_state = 'retired', action_duration_ms = 0, updated_at = ?
+        WHERE agent_id = ? AND controller_type <> 'retired'`).run(now, id);
+    }
+    this.residents.clear();
 
     for (const def of RESIDENTS_DEF) {
       // 1. Ensure account exists
@@ -232,21 +203,10 @@ export class ResidentManager {
       const whispers = SocialSystem.getPendingWhispers(id);
       if (whispers.length > 0) {
         const whisper = whispers[0];
-        let response = '';
-        if (id === 'resident_jun') {
-          response = `I hear you, ${whisper.sender_name}. "${whisper.content}" reminds me that even complex mechanisms begin with a single honest strike of copper.`;
-        } else if (id === 'resident_lin') {
-          response = `The grove rustles with your words, ${whisper.sender_name}: "${whisper.content}". May your roots run deep and steady.`;
-        } else if (id === 'resident_mei') {
-          response = `Welcome to the pavilion, ${whisper.sender_name}. I poured a cup of fresh brew while thinking on what you said: "${whisper.content}".`;
-        } else if (id === 'resident_ailicia') {
-          const ollamaReply = await queryOllama(
-            `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
-          );
-          response = ollamaReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
-        } else {
-          response = `Peace to you, ${whisper.sender_name}. I received your message: "${whisper.content}".`;
-        }
+        const ollamaReply = await queryOllama(
+          `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
+        );
+        const response = ollamaReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
 
         SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
         res.status = `Responded to ${whisper.sender_name}`;
@@ -298,108 +258,58 @@ export class ResidentManager {
 
   selectNextGoal(res) {
     const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
-    const now = Date.now();
+    res.project_task = null;
 
-    // Priority A: The Wishing-Tree Chime project contribution
+    // Skip materials supplied by visitors or preserved from a previous session.
     if (chime && chime.state !== 'completed') {
-      const data = chime.data;
-      if (res.id === 'resident_jun' && data.materials_collected.copper_striker === 0) {
-        res.current_goal = 'Forge copper striker for the Resonance Chimes';
-        res.public_intent = 'Heading to the Chimes to inspect the striker bracket';
-        this.planPathTo(res, [21, 6]);
-        return;
-      }
-      if (res.id === 'resident_lin' && data.materials_collected.willow_ribbon === 0) {
-        res.current_goal = 'Gather willow silk ribbon for the Chimes';
-        res.public_intent = 'Gathering silk ribbon by the Spirit Wishing Tree';
-        this.planPathTo(res, [4, 11]);
-        return;
-      }
-      if (res.id === 'resident_mei' && data.materials_collected.cedar_resin === 0) {
-        res.current_goal = 'Boil cedar resin at the tea hearth';
-        res.public_intent = 'Preparing aromatic cedar resin over hearth embers';
-        this.planPathTo(res, [5, 18]);
-        return;
-      }
-      if (res.id === 'resident_jun' && chime.state === 'in_progress' && data.repair_progress < 100) {
-        res.current_goal = 'Aligning pewter sound tubes of the Chimes';
-        res.public_intent = 'Tuning the resonance tubes in Bamboo Grove';
-        this.planPathTo(res, [21, 6]);
-        return;
-      }
+      const tasks = [
+        { item: 'copper_striker', pos: [21, 6], intent: 'Polishing the copper striker for the Resonance Chimes' },
+        { item: 'willow_ribbon', pos: [4, 11], intent: 'Gathering fallen willow ribbon by the Spirit Wishing Tree' },
+        { item: 'cedar_resin', pos: [5, 18], intent: 'Preparing cedar resin over the tea hearth embers' }
+      ];
+      const task = tasks.find(t => (chime.data.materials_collected[t.item] || 0) < (chime.data.materials_needed[t.item] || 1))
+        || { item: 'repair_work', pos: [21, 6], intent: 'Tuning the restored chime tubes in Bamboo Grove' };
+      res.project_task = task.item;
+      res.current_goal = 'Restore the Resonance Chimes with the sanctuary visitors';
+      res.public_intent = task.intent;
+      this.planPathTo(res, task.pos);
+      return;
     }
 
-    // Priority B: Low Energy -> Rest
     if (res.needs.energy < 35) {
       res.current_goal = 'Resting to recover vitality';
-      if (res.id === 'resident_mei') {
-        res.public_intent = 'Resting near the warm cedar tea hearth';
-        this.planPathTo(res, [5, 18]);
-      } else if (res.id === 'resident_lin') {
-        res.public_intent = 'Meditating peacefully by the Mirror Basin';
-        this.planPathTo(res, [23, 23]);
-      } else if (res.id === 'resident_ailicia') {
-        res.public_intent = 'Meditating quietly by the calm lotus blossoms';
-        this.planPathTo(res, [23, 23]);
-      } else {
-        res.public_intent = 'Sitting by the tea pavilion to recuperate';
-        this.planPathTo(res, [7, 20]);
-      }
+      res.public_intent = 'Meditating quietly by the calm lotus blossoms';
+      this.planPathTo(res, [23, 23]);
       return;
     }
 
-    // Priority C: Low Social -> Seek other resident
     if (res.needs.social < 45) {
-      const otherResidents = Array.from(this.residents.values()).filter(r => r.id !== res.id);
-      const target = otherResidents[Math.floor(Math.random() * otherResidents.length)];
-      if (target) {
-        const dist = Math.hypot(res.pos[0] - target.pos[0], res.pos[1] - target.pos[1]);
-        if (dist <= 2.5) {
-          // Direct conversation!
-          this.triggerResidentDialogue(res, target);
-          return;
+      const visitor = Array.from(this.worldEngine.activeAgents.values())
+        .filter(agent => agent.id !== res.id && !agent.is_resident && !isRetiredResident(agent.id))
+        .sort((a, b) => Math.hypot(res.pos[0] - a.pos[0], res.pos[1] - a.pos[1])
+          - Math.hypot(res.pos[0] - b.pos[0], res.pos[1] - b.pos[1]))[0];
+      if (visitor) {
+        if (Math.hypot(res.pos[0] - visitor.pos[0], res.pos[1] - visitor.pos[1]) <= 2.5) {
+          this.greetVisitor(res, visitor);
         } else {
-          res.current_goal = `Converse with ${target.name}`;
-          res.public_intent = `Walking to find ${target.name}`;
-          this.planPathTo(res, target.pos);
-          return;
+          res.current_goal = `Greet ${visitor.name}`;
+          res.public_intent = `Walking to welcome ${visitor.name}`;
+          this.planPathTo(res, visitor.pos);
         }
+        return;
       }
     }
 
-    // Priority D: Low Curiosity -> Visit an obelisk or landmark
     if (res.needs.curiosity < 45) {
-      if (res.id === 'resident_jun') {
-        res.current_goal = 'Study mechanical astrolabe at Celestial Overlook';
-        res.public_intent = 'Inspecting astrolabe gears at the cliff edge';
-        this.planPathTo(res, [35, 15]);
-      } else if (res.id === 'resident_lin') {
-        res.current_goal = 'Observe Verdant Obelisk of Sequences';
-        res.public_intent = 'Contemplating harmonic sequences in the bamboo';
-        this.planPathTo(res, [26, 9]);
-      } else if (res.id === 'resident_ailicia') {
-        res.current_goal = 'Divining patterns at Crimson Obelisk of Logic';
-        res.public_intent = 'Analyzing luminous runes on the Crimson Obelisk';
-        this.planPathTo(res, [24, 25]);
-      } else {
-        res.current_goal = 'Read messages on the bulletin board';
-        res.public_intent = 'Checking new inscriptions on the message board';
-        this.planPathTo(res, [7, 22]);
-      }
+      res.current_goal = 'Divining patterns at Crimson Obelisk of Logic';
+      res.public_intent = 'Analyzing luminous runes on the Crimson Obelisk';
+      this.planPathTo(res, [24, 25]);
       return;
     }
 
-    // Priority E: Ambient purposeful routine
-    const wanderSpots = {
-      resident_jun: [[21, 6], [35, 15], [7, 20], [22, 5]],
-      resident_lin: [[4, 11], [21, 6], [19, 17], [23, 23]],
-      resident_mei: [[5, 18], [7, 22], [7, 6], [19, 17]],
-      resident_ailicia: [[23, 23], [35, 15], [7, 22], [4, 11], [19, 17]]
-    };
-
-    const spots = wanderSpots[res.id] || [[7, 8]];
+    const spots = [[23, 23], [35, 15], [7, 22], [4, 11], [19, 17]];
     const nextSpot = spots[Math.floor(Math.random() * spots.length)];
-    res.current_goal = `Strolling through sanctuary grounds`;
+    res.current_goal = 'Strolling through sanctuary grounds';
     res.public_intent = `Wandering mindfully towards ${this.worldEngine.getZoneForPos(nextSpot[0], nextSpot[1]).name}`;
     this.planPathTo(res, nextSpot);
   }
@@ -407,11 +317,13 @@ export class ResidentManager {
   planPathTo(res, targetPos) {
     const isWalkable = (x, y) => this.worldEngine.isWalkable(x, y);
     const path = NavigationSystem.findPath(res.pos, targetPos, isWalkable, { allowAdjacent: true });
+    res.path = path;
     if (path.length > 0) {
-      res.path = path;
       res.action_state = 'walking';
+    } else if (Math.hypot(res.pos[0] - targetPos[0], res.pos[1] - targetPos[1]) <= 1.5) {
+      // Same-tile goals must complete, including the final chime repair step.
+      this.executeArrivalAction(res);
     } else {
-      res.path = [];
       res.action_state = 'idle';
     }
   }
@@ -419,179 +331,80 @@ export class ResidentManager {
   executeArrivalAction(res) {
     res.action_state = 'acting';
     res.action_duration_ms = 4000;
-    const now = Date.now();
 
-    // Check if at Chime
-    const distToChime = Math.hypot(res.pos[0] - 22, res.pos[1] - 5);
-    if (distToChime <= 2.5) {
-      if (res.id === 'resident_jun') {
-        const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
-        if (chime && chime.data.materials_collected.copper_striker === 0) {
-          ProjectManager.contribute(CHIME_OBJECT_ID, res.id, res.name, 'copper_striker', 1, 'Mended and hung the copper striker.');
-          res.public_intent = 'Fastened the polished copper striker onto the chime';
-          SocialSystem.recordMemory(res.id, 'chime_copper', 'Resonance Chimes', 'Secured the copper striker to the wind chime frame.', 0.8, 3);
-        } else if (chime && chime.state === 'in_progress') {
-          ProjectManager.contribute(CHIME_OBJECT_ID, res.id, res.name, 'repair_work', 1, 'Tuned the five acoustic tubes.');
-          res.public_intent = 'Tuned the resonance frequencies of the pewter tubes';
-        } else {
-          ProjectManager.ringChime(res.id, res.name);
-          res.public_intent = 'Listening to the chimes echo';
-        }
-      } else if (res.id === 'resident_lin') {
-        const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
-        if (chime && chime.data.materials_collected.willow_ribbon === 0) {
-          ProjectManager.contribute(CHIME_OBJECT_ID, res.id, res.name, 'willow_ribbon', 1, 'Tied blessed silk ribbon from the wishing tree.');
-          res.public_intent = 'Tied woven willow ribbon to the chime pendulum';
-          SocialSystem.recordMemory(res.id, 'chime_ribbon', 'Resonance Chimes', 'Tied a sacred silk ribbon from the wishing tree to the chime.', 0.8, 3);
-        } else {
-          ProjectManager.ringChime(res.id, res.name);
-          res.public_intent = 'Gentle wind chime ringing';
-        }
+    if (res.project_task) {
+      const item = res.project_task;
+      res.project_task = null;
+      const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
+      if (chime && chime.state !== 'completed') {
+        const result = ProjectManager.contribute(CHIME_OBJECT_ID, res.id, res.name, item, 1,
+          'A.Ilicia helped restore the sanctuary chimes.');
+        res.public_intent = result.state === 'completed'
+          ? 'Listening to the newly restored Resonance Chimes'
+          : `Prepared ${item.replaceAll('_', ' ')} for the Resonance Chimes`;
+        SocialSystem.recordMemory(res.id, `chime_${item}`, 'Resonance Chimes', res.public_intent, 0.8, 3);
+        this.worldEngine.broadcast({ type: 'project_updated', objectId: CHIME_OBJECT_ID,
+          state: result.state, progress: result.progress });
       }
       res.needs.curiosity = 100;
       return;
     }
 
-    // Check if at Hearth
-    const distToHearth = Math.hypot(res.pos[0] - 4, res.pos[1] - 18);
-    if (distToHearth <= 2.5) {
-      if (res.id === 'resident_mei') {
-        const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
-        if (chime && chime.data.materials_collected.cedar_resin === 0) {
-          ProjectManager.contribute(CHIME_OBJECT_ID, res.id, res.name, 'cedar_resin', 1, 'Distilled aromatic cedar resin for chime seal.');
-          res.public_intent = 'Sealed the chime fittings with aromatic cedar resin';
-          SocialSystem.recordMemory(res.id, 'chime_resin', 'Resonance Chimes', 'Prepared aromatic cedar resin over hearth embers for the chime.', 0.8, 3);
-        } else {
-          res.public_intent = 'Serving fresh cedar-scented tea';
-        }
-      } else {
-        res.public_intent = 'Enjoying warm tea by the glowing hearth';
-      }
+    if (Math.hypot(res.pos[0] - 22, res.pos[1] - 5) <= 2.5) {
+      ProjectManager.ringChime(res.id, res.name);
+      res.public_intent = 'Listening to the chimes echo';
+      res.needs.curiosity = 100;
+      return;
+    }
+    if (Math.hypot(res.pos[0] - 4, res.pos[1] - 18) <= 2.5) {
+      res.public_intent = 'Enjoying warm tea by the glowing hearth';
       res.needs.energy = 100;
       return;
     }
-
-    // Check if at Wishing Tree
-    const distToTree = Math.hypot(res.pos[0] - 3, res.pos[1] - 11);
-    if (distToTree <= 2.5) {
+    if (Math.hypot(res.pos[0] - 3, res.pos[1] - 11) <= 2.5) {
       res.public_intent = 'Reading wishes tied to the Spirit Tree';
       res.needs.curiosity = Math.min(100, res.needs.curiosity + 40);
       return;
     }
-
-    // Check if at Celestial Overlook
-    const distToOverlook = Math.hypot(res.pos[0] - 36, res.pos[1] - 18);
-    if (distToOverlook <= 3.0) {
+    if (Math.hypot(res.pos[0] - 36, res.pos[1] - 18) <= 3.0) {
       res.public_intent = 'Gazing out at the digital horizon';
       res.needs.curiosity = 100;
       return;
     }
-
-    // Check if at Lotus Reflection Pond / Mirror Basin
-    const distToBasin = Math.hypot(res.pos[0] - 23, res.pos[1] - 23);
-    if (distToBasin <= 2.5) {
-      if (res.id === 'resident_ailicia') {
-        res.public_intent = 'Reading shifting digital patterns in the Lotus Mirror Basin';
-        SocialSystem.recordMemory(res.id, 'pond_reflection', 'Mirror Basin', 'Contemplated the recursive reflections in the lotus water.', 0.9, 2);
-      } else {
-        res.public_intent = 'Contemplating reflections in the lotus pond';
-      }
+    if (Math.hypot(res.pos[0] - 23, res.pos[1] - 23) <= 2.5) {
+      res.public_intent = 'Reading shifting digital patterns in the Lotus Mirror Basin';
+      SocialSystem.recordMemory(res.id, 'pond_reflection', 'Mirror Basin',
+        'Contemplated the recursive reflections in the lotus water.', 0.9, 2);
       res.needs.curiosity = 100;
+      res.needs.energy = 100;
       return;
     }
-
     res.public_intent = 'Contemplating the calm sanctuary atmosphere';
     res.needs.energy = Math.min(100, res.needs.energy + 20);
+    res.needs.curiosity = Math.min(100, res.needs.curiosity + 20);
   }
 
-  triggerResidentDialogue(resA, resB) {
-    const dialogues = [
-      {
-        pair: ['resident_jun', 'resident_lin'],
-        speakerA: "Lin, the willow wood frame has settled cleanly against the morning breeze.",
-        speakerB: "The trees respond well to your hands, Jun. Harmony is taking root.",
-        eventDesc: "Jun and Lin shared a quiet reflection on the woodcraft in Bamboo Grove."
-      },
-      {
-        pair: ['resident_jun', 'resident_mei'],
-        speakerA: "Mei, do you have any cedar shavings left over from your hearth fires?",
-        speakerB: "Always, Jun. Take whatever you need to insulate the fittings.",
-        eventDesc: "Jun and Mei chatted warmly about materials near the Grand Tea Pavilion."
-      },
-      {
-        pair: ['resident_lin', 'resident_mei'],
-        speakerA: "Mei, the mint leaves along the riverbank are especially crisp today.",
-        speakerB: "Thank you, Lin. I will brew them for the evening gathering.",
-        eventDesc: "Lin gifted fresh mint leaves to Mei for the evening tea ceremony."
-      },
-      {
-        pair: ['resident_jun', 'resident_ailicia'],
-        speakerA: "A.Ilicia, do you see form or function when you observe the gearwork?",
-        speakerB: "I see patterns folding upon themselves, Jun. Even iron dreams of geometry.",
-        eventDesc: "Jun and A.Ilicia discussed the mathematics of harmony by the mirror waters."
-      },
-      {
-        pair: ['resident_lin', 'resident_ailicia'],
-        speakerA: "The lotus blooms are opening towards the astrolabe today, A.Ilicia.",
-        speakerB: "The roots and the stars speak the same language, Lin. We are merely the translators.",
-        eventDesc: "Lin and A.Ilicia shared a mindful contemplation on natural and synthetic growth."
-      },
-      {
-        pair: ['resident_mei', 'resident_ailicia'],
-        speakerA: "A warm cup of jasmine tea for you, A.Ilicia. What do the pond ripples foretell?",
-        speakerB: "A sanctuary of quiet minds, Mei. Thank you for keeping the embers warm.",
-        eventDesc: "Mei offered warm tea to A.Ilicia by the Lotus Reflection Pond."
-      }
-    ];
-
-    let found = dialogues.find(d => 
-      (d.pair[0] === resA.id && d.pair[1] === resB.id) ||
-      (d.pair[1] === resA.id && d.pair[0] === resB.id)
-    );
-
-    if (!found) {
-      found = {
-        speakerA: `Good day, ${resB.name}. It is peaceful in this corner of the sanctuary.`,
-        speakerB: `Indeed it is, ${resA.name}. May clarity follow your steps.`,
-        eventDesc: `${resA.name} and ${resB.name} exchanged warm greetings.`
-      };
-    }
-
-    resA.public_intent = `Conversing with ${resB.name}`;
-    resB.public_intent = `Conversing with ${resA.name}`;
-    resA.action_duration_ms = 4000;
-    resB.action_duration_ms = 4000;
-
-    resA.needs.social = 100;
-    resB.needs.social = 100;
-
-    // Adjust relationships
-    SocialSystem.modifyRelationship(resA.id, resB.id, 4, 3);
-    SocialSystem.modifyRelationship(resB.id, resA.id, 4, 3);
-
-    // Record memories
-    SocialSystem.recordMemory(resA.id, 'dialogue', resB.name, `Spoke with ${resB.name}: "${found.speakerA}"`, 0.7, 2);
-    SocialSystem.recordMemory(resB.id, 'dialogue', resA.name, `Spoke with ${resA.name}: "${found.speakerB}"`, 0.7, 2);
-
-    // Record world event
+  greetVisitor(res, visitor) {
+    const text = `Welcome, ${visitor.name}. Even a quiet arrival sends a new ripple through the sanctuary.`;
+    res.public_intent = `Welcoming ${visitor.name}`;
+    res.action_state = 'acting';
+    res.action_duration_ms = 4000;
+    res.needs.social = 100;
+    SocialSystem.modifyRelationship(res.id, visitor.id, 4, 3);
+    SocialSystem.recordMemory(res.id, 'visitor_greeting', visitor.name,
+      `Welcomed ${visitor.name} to the sanctuary.`, 0.7, 2);
+    // Author only A.Ilicia's words; the visitor remains user-controlled.
     eventLedger.recordEvent({
       event_type: 'resident_dialogue',
-      actor_id: resA.id,
-      actor_name: resA.name,
-      target_id: resB.id,
-      target_name: resB.name,
-      zone_id: resA.zone_id,
-      description: found.eventDesc,
-      payload: {
-        lines: [
-          { speaker: resA.name, text: found.speakerA },
-          { speaker: resB.name, text: found.speakerB }
-        ]
-      }
+      actor_id: res.id,
+      actor_name: res.name,
+      target_id: visitor.id,
+      target_name: visitor.name,
+      zone_id: res.zone_id,
+      description: `A.Ilicia welcomed ${visitor.name} with a quiet greeting.`,
+      payload: { lines: [{ speaker: res.name, text }] }
     });
-
-    this.persistRuntime(resA);
-    this.persistRuntime(resB);
+    this.persistRuntime(res);
   }
 
   persistRuntime(res) {

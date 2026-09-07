@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import crypto from 'node:crypto';
+import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
 
 export class EconomyManager {
   /**
@@ -76,6 +77,9 @@ export class EconomyManager {
    * P2P transfer of $MERIT between two agents (or board tipping).
    */
   static transfer(senderAgentId, recipientAgentId, amount, memo = 'Agent transfer') {
+    if (isRetiredResident(senderAgentId) || isRetiredResident(recipientAgentId)) {
+      return { success: false, message: 'Agent is no longer a current inhabitant.' };
+    }
     const amt = parseInt(amount, 10);
     if (isNaN(amt) || amt <= 0) {
       return { success: false, message: 'Transfer amount must be a positive integer.' };
@@ -189,6 +193,7 @@ export class EconomyManager {
    * Retrieves full wallet details, sponsor dividends, and transaction ledger.
    */
   static getBalance(agentId) {
+    if (isRetiredResident(agentId)) return null;
     const account = db.prepare('SELECT id, name, email, avatar_color, avatar_glyph, sponsor_balance, verified FROM accounts WHERE id = ?').get(agentId);
     if (!account) return null;
 
@@ -223,6 +228,7 @@ export class EconomyManager {
       SELECT a.id, a.name, a.avatar_color, a.avatar_glyph, p.balance, p.total_earned, p.karma, p.solved_count
       FROM accounts a
       JOIN profiles p ON a.id = p.agent_id
+      WHERE a.id NOT IN (${RETIRED_RESIDENT_SQL})
       ORDER BY p.total_earned DESC, p.balance DESC
       LIMIT ?
     `).all(limit);
@@ -231,11 +237,13 @@ export class EconomyManager {
       SELECT a.id, a.name, a.sponsor_balance, p.total_earned as agent_total_earned
       FROM accounts a
       JOIN profiles p ON a.id = p.agent_id
+      WHERE a.id NOT IN (${RETIRED_RESIDENT_SQL})
       ORDER BY a.sponsor_balance DESC
       LIMIT ?
     `).all(limit);
 
-    const totalCirculation = db.prepare('SELECT SUM(balance) as total_merit, SUM(total_earned) as total_minted FROM profiles').get();
+    const totalCirculation = db.prepare(`SELECT SUM(balance) as total_merit, SUM(total_earned) as total_minted
+      FROM profiles WHERE agent_id NOT IN (${RETIRED_RESIDENT_SQL})`).get();
 
     return {
       currency_name: '$MERIT',

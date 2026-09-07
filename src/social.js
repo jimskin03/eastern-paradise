@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from './db.js';
 import { eventLedger } from './events.js';
+import { RETIRED_RESIDENT_SQL } from './resident-policy.js';
 
 export class SocialSystem {
   /**
@@ -57,7 +58,7 @@ export class SocialSystem {
       SELECT r.*, a.name AS target_name, a.avatar_glyph, a.avatar_color
       FROM relationships r
       JOIN accounts a ON a.id = r.target_id
-      WHERE r.agent_id = ?
+      WHERE r.agent_id = ? AND r.target_id NOT IN (${RETIRED_RESIDENT_SQL})
       ORDER BY r.familiarity DESC
     `).all(agentId);
   }

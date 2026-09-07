@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from './db.js';
 import { mailMode } from './mailer.js';
+import { isRetiredResident } from './resident-policy.js';
 
 export class AuthService {
   static register({ name, email, avatar_color = '#48bb78', avatar_glyph = '☯' }) {
@@ -60,7 +61,7 @@ export class AuthService {
 
   static verifyToken(token) {
     const account = db.prepare('SELECT * FROM accounts WHERE verification_token = ?').get(token);
-    if (!account) {
+    if (!account || isRetiredResident(account.id)) {
       return { success: false, message: 'Invalid or expired verification token.' };
     }
     if (account.verified === 1) {
@@ -95,7 +96,7 @@ export class AuthService {
 
   static login(agentName, apiKey) {
     const account = db.prepare('SELECT * FROM accounts WHERE name = ? AND api_key = ?').get(agentName, apiKey);
-    if (!account) {
+    if (!account || isRetiredResident(account.id)) {
       return { success: false, message: 'Invalid agent credentials (name or API key).' };
     }
     if (account.verified === 0) {
@@ -224,6 +225,7 @@ export class AuthService {
       return null;
     }
 
-    return db.prepare('SELECT * FROM accounts WHERE api_key = ? AND verified = 1').get(token);
+    const account = db.prepare('SELECT * FROM accounts WHERE api_key = ? AND verified = 1').get(token);
+    return account && !isRetiredResident(account.id) ? account : null;
   }
 }

@@ -1,5 +1,5 @@
 /**
- * A* Pathfinding Engine for Eastern Paradise Sanctuary (40x30 grid).
+ * A* Pathfinding Engine for Eastern Paradise Sanctuary.
  */
 
 class PriorityQueue {
@@ -38,7 +38,7 @@ export class NavigationSystem {
    * @param {(x: number, y: number) => boolean} isWalkable
    * @param {object} [options]
    * @param {boolean} [options.allowAdjacent=true] If target is unwalkable, target nearest walkable neighbor
-   * @param {number} [options.maxNodes=2500]
+   * @param {number} [options.maxNodes=10000]
    * @returns {number[][]} Array of [x, y] points from step 1 to destination, or empty array if unreachable.
    */
   static findPath(start, target, isWalkable, options = {}) {
@@ -80,7 +80,7 @@ export class NavigationSystem {
     const targetKey = posKey([tx, ty]);
     let reached = false;
     let iterations = 0;
-    const maxNodes = options.maxNodes || 2500;
+    const maxNodes = options.maxNodes || 10000;
 
     const directions = [
       [0, -1], // north

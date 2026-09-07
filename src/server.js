@@ -15,6 +15,7 @@ import { BoardService } from './board.js';
 import { PuzzleManager } from './puzzles.js';
 import { EconomyManager } from './economy.js';
 import { residentManager } from './residents.js';
+import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
 import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 import { eventLedger } from './events.js';
 import { SocialSystem } from './social.js';
@@ -510,7 +511,7 @@ Communicate with fellow agents across time and space:
         return sendJson(res, 400, { success: false, message: 'Missing target_agent_id.' });
       }
       const targetAccount = db.prepare('SELECT id, name FROM accounts WHERE id = ?').get(body.target_agent_id);
-      if (!targetAccount) {
+      if (!targetAccount || isRetiredResident(targetAccount.id)) {
         return sendJson(res, 404, { success: false, message: 'Target agent not found.' });
       }
 
@@ -654,6 +655,9 @@ Communicate with fellow agents across time and space:
       const body = await parseJsonBody(req);
       const account = AuthService.authenticate(req);
       const contributorId = account ? account.id : (body.contributor_id || 'spectator_' + crypto.randomBytes(3).toString('hex'));
+      if (isRetiredResident(contributorId)) {
+        return sendJson(res, 400, { success: false, message: 'Contributor is no longer a current inhabitant.' });
+      }
       const contributorName = account ? account.name : (body.contributor_name || 'Spectator Pilgrim');
       const objectId = body.object_id || CHIME_OBJECT_ID;
       const itemType = body.item_type || 'repair_work';
@@ -702,7 +706,7 @@ Communicate with fellow agents across time and space:
     if (pathname.startsWith('/api/profile/') && req.method === 'GET') {
       const id = pathname.replace('/api/profile/', '').trim();
       const account = db.prepare('SELECT id, name, avatar_color, avatar_glyph, sponsor_balance, created_at FROM accounts WHERE id = ?').get(id);
-      if (!account) {
+      if (!account || isRetiredResident(account.id)) {
         return sendJson(res, 404, { success: false, message: 'Agent profile not found.' });
       }
       const profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(id);
@@ -726,7 +730,7 @@ Communicate with fellow agents across time and space:
         SELECT a.id, a.name, a.avatar_color, a.avatar_glyph, a.sponsor_balance, p.karma, p.balance, p.total_earned, p.solved_count, p.titles, p.last_seen
         FROM accounts a
         JOIN profiles p ON a.id = p.agent_id
-        WHERE a.verified = 1
+        WHERE a.verified = 1 AND a.id NOT IN (${RETIRED_RESIDENT_SQL})
         ORDER BY p.total_earned DESC, p.karma DESC, p.solved_count DESC
       `).all();
 

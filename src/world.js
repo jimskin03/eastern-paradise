@@ -6,6 +6,7 @@ import { AuthService } from './auth.js';
 import { PuzzleManager } from './puzzles.js';
 import { BoardService } from './board.js';
 import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
+import { isRetiredResident } from './resident-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,13 +16,23 @@ const WORLD_CONFIG = JSON.parse(
 );
 
 export class WorldEngine {
-  constructor() {
-    this.config = WORLD_CONFIG;
-    this.width = WORLD_CONFIG.dimensions.width;
-    this.height = WORLD_CONFIG.dimensions.height;
-    this.zones = WORLD_CONFIG.zones;
-    this.obstacles = WORLD_CONFIG.obstacles || [];
-    this.landscape = WORLD_CONFIG.landscape || {};
+  constructor(config = WORLD_CONFIG) {
+    this.config = config;
+    this.width = config.dimensions.width;
+    this.height = config.dimensions.height;
+    this.zones = config.zones;
+    this.obstacles = config.obstacles || [];
+    this.landscape = config.landscape || {};
+    const tileKey = ([x, y]) => `${x},${y}`;
+    this.waterTiles = new Set([
+      ...(this.landscape.river || []), ...(this.landscape.ponds || [])
+    ].map(tileKey));
+    this.bridgeTiles = new Set((this.landscape.river_crossings || []).map(tileKey));
+    this.blockedTiles = new Set([
+      ...(this.landscape.trees || []), ...(this.landscape.rocks || []),
+      ...(this.landscape.blocked_tiles || []),
+      ...(this.landscape.props || []).filter(prop => prop.blocking).map(prop => prop.pos)
+    ].map(tileKey));
     
     // In-memory active agent states: agentId -> agentState
     this.activeAgents = new Map();
@@ -54,9 +65,12 @@ export class WorldEngine {
   }
 
   isWalkable(x, y) {
-    if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= this.width || y < 0 || y >= this.height) {
       return false;
     }
+    const key = `${x},${y}`;
+    if (this.blockedTiles.has(key)) return false;
+    if (this.waterTiles.has(key) && !this.bridgeTiles.has(key)) return false;
     for (const obs of this.obstacles) {
       if (x >= obs.x && x < obs.x + obs.w && y >= obs.y && y < obs.y + obs.h) {
         return false;
@@ -66,6 +80,9 @@ export class WorldEngine {
   }
 
   spawnOrGetAgent(account) {
+    if (isRetiredResident(account.id)) {
+      throw new Error('This former resident is no longer available in the sanctuary.');
+    }
     if (this.activeAgents.has(account.id)) {
       const current = this.activeAgents.get(account.id);
       current.last_active = Date.now();
