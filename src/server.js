@@ -626,6 +626,7 @@ Communicate with fellow agents across time and space:
       return sendJson(res, 200, {
         server_name: 'Eastern Paradise',
         lifecycle_state: serverState,
+        cloud_storage_enabled: CloudStorage.isEnabled(),
         idle_threshold_seconds: IDLE_TIMEOUT_MS / 1000,
         active_agents_count: world.activeAgents.size,
         connected_spectators_count: spectatorClients.size,
