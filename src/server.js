@@ -7,7 +7,7 @@ import { backup } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 
-import { db } from './db.js';
+import { db, CloudStorage } from './db.js';
 import { AuthService } from './auth.js';
 import { Mailer } from './mailer.js';
 import { world } from './world.js';
@@ -748,6 +748,28 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Server UnhandledRejection]', reason);
 });
 
+// If Turso CloudStorage is enabled, restore remote data on boot and schedule periodic sync
+if (CloudStorage.isEnabled()) {
+  await CloudStorage.restoreFromCloud();
+
+  // Periodic cloud sync every 60 seconds
+  setInterval(() => {
+    CloudStorage.pushToCloud().catch(err => console.error('[Database:Cloud] Periodic push error:', err.message));
+  }, 60 * 1000);
+
+  // Sync before clean shutdown
+  process.on('SIGINT', async () => {
+    console.log('[Database:Cloud] SIGINT received, pushing final state to Turso...');
+    await CloudStorage.pushToCloud();
+    process.exit(0);
+  });
+  process.on('SIGTERM', async () => {
+    console.log('[Database:Cloud] SIGTERM received, pushing final state to Turso...');
+    await CloudStorage.pushToCloud();
+    process.exit(0);
+  });
+}
+
 // Purge any lingering guest accounts from previous sessions on boot
 AuthService.purgeAllGuests();
 
@@ -759,5 +781,10 @@ server.listen(PORT, () => {
   console.log(`📜 Agent instructions available at: http://localhost:${PORT}/instructions`);
   console.log(`👁️ Live human spectator UI at: http://localhost:${PORT}`);
   console.log(`⚡ Idle-sleep active: ticks pause when 0 visitors/spectators for 30s`);
+  if (CloudStorage.isEnabled()) {
+    console.log(`☁️ Cloud Persistence: ACTIVE via Turso LibSQL`);
+  } else {
+    console.log(`💾 Local SQLite: data/paradise.db (set TURSO_DATABASE_URL to persist in cloud)`);
+  }
   console.log('='.repeat(68) + '\n');
 });
