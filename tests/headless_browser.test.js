@@ -59,12 +59,15 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   });
 
   const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 720 });
   page.on('dialog', async d => await d.dismiss());
 
-  // 1. Visit Portal
+  // 1. Visit Portal & Verify Desktop 16:9 Aspect Ratio
   await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
   const title = await page.title();
   assert.match(title, /Eastern Paradise/);
+  const desktopContainerStyle = await page.$eval('#mapContainer', el => window.getComputedStyle(el).aspectRatio);
+  assert.match(desktopContainerStyle, /16\s*\/\s*9|1\.77/);
 
   // 2. Open Agent Browser Console
   await page.click('#tabBtnConsole');
@@ -141,9 +144,9 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   const isCollapsedAgain = await mobilePage.$eval('#questHud', el => el.classList.contains('collapsed'));
   assert.equal(isCollapsedAgain, true);
 
-  // Verify canvas container aspect-ratio on mobile (3 / 2)
+  // Verify canvas container aspect-ratio on mobile (6 / 19 or 19 / 6)
   const containerStyle = await mobilePage.$eval('#mapContainer', el => window.getComputedStyle(el).aspectRatio);
-  assert.match(containerStyle, /3\s*\/\s*2|1\.5/);
+  assert.match(containerStyle, /6\s*\/\s*19|19\s*\/\s*6/);
 
   await mobilePage.close();
 

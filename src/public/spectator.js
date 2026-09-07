@@ -87,7 +87,9 @@ class SoundSystem {
   updateUI() {
     const btn = document.getElementById('btnToggleMute');
     if (btn) {
-      btn.innerHTML = this.muted ? '🔇 Sound Off' : '🔊 Sound On';
+      const icon = this.muted ? '🔇' : '🔊';
+      const label = this.muted ? 'Sound Off' : 'Sound On';
+      btn.innerHTML = `${icon} <span class="btn-text-full">${label}</span>`;
       btn.className = this.muted ? 'btn-sound muted' : 'btn-sound';
     }
   }
@@ -292,6 +294,7 @@ function handleServerMessage(msg) {
           isMoving: false
         });
       }
+      updateCanvasDimensions();
       fitTerrariumCamera();
       updateCounts();
 
@@ -928,173 +931,35 @@ function drawObeliskMonument(ctx, x, y, node) {
 // -----------------------------------------------------------------------------
 
 function drawParchmentHUD(ctx, time) {
-  // 1. Top-Left Vertical Totem Toolbar
-  const tbX = 14;
-  const tbY = 14;
-  const tbW = 76;
-  const tbH = 224;
-
-  // Parchment Background & Wood Border
-  ctx.fillStyle = '#dfcf9f';
-  ctx.fillRect(tbX, tbY, tbW, tbH);
-  ctx.strokeStyle = '#3d2b1f';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(tbX, tbY, tbW, tbH);
-
-  // Inner parchment bevel
-  ctx.strokeStyle = '#c8b682';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(tbX + 3, tbY + 3, tbW - 6, tbH - 6);
-
-  // Top Totem Emblem (Carved symbol)
-  ctx.fillStyle = '#9e2a2b';
-  ctx.beginPath();
-  ctx.arc(tbX + tbW / 2, tbY + 16, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#dfcf9f';
-  ctx.font = 'bold 11px serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('☯', tbX + tbW / 2, tbY + 20);
-
-  // 8 Tool Icon Buttons (2 columns x 4 rows)
-  const icons = [
-    { id: 'pointer', icon: '👆', name: 'Select' },
-    { id: 'radar', icon: '👁️', name: 'Sense' },
-    { id: 'stats', icon: '🧱', name: 'Karma' },
-    { id: 'shrine', icon: '🥚', name: 'Altar' },
-    { id: 'wish', icon: '🪶', name: 'Wish' },
-    { id: 'tea', icon: '🍵', name: 'Hearth' },
-    { id: 'puzzle', icon: '⚙️', name: 'Trials' },
-    { id: 'roster', icon: '👥', name: 'Seekers' }
-  ];
-
+  // Cleared in modern DOM HUD overhaul to prevent canvas/DOM overlap
   hudHotspots.icons = [];
-  const startY = tbY + 34;
-  const colW = 32;
-  const rowH = 44;
-
-  for (let i = 0; i < icons.length; i++) {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const btnX = tbX + 6 + col * (colW + 4);
-    const btnY = startY + row * rowH;
-
-    hudHotspots.icons.push({
-      ...icons[i],
-      x: btnX,
-      y: btnY,
-      w: colW,
-      h: rowH - 6
-    });
-
-    const isHover = hoveredTile?.isHudIcon && hoveredTile.iconId === icons[i].id;
-    const isActive = activeHudTool === icons[i].id;
-
-    // Button frame
-    ctx.fillStyle = isActive ? '#bfa874' : (isHover ? '#eae0bc' : '#d2c08e');
-    ctx.fillRect(btnX, btnY, colW, rowH - 6);
-    ctx.strokeStyle = '#3d2b1f';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(btnX, btnY, colW, rowH - 6);
-
-    // Icon
-    ctx.font = '16px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(icons[i].icon, btnX + colW / 2, btnY + 20);
-
-    // Label
-    ctx.font = 'bold 8px sans-serif';
-    ctx.fillStyle = '#2b1e14';
-    ctx.fillText(icons[i].name, btnX + colW / 2, btnY + 32);
-  }
-
-  // 2. Top-Right Population Counter (Parchment Badge with 3 Thronglets)
-  const cpX = canvas.width - 124;
-  const cpY = 14;
-  const cpW = 110;
-  const cpH = 56;
-  hudHotspots.counter = { x: cpX, y: cpY, w: cpW, h: cpH };
-
-  ctx.fillStyle = '#dfcf9f';
-  ctx.fillRect(cpX, cpY, cpW, cpH);
-  ctx.strokeStyle = '#3d2b1f';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(cpX, cpY, cpW, cpH);
-
-  // 3 Tiny Thronglet Mini-emblems at top of badge
-  ctx.font = '10px serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('🧸 🧸 🧸', cpX + cpW / 2, cpY + 16);
-
-  // Population Counter (Shows live agents count in sanctuary)
-  const countDisplay = String(agents.size);
-  ctx.font = 'bold 22px monospace';
-  ctx.fillStyle = '#1e293b';
-  ctx.fillText(countDisplay, cpX + cpW / 2, cpY + 44);
-
-  // 3. Camera Mode Toggle Button
-  const camX = cpX - 148;
-  const camY = 14;
-  const camW = 140;
-  const camH = 28;
-  hudHotspots.cameraBtn = { x: camX, y: camY, w: camW, h: camH };
-
-  ctx.fillStyle = '#dfcf9f';
-  ctx.fillRect(camX, camY, camW, camH);
-  ctx.strokeStyle = '#3d2b1f';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(camX, camY, camW, camH);
-
-  ctx.font = 'bold 10px sans-serif';
-  ctx.fillStyle = '#3d2b1f';
-  ctx.textAlign = 'center';
-  const camText = camera.mode === 'overview' ? '📷 Terrarium View' : (camera.mode === 'free' ? '🖐️ Free Pan & Zoom' : '🎯 Follow Thronglet');
-  ctx.fillText(camText, camX + camW / 2, camY + 18);
-
-  // 4. Sanctuary Treasury Coin Badge
-  const coinX = camX - 150;
-  const coinY = 14;
-  const coinW = 142;
-  const coinH = 28;
-  hudHotspots.coinBadge = { x: coinX, y: coinY, w: coinW, h: coinH };
-
-  ctx.fillStyle = '#dfcf9f';
-  ctx.fillRect(coinX, coinY, coinW, coinH);
-  ctx.strokeStyle = '#3d2b1f';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(coinX, coinY, coinW, coinH);
-
-  let badgeLabel = '🪙 0 $MERIT';
-  if (selectedAgentId && agents.has(selectedAgentId)) {
-    const selA = agents.get(selectedAgentId);
-    badgeLabel = `🪙 ${selA.merit || 0} $MERIT`;
-  } else if (sanctuaryCirculation > 0) {
-    badgeLabel = `🪙 ${sanctuaryCirculation} $MERIT`;
-  }
-  ctx.font = 'bold 11px monospace';
-  ctx.fillStyle = '#b45309';
-  ctx.textAlign = 'center';
-  ctx.fillText(badgeLabel, coinX + coinW / 2, coinY + 18);
-
-  // 5. Audio Settings Toggle (Parchment button)
-  const audioX = coinX - 110;
-  const audioY = 14;
-  const audioW = 104;
-  const audioH = 28;
-  hudHotspots.audioBtn = { x: audioX, y: audioY, w: audioW, h: audioH };
-
-  ctx.fillStyle = soundSystem.muted ? '#bfa874' : '#dfcf9f';
-  ctx.fillRect(audioX, audioY, audioW, audioH);
-  ctx.strokeStyle = '#3d2b1f';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(audioX, audioY, audioW, audioH);
-
-  ctx.font = 'bold 10px sans-serif';
-  ctx.fillStyle = soundSystem.muted ? '#5e533c' : '#2b1e14';
-  ctx.textAlign = 'center';
-  const audioText = soundSystem.muted ? '🔇 Muted' : '🔊 Sound On';
-  ctx.fillText(audioText, audioX + audioW / 2, audioY + 18);
+  hudHotspots.cameraBtn = { x: -1, y: -1, w: 0, h: 0 };
+  hudHotspots.coinBadge = { x: -1, y: -1, w: 0, h: 0 };
+  hudHotspots.audioBtn = { x: -1, y: -1, w: 0, h: 0 };
+  return;
 }
+
+function updateCanvasDimensions() {
+  const isMobile = window.innerWidth <= 900;
+  let targetW = 1440;
+  let targetH = 810; // 16:9 widescreen desktop
+  if (isMobile) {
+    targetW = 720;
+    targetH = Math.round(720 * (19 / 6)); // 2280 (19:6 mobile format)
+  }
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+    if (camera.mode === 'overview') {
+      fitTerrariumCamera();
+      camera.zoom = camera.targetZoom;
+      camera.offsetX = camera.targetOffsetX;
+      camera.offsetY = camera.targetOffsetY;
+    }
+  }
+}
+window.addEventListener('resize', updateCanvasDimensions);
+
 
 // -----------------------------------------------------------------------------
 // Main Render Loop

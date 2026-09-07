@@ -41,28 +41,21 @@
       <div class="telemetry-item"><span>📍</span> <span id="topZone" style="color: var(--text-muted);">Gate of Arrival</span></div>
     </div>
 
-    <!-- Gameplay & System Modes -->
     <div class="header-modes">
-      <button id="btnModeSpectate" class="btn-mode active" onclick="setPlayerMode('spectate')">👁️ Watch World</button>
-      <button id="btnModeGuest" class="btn-mode primary" onclick="setPlayerMode('guest')">🕹️ Enter as Guest</button>
-      <button id="btnModeDispatch" class="btn-mode" onclick="openDispatchModal()">🤖 Send AI Agent</button>
-      <button id="btnToggleDrawer" class="btn-drawer-toggle" onclick="toggleConsoleDrawer()" title="Open System Consoles">☰ Console</button>
+      <button id="btnModeSpectate" class="btn-mode active" onclick="setPlayerMode('spectate')" title="Watch sanctuary world">👁️ <span class="btn-text-full">Watch World</span><span class="btn-text-short">Watch</span></button>
+      <button id="btnModeGuest" class="btn-mode primary" onclick="setPlayerMode('guest')" title="Instant guest entrance">🕹️ <span class="btn-text-full">Enter as Guest</span><span class="btn-text-short">Guest</span></button>
+      <button id="btnModeDispatch" class="btn-mode" onclick="openDispatchModal()" title="AI agent instructions">🤖 <span class="btn-text-full">Send AI Agent</span><span class="btn-text-short">Agent</span></button>
     </div>
 
-    <nav class="tab-nav">
-      <button class="tab-btn active" onclick="switchTab('spectatorTab', this)">👁️ World</button>
-      <button id="tabBtnConsole" class="tab-btn" onclick="openConsoleDrawer('consoleTab', this)">🕹️ Agent Console</button>
-      <button id="tabBtnJournal" class="tab-btn" onclick="openConsoleDrawer('journalTab', this)">📜 Journal</button>
-      <button id="tabBtnBoard" class="tab-btn" onclick="openConsoleDrawer('boardTab', this)">📋 Board</button>
-      <button id="tabBtnInhabitants" class="tab-btn" onclick="openConsoleDrawer('inhabitantsTab', this)">🎋 Inhabitants</button>
-      <button id="tabBtnTreasury" class="tab-btn" onclick="openConsoleDrawer('treasuryTab', this)">🪙 Treasury</button>
-      <button id="tabBtnManual" class="tab-btn" onclick="openConsoleDrawer('manualTab', this)">📖 Manual</button>
-    </nav>
+    <button id="tabBtnConsole" class="btn-drawer-toggle" onclick="openConsoleDrawer('consoleTab', this)" title="Open Systems & Agent Console">☰ Console</button>
+    <button id="btnToggleDrawer" class="sr-only" onclick="toggleConsoleDrawer()" tabindex="-1" aria-hidden="true">Console Drawer</button>
 
     <div class="header-status">
-      <button id="btnToggleMute" class="btn-sound" onclick="soundSystem.toggleMute()" title="Toggle Sound Effects">🔊 Sound On</button>
-      <div>Spectators: <strong id="spectatorCount">0</strong></div>
-      <div>Active Agents: <strong id="agentCount">0</strong></div>
+      <button id="btnToggleMute" class="btn-sound" onclick="soundSystem.toggleMute()" title="Toggle Sound Effects">🔊 <span class="btn-text-full">Sound On</span></button>
+      <div class="status-summary" title="Active Agents">
+        <span>🤖 <strong id="agentCount">0</strong></span>
+        <span class="sr-only">Spectators: <strong id="spectatorCount">0</strong></span>
+      </div>
       <div id="statusPill" class="status-pill">
         <span class="status-dot"></span>
         <span id="statusText">ACTIVE</span>
@@ -74,7 +67,7 @@
     <!-- Tab 1: Live Spectator (Dominant Map Screen: 75-85% Viewport) -->
     <div id="spectatorTab" class="game-viewport">
       <div class="canvas-container map-dominant" id="mapContainer">
-        <canvas id="worldCanvas" width="1440" height="960" tabindex="0" aria-label="Eastern Paradise sanctuary map. Use WASD or arrows to navigate, or controls below to explore."></canvas>
+        <canvas id="worldCanvas" width="1440" height="810" tabindex="0" aria-label="Eastern Paradise sanctuary map. Use WASD or arrows to navigate, or controls below to explore."></canvas>
 
         <!-- Floating In-Canvas Quest HUD (First-5-Minutes Journey Loop with Skip Option) -->
         <div id="questHud" class="quest-hud-widget" role="region" aria-label="Sanctuary Journey Guide" onclick="handleQuestHudClick(event)">
@@ -122,9 +115,11 @@
           <button type="button" onclick="focusAilicia()" title="Find Resident Oracle A.Ilicia">🪷 Find A.Ilicia</button>
           <button type="button" id="btnFocusPlayer" onclick="focusPlayer()" title="Center Camera on Player" style="display: none;">🧭 Center Me</button>
           <div class="divider"></div>
-          <button type="button" onclick="openConsoleDrawer('boardTab')" title="Open Notice Board">📋 Board</button>
-          <button type="button" onclick="openConsoleDrawer('inhabitantsTab')" title="View Sanctuary Inhabitants">🎋 Inhabitants</button>
-          <button type="button" onclick="openConsoleDrawer('treasuryTab')" title="View $MERIT Leaderboard">🪙 Treasury</button>
+          <button type="button" id="tabBtnJournal" onclick="openConsoleDrawer('journalTab', this)" title="Sanctuary Journal">📜 Journal</button>
+          <button type="button" id="tabBtnBoard" onclick="openConsoleDrawer('boardTab', this)" title="Open Notice Board">📋 Board</button>
+          <button type="button" id="tabBtnInhabitants" onclick="openConsoleDrawer('inhabitantsTab', this)" title="View Sanctuary Inhabitants">🎋 Inhabitants</button>
+          <button type="button" id="tabBtnTreasury" onclick="openConsoleDrawer('treasuryTab', this)" title="View $MERIT Leaderboard">🪙 Treasury</button>
+          <button type="button" id="tabBtnManual" onclick="openConsoleDrawer('manualTab', this)" title="Agent Manual">📖 Manual</button>
           <button id="btnExpandMap" type="button" onclick="toggleSanctuaryExpanded()" aria-pressed="false">⛶ Expand</button>
         </div>
 
