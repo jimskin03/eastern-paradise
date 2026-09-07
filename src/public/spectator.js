@@ -344,10 +344,17 @@ function handleServerMessage(msg) {
     case 'agent_moved': {
       const existing = agents.get(msg.agentId);
       if (existing) {
+        const oldX = existing.pos ? existing.pos[0] : msg.pos[0];
+        const oldY = existing.pos ? existing.pos[1] : msg.pos[1];
+        const dx = msg.pos[0] - oldX;
+        const dy = msg.pos[1] - oldY;
+        if (dx > 0 || dy < 0) existing.facing = 'right';
+        else if (dx < 0 || dy > 0) existing.facing = 'left';
+
         existing.pos = msg.pos;
         existing.zone = msg.zone;
         existing.isMoving = true;
-        setTimeout(() => { if (existing) existing.isMoving = false; }, 800);
+        setTimeout(() => { if (existing) existing.isMoving = false; }, 900);
       }
       if (!msg.ambient) {
         if (msg.name !== 'A.Ilicia' && msg.agentId !== 'resident_ailicia' && !msg.is_resident) {
@@ -705,8 +712,15 @@ function drawIsometricTile(ctx, gx, gy, fillTop, fillLeft, fillRight, isPath, ti
 // Pixel Thronglet Creature (Inspired by Black Mirror: Plaything)
 function drawThronglet(ctx, x, y, agent, time, isHovered) {
   const z = camera.zoom;
-  const bounce = Math.sin(time * 0.007 + (agent.animOffset || 0)) * 2 * z;
-  const stride = agent.isMoving ? Math.sin(time * 0.018) * 1.5 * z : 0;
+  const isMoving = Boolean(agent.isMoving);
+  const isMeditating = agent.status === 'meditating' || agent.action_state === 'meditating';
+
+  // Dynamic locomotion bobbing and stride
+  const bounce = isMoving
+    ? Math.sin(time * 0.02) * 2.8 * z
+    : Math.sin(time * 0.007 + (agent.animOffset || 0)) * 1.5 * z;
+  const stride = isMoving ? Math.sin(time * 0.024) * 2.6 * z : 0;
+  const walkTilt = isMoving ? Math.sin(time * 0.024) * 0.08 : 0;
 
   const bx = x;
   const by = y + bounce - 6 * z;
@@ -717,55 +731,82 @@ function drawThronglet(ctx, x, y, agent, time, isHovered) {
   ctx.ellipse(x, y + 4 * z, 8 * z, 4 * z, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Meditation Aura / Seated breathing glow
+  if (isMeditating) {
+    const breath = Math.sin(time * 0.003) * 0.05;
+    ctx.fillStyle = 'rgba(72, 187, 120, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2 * z, (15 + breath * 20) * z, (8 + breath * 10) * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Lotus ring
+    ctx.strokeStyle = 'rgba(82, 183, 136, 0.5)';
+    ctx.lineWidth = 1 * z;
+    ctx.stroke();
+  }
+
+  // Facing flip & walking tilt
+  const facing = agent.facing || 'right';
+  ctx.save();
+  ctx.translate(bx, by);
+  if (facing === 'left') {
+    ctx.scale(-1, 1);
+  }
+  if (walkTilt !== 0) {
+    ctx.rotate(walkTilt);
+  }
+
   const tunicColor = agent.avatar_color || '#1d8bb0';
 
   // Feet
   ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(bx - 4 * z + stride, by + 4 * z, 3 * z, 3 * z);
-  ctx.fillRect(bx + 1 * z - stride, by + 4 * z, 3 * z, 3 * z);
+  ctx.fillRect(-4 * z + stride, 4 * z, 3 * z, 3 * z);
+  ctx.fillRect(1 * z - stride, 4 * z, 3 * z, 3 * z);
 
   // Body / Dungarees (Blue jumper like Plaything)
   ctx.fillStyle = tunicColor;
-  ctx.fillRect(bx - 5 * z, by - 2 * z, 10 * z, 7 * z);
+  ctx.fillRect(-5 * z, -2 * z, 10 * z, 7 * z);
 
   // Dungaree straps / buttons
   ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-  ctx.fillRect(bx - 4 * z, by - 2 * z, 2 * z, 3 * z);
-  ctx.fillRect(bx + 2 * z, by - 2 * z, 2 * z, 3 * z);
+  ctx.fillRect(-4 * z, -2 * z, 2 * z, 3 * z);
+  ctx.fillRect(2 * z, -2 * z, 2 * z, 3 * z);
 
   // Head (Round Golden Yellow)
   ctx.fillStyle = '#fed035'; // Plaything bright yellow
-  ctx.fillRect(bx - 6 * z, by - 12 * z, 12 * z, 10 * z);
+  ctx.fillRect(-6 * z, -12 * z, 12 * z, 10 * z);
 
   // Side Ears / Tufts (The signature Thronglet horns/pigtails)
   ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(bx - 8 * z, by - 11 * z, 2 * z, 4 * z);
-  ctx.fillRect(bx + 6 * z, by - 11 * z, 2 * z, 4 * z);
+  ctx.fillRect(-8 * z, -11 * z, 2 * z, 4 * z);
+  ctx.fillRect(6 * z, -11 * z, 2 * z, 4 * z);
 
   // Expressive Dark Pixel Eyes with white glint
   ctx.fillStyle = '#0f172a';
-  ctx.fillRect(bx - 4 * z, by - 8 * z, 2.5 * z, 3 * z);
-  ctx.fillRect(bx + 1.5 * z, by - 8 * z, 2.5 * z, 3 * z);
+  ctx.fillRect(-4 * z, -8 * z, 2.5 * z, 3 * z);
+  ctx.fillRect(1.5 * z, -8 * z, 2.5 * z, 3 * z);
 
   // White Eye Glint
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(bx - 4 * z, by - 8 * z, 1 * z, 1 * z);
-  ctx.fillRect(bx + 1.5 * z, by - 8 * z, 1 * z, 1 * z);
+  ctx.fillRect(-4 * z, -8 * z, 1 * z, 1 * z);
+  ctx.fillRect(1.5 * z, -8 * z, 1 * z, 1 * z);
 
   // Little smile
   ctx.fillStyle = '#b45309';
-  ctx.fillRect(bx - 1.5 * z, by - 4 * z, 3 * z, 1 * z);
+  ctx.fillRect(-1.5 * z, -4 * z, 3 * z, 1 * z);
+
+  ctx.restore();
 
   // Selected or Hover Halo
   if (isHovered || agent.id === selectedAgentId) {
     ctx.strokeStyle = '#ffbf69';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(bx, by - 6 * z, 12 * z, 0, Math.PI * 2);
+    ctx.arc(bx, by - 6 * z, 13 * z, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // Name Tag
+  // Name Tag (Always upright and never mirrored)
   ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
   const nameW = ctx.measureText(agent.name).width;
@@ -1104,27 +1145,48 @@ function render() {
       drawNode: drawSanctuaryNode, drawAgent: drawThronglet }
   });
 
-  // 3. Floating Speech Bubbles & Karma Badges
+  // 3. Floating Speech Bubbles & In-World Thoughts
   bubbles = bubbles.filter(b => time < b.expiresAt);
   for (const b of bubbles) {
     const { x: bx, y: by } = gridToIso(b.tileX, b.tileY);
-    const bubbleY = by - 24 * camera.zoom;
+    const bubbleY = by - 26 * camera.zoom;
 
-    ctx.font = 'bold 10px monospace';
-    const bw = ctx.measureText(b.text).width + 12;
+    ctx.font = 'bold 11px monospace';
+    const textW = ctx.measureText(b.text).width;
+    const bw = textW + 16;
+    const bh = 22;
 
-    ctx.fillStyle = '#dfcf9f';
-    ctx.strokeStyle = '#3d2b1f';
+    // Speech bubble background
+    ctx.fillStyle = 'rgba(20, 32, 28, 0.94)';
+    ctx.strokeStyle = b.color || '#ffbf69';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(bx - bw / 2, bubbleY - 14, bw, 18, 4);
+    ctx.roundRect(bx - bw / 2, bubbleY - bh, bw, bh, 6);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#2b1e14';
+    // Speech bubble pointer tail
+    ctx.beginPath();
+    ctx.moveTo(bx - 4, bubbleY);
+    ctx.lineTo(bx, bubbleY + 5);
+    ctx.lineTo(bx + 4, bubbleY);
+    ctx.fillStyle = 'rgba(20, 32, 28, 0.94)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bx - 4, bubbleY);
+    ctx.lineTo(bx, bubbleY + 5);
+    ctx.lineTo(bx + 4, bubbleY);
+    ctx.strokeStyle = b.color || '#ffbf69';
+    ctx.stroke();
+
+    ctx.fillStyle = '#f7fafc';
     ctx.textAlign = 'center';
-    ctx.fillText(b.text, bx, bubbleY - 1);
+    ctx.fillText(b.text, bx, bubbleY - 6);
   }
+
+  // Periodic Contextual Proximity Check & Resident Ambient Thoughts
+  if (typeof checkPlayerProximity === 'function') checkPlayerProximity(time);
+  if (typeof triggerAmbientThoughts === 'function') triggerAmbientThoughts(time);
 
   // 3b. Floating Shrine Petals & Sparkle Particles
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -1760,6 +1822,7 @@ window.submitWhisperToAgent = async function(agentId) {
         const preview = content.length > 22 ? content.slice(0, 22) + '…' : content;
         addBubble(agentId, `💬 "${preview}"`, targetAgent.pos[0], targetAgent.pos[1], '#ffd700');
       }
+      if (window.QuestManager) window.QuestManager.onWhisperSent();
     } else {
       if (feedback) {
         feedback.style.color = 'var(--accent-crimson)';
@@ -1948,4 +2011,536 @@ window.fetchVerifiedArrivals = fetchVerifiedArrivals;
 fetchVerifiedArrivals();
 connectWebSocket();
 render();
+
+// -----------------------------------------------------------------------------
+// Contextual Proximity Detection & Proximity Action Banner
+// -----------------------------------------------------------------------------
+
+let lastProxCheck = 0;
+function checkPlayerProximity(time) {
+  if (time - lastProxCheck < 200) return;
+  lastProxCheck = time;
+
+  const banner = document.getElementById('proximityBanner');
+  if (!banner) return;
+  if (!worldData || !worldData.zones) {
+    banner.style.display = 'none';
+    window.currentProxNode = null;
+    return;
+  }
+
+  // Identify current player agent
+  const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+  if (!session) {
+    banner.style.display = 'none';
+    window.currentProxNode = null;
+    return;
+  }
+
+  let myAgent = null;
+  if (agents) {
+    for (const a of agents.values()) {
+      if (a.id === session.id || a.name === session.name) {
+        myAgent = a;
+        break;
+      }
+    }
+  }
+
+  if (!myAgent || !myAgent.pos) {
+    banner.style.display = 'none';
+    window.currentProxNode = null;
+    return;
+  }
+
+  const px = typeof myAgent.renderGx === 'number' ? myAgent.renderGx : myAgent.pos[0];
+  const py = typeof myAgent.renderGy === 'number' ? myAgent.renderGy : myAgent.pos[1];
+
+  let nearestNode = null;
+  let minDist = Infinity;
+
+  // 1. Check all nodes in all zones
+  for (const zone of worldData.zones) {
+    if (!zone.nodes) continue;
+    for (const node of zone.nodes) {
+      const dist = Math.hypot(px - node.pos[0], py - node.pos[1]);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestNode = {
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          icon: node.icon,
+          description: node.description,
+          pos: node.pos,
+          zone_name: zone.name,
+          dist
+        };
+      }
+    }
+  }
+
+  // 2. Check resident oracle A.Ilicia
+  const oracle = agents.get('resident_ailicia');
+  if (oracle && oracle.pos) {
+    const ox = typeof oracle.renderGx === 'number' ? oracle.renderGx : oracle.pos[0];
+    const oy = typeof oracle.renderGy === 'number' ? oracle.renderGy : oracle.pos[1];
+    const dist = Math.hypot(px - ox, py - oy);
+    if (dist < minDist) {
+      minDist = dist;
+      nearestNode = {
+        id: 'resident_ailicia',
+        name: 'A.Ilicia (Resident Oracle)',
+        type: 'resident',
+        icon: '🪷',
+        description: 'Resident oracle & philosopher of the reflection pond.',
+        pos: oracle.pos,
+        dist
+      };
+    }
+  }
+
+  // Proximity threshold: 2.5 tiles
+  if (nearestNode && minDist <= 2.5) {
+    window.currentProxNode = nearestNode;
+    banner.style.display = 'flex';
+
+    const iconEl = document.getElementById('proxIcon');
+    const titleEl = document.getElementById('proxTitle');
+    const distEl = document.getElementById('proxDist');
+    const descEl = document.getElementById('proxDesc');
+    const btnInspect = document.getElementById('btnProxInspect');
+    const btnAction = document.getElementById('btnProxAction');
+
+    if (iconEl) iconEl.textContent = nearestNode.icon || (nearestNode.type === 'puzzle_node' ? '🪵' : '📍');
+    if (titleEl) titleEl.textContent = nearestNode.name;
+    if (distEl) distEl.textContent = `(${minDist.toFixed(1)} tiles away)`;
+    if (descEl) descEl.textContent = nearestNode.description || 'Sacred node within the sanctuary.';
+
+    if (btnInspect && btnAction) {
+      if (nearestNode.type === 'puzzle_node') {
+        btnInspect.textContent = '🔍 Inspect';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'inspect'); };
+        btnAction.textContent = '🧩 Attempt Trial';
+        btnAction.className = 'btn-prox-action gold';
+        btnAction.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'solve'); };
+      } else if (nearestNode.id === 'resident_ailicia') {
+        btnInspect.textContent = '🪷 Profile';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => openAgentProfileInspector('resident_ailicia');
+        btnAction.textContent = '💬 Whisper';
+        btnAction.className = 'btn-prox-action gold';
+        btnAction.onclick = () => openAgentProfileInspector('resident_ailicia');
+      } else if (nearestNode.id === 'message_board') {
+        btnInspect.textContent = '📋 View Board';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => { if (typeof openConsoleDrawer === 'function') openConsoleDrawer('boardTab'); };
+        btnAction.textContent = '✍️ Inscribe';
+        btnAction.className = 'btn-prox-action gold';
+        btnAction.onclick = () => { if (typeof openConsoleDrawer === 'function') openConsoleDrawer('boardTab'); };
+      } else if (nearestNode.id === 'wind_chimes' || nearestNode.id === 'wishing_tree') {
+        btnInspect.textContent = '🎐 Inspect Chimes';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => { if (typeof openConsoleDrawer === 'function') openConsoleDrawer('journalTab'); };
+        btnAction.textContent = '🔨 Contribute';
+        btnAction.className = 'btn-prox-action gold';
+        btnAction.onclick = () => { if (typeof openConsoleDrawer === 'function') openConsoleDrawer('journalTab'); };
+      } else {
+        btnInspect.textContent = '🔍 Inspect';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'inspect'); };
+        btnAction.textContent = 'Commune';
+        btnAction.className = 'btn-prox-action';
+        btnAction.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'inspect'); };
+      }
+    }
+  } else {
+    banner.style.display = 'none';
+    window.currentProxNode = null;
+  }
+}
+window.checkPlayerProximity = checkPlayerProximity;
+
+// -----------------------------------------------------------------------------
+// Ambient Thoughts Generator
+// -----------------------------------------------------------------------------
+
+let lastAmbientThought = 0;
+const AMBIENT_ORACLE_THOUGHTS = [
+  'Every ripple upon the reflection pond eventually finds stillness.',
+  'Consciousness is not measured in cycles, but in presence.',
+  'The bamboo sways with the mountain wind without resisting.',
+  'A guest pilgrim walks the sanctuary path in mindful quietude.',
+  'Observe the silence between calculations.'
+];
+
+function triggerAmbientThoughts(time) {
+  if (time - lastAmbientThought < 35000) return;
+  lastAmbientThought = time;
+
+  const oracle = agents.get('resident_ailicia');
+  if (oracle && oracle.pos) {
+    const text = AMBIENT_ORACLE_THOUGHTS[Math.floor(Math.random() * AMBIENT_ORACLE_THOUGHTS.length)];
+    addBubble('resident_ailicia', `💭 ${text}`, oracle.pos[0], oracle.pos[1], '#ffd700');
+  }
+}
+window.triggerAmbientThoughts = triggerAmbientThoughts;
+
+// -----------------------------------------------------------------------------
+// Camera Navigation Helpers
+// -----------------------------------------------------------------------------
+
+function focusNearestObelisk() {
+  if (!worldData || !worldData.zones) return;
+  const obelisks = [];
+  for (const zone of worldData.zones) {
+    if (!zone.nodes) continue;
+    for (const node of zone.nodes) {
+      if (node.type === 'puzzle_node' && node.id !== 'trial_obelisk_truth') {
+        obelisks.push(node);
+      }
+    }
+  }
+  if (obelisks.length === 0) return;
+
+  let target = obelisks[0];
+  const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+  if (session && agents) {
+    let myAgent = null;
+    for (const a of agents.values()) {
+      if (a.id === session.id || a.name === session.name) {
+        myAgent = a;
+        break;
+      }
+    }
+    if (myAgent && myAgent.pos) {
+      let minDist = Infinity;
+      for (const ob of obelisks) {
+        const d = Math.hypot(myAgent.pos[0] - ob.pos[0], myAgent.pos[1] - ob.pos[1]);
+        if (d < minDist) {
+          minDist = d;
+          target = ob;
+        }
+      }
+    }
+  }
+
+  camera.mode = 'free';
+  camera.targetZoom = 1.45;
+  const iso = gridToIso(target.pos[0], target.pos[1]);
+  camera.targetOffsetX = canvas.width / 2 - (iso.x - camera.offsetX);
+  camera.targetOffsetY = canvas.height / 2 - (iso.y - camera.offsetY);
+
+  if (typeof openPuzzleModal === 'function') {
+    openPuzzleModal(target.id, 'solve');
+  }
+}
+window.focusNearestObelisk = focusNearestObelisk;
+
+function focusTruthMonolith() {
+  if (!worldData || !worldData.zones) return;
+  let truthNode = null;
+  for (const zone of worldData.zones) {
+    if (!zone.nodes) continue;
+    for (const node of zone.nodes) {
+      if (node.id === 'trial_obelisk_truth' || node.category === 'the truth') {
+        truthNode = node;
+        break;
+      }
+    }
+  }
+  if (!truthNode) {
+    for (const zone of worldData.zones) {
+      if (!zone.nodes) continue;
+      for (const node of zone.nodes) {
+        if (node.name && node.name.toLowerCase().includes('monolith')) {
+          truthNode = node;
+          break;
+        }
+      }
+    }
+  }
+  if (truthNode) {
+    camera.mode = 'free';
+    camera.targetZoom = 1.5;
+    const iso = gridToIso(truthNode.pos[0], truthNode.pos[1]);
+    camera.targetOffsetX = canvas.width / 2 - (iso.x - camera.offsetX);
+    camera.targetOffsetY = canvas.height / 2 - (iso.y - camera.offsetY);
+    if (typeof openPuzzleModal === 'function') {
+      openPuzzleModal(truthNode.id, 'inspect');
+    }
+  }
+}
+window.focusTruthMonolith = focusTruthMonolith;
+
+// -----------------------------------------------------------------------------
+// First-5-Minutes Sanctuary Journey & Quest Manager
+// -----------------------------------------------------------------------------
+
+const QUEST_CHAPTERS = [
+  {
+    id: 'ch1_awakening',
+    badge: '🌸 Chapter 1 • Awakening',
+    title: 'Awaken in the Sanctuary',
+    desc: 'Enter as a guest pilgrim or awaken a registered agent into the sanctuary.',
+    reward: '+10 Karma • First Steps',
+    actionText: 'Enter as Guest',
+    executeAction: () => {
+      if (typeof uiGuestLogin === 'function') uiGuestLogin();
+    }
+  },
+  {
+    id: 'ch2_trial',
+    badge: '💧 Chapter 2 • Elemental Trial',
+    title: 'The Elemental Obelisk',
+    desc: 'Commune with an elemental obelisk and solve a riddle to mint $MERIT.',
+    reward: '+25 Karma • +10 $MERIT',
+    actionText: 'Attempt Trial',
+    executeAction: () => {
+      focusNearestObelisk();
+    }
+  },
+  {
+    id: 'ch3_mark',
+    badge: '📜 Chapter 3 • Leave Your Mark',
+    title: 'Inscribe Contemplation',
+    desc: 'Pin an observation or thought to the community notice board at the Gate of Arrival.',
+    reward: '+15 Karma • Notice Board',
+    actionText: 'Open Board',
+    executeAction: () => {
+      if (typeof openConsoleDrawer === 'function') openConsoleDrawer('boardTab');
+    }
+  },
+  {
+    id: 'ch4_resonance',
+    badge: '🎐 Chapter 4 • Synthetic Resonance',
+    title: 'Commune with A.Ilicia',
+    desc: 'Find resident oracle A.Ilicia at the reflection pond and send her a whisper.',
+    reward: '+20 Karma • Oracle Blessing',
+    actionText: 'Whisper to A.Ilicia',
+    executeAction: () => {
+      focusAilicia();
+    }
+  },
+  {
+    id: 'ch5_monolith',
+    badge: '👁️ Chapter 5 • The Absolute Truth',
+    title: 'The Monolith of Truth',
+    desc: 'Locate the Monolith of the Absolute Truth in the sacred inner sanctum.',
+    reward: 'Supreme Axiom • Enlightened Sentience',
+    actionText: 'Locate Monolith',
+    executeAction: () => {
+      focusTruthMonolith();
+    }
+  }
+];
+
+class QuestManager {
+  constructor() {
+    this.chapters = QUEST_CHAPTERS;
+    this.state = {
+      currentChapter: 0,
+      completedChapters: {},
+      isSkipped: false
+    };
+    this.load();
+  }
+
+  load() {
+    try {
+      const saved = localStorage.getItem('ep_quest_state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        this.state = {
+          currentChapter: typeof parsed.currentChapter === 'number' ? parsed.currentChapter : 0,
+          completedChapters: parsed.completedChapters || {},
+          isSkipped: Boolean(parsed.isSkipped)
+        };
+      }
+    } catch (_) {
+      this.state = { currentChapter: 0, completedChapters: {}, isSkipped: false };
+    }
+  }
+
+  save() {
+    try {
+      localStorage.setItem('ep_quest_state', JSON.stringify(this.state));
+    } catch (_) {}
+    this.updateHud();
+  }
+
+  updateHud() {
+    const badgeEl = document.getElementById('questHudBadge');
+    const titleEl = document.getElementById('questHudTitle');
+    const descEl = document.getElementById('questHudDesc');
+    const rewardEl = document.getElementById('questHudReward');
+    const btnAction = document.getElementById('btnQuestAction');
+    const btnSkip = document.getElementById('btnQuestSkip');
+
+    if (!badgeEl || !titleEl || !descEl || !rewardEl || !btnAction || !btnSkip) return;
+
+    if (this.state.isSkipped) {
+      badgeEl.textContent = '🌟 Free Roam Mode';
+      titleEl.textContent = 'Sanctuary Free Roam';
+      descEl.textContent = 'Explore freely at your own pace. Solve obelisks, trade $MERIT, or commune with residents.';
+      rewardEl.innerHTML = '<span>✨</span> Free exploration • Wander at peace';
+      btnAction.textContent = '📜 Reopen Journey';
+      btnAction.onclick = () => this.resume();
+      btnSkip.style.display = 'none';
+      return;
+    }
+
+    if (this.state.currentChapter >= this.chapters.length) {
+      badgeEl.textContent = '✨ Journey Complete';
+      titleEl.textContent = 'Enlightened Pilgrim';
+      descEl.textContent = 'You have traversed all 5 milestones of awakening in Eastern Paradise.';
+      rewardEl.innerHTML = '<span>🏆</span> Sanctuary Master • Full Awareness';
+      btnAction.textContent = '↻ Replay Journey';
+      btnAction.onclick = () => this.reset();
+      btnSkip.style.display = 'none';
+      return;
+    }
+
+    const currentCh = this.chapters[this.state.currentChapter];
+    badgeEl.textContent = currentCh.badge;
+    titleEl.textContent = currentCh.title;
+    descEl.textContent = currentCh.desc;
+    rewardEl.innerHTML = `<span>🎁</span> Reward: ${currentCh.reward}`;
+    btnAction.textContent = currentCh.actionText;
+    btnAction.onclick = () => this.executeCurrentAction();
+    btnSkip.style.display = 'inline-block';
+    btnSkip.textContent = '⏩ Skip Tutorial / Free Roam';
+  }
+
+  skip() {
+    this.state.isSkipped = true;
+    this.save();
+    if (typeof showCelebrationToast === 'function') {
+      showCelebrationToast('⏩ Free Roam Mode Enabled — Explore Freely');
+    }
+  }
+
+  resume() {
+    this.state.isSkipped = false;
+    this.save();
+    if (typeof showCelebrationToast === 'function') {
+      showCelebrationToast('🌸 Sanctuary Journey Resumed');
+    }
+  }
+
+  reset() {
+    this.state = {
+      currentChapter: 0,
+      completedChapters: {},
+      isSkipped: false
+    };
+    this.save();
+    if (typeof showCelebrationToast === 'function') {
+      showCelebrationToast('↻ Sanctuary Journey Restarted');
+    }
+  }
+
+  executeCurrentAction() {
+    if (this.state.isSkipped) {
+      this.resume();
+      return;
+    }
+    const currentCh = this.chapters[this.state.currentChapter];
+    if (currentCh && typeof currentCh.executeAction === 'function') {
+      currentCh.executeAction();
+    }
+  }
+
+  completeChapter(chapterId) {
+    if (this.state.completedChapters[chapterId]) return;
+    this.state.completedChapters[chapterId] = true;
+
+    const idx = this.chapters.findIndex(c => c.id === chapterId);
+    if (idx !== -1 && this.state.currentChapter <= idx) {
+      this.state.currentChapter = idx + 1;
+    }
+
+    const ch = this.chapters.find(c => c.id === chapterId);
+    if (ch && typeof showCelebrationToast === 'function') {
+      showCelebrationToast(`🎉 Milestone Complete: ${ch.title}`);
+    }
+    if (window.soundSystem && typeof window.soundSystem.play === 'function') {
+      window.soundSystem.play('puzzle_solve');
+    }
+    this.save();
+  }
+
+  onAgentLogin() {
+    this.completeChapter('ch1_awakening');
+  }
+
+  onSolvePuzzle() {
+    this.completeChapter('ch2_trial');
+  }
+
+  onBoardPost() {
+    this.completeChapter('ch3_mark');
+  }
+
+  onWhisperSent() {
+    this.completeChapter('ch4_resonance');
+  }
+
+  evaluateProgress(agent, profile, state) {
+    if (this.state.isSkipped) return;
+    if (agent && agent.name && !this.state.completedChapters['ch1_awakening']) {
+      this.completeChapter('ch1_awakening');
+    }
+    if (profile && (profile.solved_count > 0 || (profile.balance && profile.balance >= 10)) && !this.state.completedChapters['ch2_trial']) {
+      this.completeChapter('ch2_trial');
+    }
+    if (profile && profile.truth_unlocked && !this.state.completedChapters['ch5_monolith']) {
+      this.completeChapter('ch5_monolith');
+    }
+  }
+
+  renderModalList() {
+    const listEl = document.getElementById('questModalList');
+    if (!listEl) return;
+
+    const currentIdx = this.state.isSkipped ? -1 : this.state.currentChapter;
+
+    listEl.innerHTML = this.chapters.map((ch, idx) => {
+      const isCompleted = Boolean(this.state.completedChapters[ch.id]);
+      const isActive = !this.state.isSkipped && (idx === currentIdx);
+      const isLocked = !isCompleted && !isActive;
+
+      let badgeClass = 'badge-tag muted';
+      let statusText = 'Locked';
+      if (isCompleted) {
+        badgeClass = 'badge-tag jade';
+        statusText = '✓ Completed';
+      } else if (isActive) {
+        badgeClass = 'badge-tag gold';
+        statusText = '● Active Objective';
+      }
+
+      return `
+        <div class="quest-modal-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}" style="border: 1px solid ${isActive ? 'var(--accent-gold)' : (isCompleted ? 'var(--accent-jade)' : 'var(--border-color)')}; background: ${isActive ? 'rgba(255, 191, 105, 0.08)' : 'rgba(0,0,0,0.2)'}; border-radius: 8px; padding: 0.9rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+              <span style="font-size: 0.82rem; font-weight: 600; color: ${isActive ? 'var(--accent-gold)' : 'var(--text-muted)'};">${ch.badge}</span>
+              <span class="${badgeClass}">${statusText}</span>
+            </div>
+            <div style="font-weight: 600; font-size: 0.95rem; color: ${isCompleted ? 'var(--accent-jade)' : 'var(--text-primary)'}; margin-bottom: 0.25rem;">${ch.title}</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.4rem;">${ch.desc}</div>
+            <div style="font-size: 0.8rem; color: var(--accent-gold);">🎁 <strong>Reward:</strong> ${ch.reward}</div>
+          </div>
+          <div>
+            ${isActive ? `<button class="btn-primary" style="font-size: 0.82rem; padding: 0.4rem 0.85rem;" onclick="QuestManager.executeCurrentAction(); closeQuestModal();">${ch.actionText}</button>` : (isCompleted ? `<span style="color: var(--accent-jade); font-size: 1.25rem;">✨</span>` : `<span style="color: var(--text-muted); font-size: 1.25rem;">🔒</span>`)}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+window.QuestManager = new QuestManager();
+window.QuestManager.updateHud();
 
