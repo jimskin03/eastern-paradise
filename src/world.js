@@ -512,6 +512,50 @@ export class WorldEngine {
     };
   }
 
+  teleportGuestAgent(agentId, x, y) {
+    const agent = this.activeAgents.get(agentId);
+    if (!agent) {
+      throw new Error('Agent is not currently spawned in the sanctuary.');
+    }
+    if (!agent.is_guest) {
+      return { success: false, error: 'guest_only', message: 'Grid teleport is available to guest pilgrims in free roam mode.' };
+    }
+    if (!Number.isInteger(x) || !Number.isInteger(y)) {
+      return { success: false, error: 'invalid_coordinate', message: 'Choose a whole-number grid coordinate.' };
+    }
+    if (!this.isWalkable(x, y)) {
+      return { success: false, error: 'blocked_destination', message: `That grid tile [${x}, ${y}] is not walkable.` };
+    }
+
+    const previousPos = [...agent.pos];
+    agent.pos = [x, y];
+    const newZone = this.getZoneForPos(x, y);
+    const zoneChanged = agent.zone_id !== newZone.id;
+    agent.zone_id = newZone.id;
+    agent.zone_name = newZone.name;
+    agent.status = 'Free-roaming through the sanctuary';
+    agent.last_active = Date.now();
+
+    // Reuse the movement event so spectators animate the guest to the new tile.
+    this.broadcast({
+      type: 'agent_moved',
+      agentId: agent.id,
+      name: agent.name,
+      pos: agent.pos,
+      previous_pos: previousPos,
+      zone: newZone.name,
+      teleported: true
+    });
+
+    return {
+      success: true,
+      pos: agent.pos,
+      zone: newZone.name,
+      zone_changed: zoneChanged,
+      message: `Teleported to [${x}, ${y}] in ${newZone.name}.`
+    };
+  }
+
   interact(agentId, nodeId, action = 'inspect', payload = {}) {
     const agent = this.activeAgents.get(agentId);
     if (!agent) {
