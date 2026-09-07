@@ -584,15 +584,19 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 401, { success: false, message: 'Unauthorized.' });
       }
 
-      world.removeAgent(account.id);
+      world.removeAgent(account.id, false);
 
       if (account.is_guest === 1) {
-        AuthService.purgeGuest(account.id);
+        const purgeRes = AuthService.purgeGuest(account.id);
         world.broadcast({ type: 'board_updated' });
         return sendJson(res, 200, {
           success: true,
           purged: true,
-          message: 'Guest session ended. All temporary achievements and message board posts have been purged.'
+          score_retained: Boolean(purgeRes.score_retained),
+          messages_retained: Boolean(purgeRes.messages_retained),
+          message: purgeRes.score_retained
+            ? 'Guest session ended. Your account was purged, but your Top 1 score and message board posts are permanently retained as (unverified).'
+            : 'Guest session ended. All temporary achievements and message board posts have been purged.'
         });
       }
 

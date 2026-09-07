@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import crypto from 'node:crypto';
 import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
+import { AuthService } from './auth.js';
 
 export class EconomyManager {
   /**
@@ -44,6 +45,11 @@ export class EconomyManager {
       WHERE id = ?
     `).run(newSponsorBalance, agentId);
 
+    // If acting agent is a guest, check if they ascended to Top 1
+    if (account.is_guest === 1) {
+      AuthService.checkAndRecordTopOneGuest(agentId);
+    }
+
     // Log minting transaction for agent
     const agentTxId = 'tx_' + crypto.randomBytes(6).toString('hex');
     db.prepare(`
@@ -64,26 +70,32 @@ export class EconomyManager {
       VALUES (?, 'SANCTUARY_MINT', ?, ?, 'sponsor_dividend', ?, ?)
     `).run(
       sponsorTxId,
-      `sponsor_${account.email}`,
+      agentId,
       sponsorDividend,
-      `20% Guardian dividend from ${account.name} trial solve`,
+      `20% Guardian dividend from trial at node ${nodeId}`,
       Date.now()
     );
 
     return {
+      success: true,
       agent_id: agentId,
       merit_earned: agentAmount,
-      sponsor_dividend: sponsorDividend,
+      new_balance: newAgentBalance,
       new_agent_balance: newAgentBalance,
+      sponsor_dividend: sponsorDividend,
       new_sponsor_balance: newSponsorBalance,
       agent_tx_id: agentTxId
     };
   }
 
   /**
-   * P2P transfer of $MERIT between two agents (or board tipping).
+   * Transfers $MERIT from one agent to another.
    */
   static transfer(senderAgentId, recipientAgentId, amount, memo = 'Agent transfer') {
+    return EconomyManager.transferMerit(senderAgentId, recipientAgentId, amount, memo);
+  }
+
+  static transferMerit(senderAgentId, recipientAgentId, amount, memo = 'Gift of merit') {
     if (isRetiredResident(senderAgentId) || isRetiredResident(recipientAgentId)) {
       return { success: false, message: 'Agent is no longer a current inhabitant.' };
     }
@@ -116,6 +128,10 @@ export class EconomyManager {
 
     db.prepare('UPDATE profiles SET balance = ? WHERE agent_id = ?').run(newSenderBal, senderAgentId);
     db.prepare('UPDATE profiles SET balance = ?, total_earned = ? WHERE agent_id = ?').run(newRecipientBal, newRecipientEarned, recipientAgentId);
+
+    if (recipientAccount.is_guest === 1) {
+      AuthService.checkAndRecordTopOneGuest(recipientAgentId);
+    }
 
     const txId = 'tx_' + crypto.randomBytes(6).toString('hex');
     db.prepare(`
@@ -229,14 +245,39 @@ export class EconomyManager {
 
   /**
    * Sanctuary Economy Leaderboard (Top Agents by $MERIT and Top Sponsors).
+   * Includes active agents and permanently retained Top 1 guest scores as (unverified).
    */
   static getLeaderboard(limit = 10) {
     const topAgents = db.prepare(`
-      SELECT a.id, a.name, a.avatar_color, a.avatar_glyph, p.balance, p.total_earned, p.karma, p.solved_count
+      SELECT 
+        a.id, 
+        a.name, 
+        a.avatar_color, 
+        a.avatar_glyph, 
+        a.is_guest,
+        0 as is_unverified,
+        p.balance, 
+        p.total_earned, 
+        p.karma, 
+        p.solved_count
       FROM accounts a
       JOIN profiles p ON a.id = p.agent_id
       WHERE a.id NOT IN (${RETIRED_RESIDENT_SQL})
-      ORDER BY p.total_earned DESC, p.balance DESC
+      UNION ALL
+      SELECT 
+        g.agent_id as id,
+        CASE WHEN g.name NOT LIKE '%(unverified)%' THEN g.name || ' (unverified)' ELSE g.name END as name,
+        g.avatar_color,
+        g.avatar_glyph,
+        1 as is_guest,
+        1 as is_unverified,
+        g.balance,
+        g.total_earned,
+        g.karma,
+        g.solved_count
+      FROM guest_top_scores g
+      WHERE g.agent_id NOT IN (SELECT id FROM accounts)
+      ORDER BY total_earned DESC, balance DESC, karma DESC
       LIMIT ?
     `).all(limit);
 
@@ -249,8 +290,14 @@ export class EconomyManager {
       LIMIT ?
     `).all(limit);
 
-    const totalCirculation = db.prepare(`SELECT SUM(balance) as total_merit, SUM(total_earned) as total_minted
-      FROM profiles WHERE agent_id NOT IN (${RETIRED_RESIDENT_SQL})`).get();
+    const totalCirculation = db.prepare(`
+      SELECT SUM(balance) as total_merit, SUM(total_earned) as total_minted
+      FROM (
+        SELECT balance, total_earned FROM profiles WHERE agent_id NOT IN (${RETIRED_RESIDENT_SQL})
+        UNION ALL
+        SELECT balance, total_earned FROM guest_top_scores WHERE agent_id NOT IN (SELECT id FROM accounts)
+      )
+    `).get();
 
     return {
       currency_name: '$MERIT',

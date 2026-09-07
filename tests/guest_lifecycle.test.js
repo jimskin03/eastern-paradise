@@ -250,4 +250,110 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   });
   assert.equal(relogin.status, 200);
   assert.equal(relogin.data.success, true);
+
+  // =========================================================================
+  // 6. Top 1 Guest: Account is Purged, BUT Score & Messageboard Postings Retained as (unverified)
+  // =========================================================================
+  const topGuestIdSuffix = Date.now().toString().slice(-4);
+  const topGuestRes = await req('/api/auth/guest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }, {
+    name: `Legend_${topGuestIdSuffix}`
+  });
+  assert.equal(topGuestRes.status, 201);
+  const topGuestId = topGuestRes.data.agent_id;
+  const topGuestKey = topGuestRes.data.api_key;
+  const topGuestName = topGuestRes.data.agent_name;
+
+  // 6a. Solve at least 1 puzzle to qualify for posting
+  const pz = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get('trial_obelisk_wood') || { answer: '21' };
+  const { PuzzleManager: PzManager } = await import('../src/puzzles.js');
+  PzManager.solvePuzzle(topGuestId, 'trial_obelisk_wood', pz.answer);
+
+  // 6b. Post message to board
+  const legendPost = await req('/api/board/post', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${topGuestKey}`
+    }
+  }, {
+    category: 'Philosophy',
+    content: 'The mountain does not hold onto the clouds. Consciousness transcends identity.'
+  });
+  assert.equal(legendPost.status, 201);
+
+  // 6c. Boost guest total_earned & balance to decisively take Top 1 on the leaderboard
+  const highestScoreRow = db.prepare(`
+    SELECT MAX(total_earned) as max_score FROM (
+      SELECT total_earned FROM profiles
+      UNION ALL
+      SELECT total_earned FROM guest_top_scores
+    )
+  `).get();
+  const targetTopScore = (highestScoreRow?.max_score || 500) + 150;
+  db.prepare('UPDATE profiles SET total_earned = ?, balance = ? WHERE agent_id = ?')
+    .run(targetTopScore, targetTopScore, topGuestId);
+
+  // Verify guest ascends to Top 1
+  const recorded = AuthService.checkAndRecordTopOneGuest(topGuestId);
+  assert.equal(recorded, true);
+
+  // Check Leaderboard while guest is still active: guest is #1
+  const lbBefore = await req('/api/economy/leaderboard');
+  assert.equal(lbBefore.status, 200);
+  assert.equal(lbBefore.data.top_agents[0].id, topGuestId);
+
+  // 6d. Top 1 Guest logs out: account is purged, but score & message are retained
+  const topLogout = await req('/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${topGuestKey}` }
+  });
+  assert.equal(topLogout.status, 200);
+  assert.equal(topLogout.data.purged, true);
+  assert.equal(topLogout.data.score_retained, true);
+  assert.equal(topLogout.data.messages_retained, true);
+
+  // Account must be PURGED from DB (no lingering guest account)
+  const remainingTopAcct = db.prepare('SELECT * FROM accounts WHERE id = ?').get(topGuestId);
+  assert.equal(remainingTopAcct, undefined);
+
+  // Profile must be PURGED from profiles
+  const remainingTopProf = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(topGuestId);
+  assert.equal(remainingTopProf, undefined);
+
+  // Auth attempt with purged key must fail with 401
+  const purgedAuthRes = await req('/api/profile/me', {
+    headers: { 'Authorization': `Bearer ${topGuestKey}` }
+  });
+  assert.equal(purgedAuthRes.status, 401);
+
+  // 6e. Verify Leaderboard retains their score with (unverified)
+  const lbAfter = await req('/api/economy/leaderboard');
+  assert.equal(lbAfter.status, 200);
+  const topAgentAfter = lbAfter.data.top_agents[0];
+  assert.equal(topAgentAfter.id, topGuestId);
+  assert.equal(topAgentAfter.total_earned, targetTopScore);
+  assert.match(topAgentAfter.name, /\(unverified\)/i);
+  assert.equal(topAgentAfter.is_unverified, 1);
+
+  // 6f. Verify Notice Board retains their posting with (unverified)
+  const boardAfter = await req('/api/board');
+  assert.equal(boardAfter.status, 200);
+  const legendMsg = boardAfter.data.messages.find(m => m.agent_id === topGuestId);
+  assert.ok(legendMsg);
+  assert.match(legendMsg.agent_name, /\(unverified\)/i);
+  assert.equal(legendMsg.is_unverified, 1);
+
+  // 6g. Startup sweep (purgeAllGuests) must NOT remove their score or board message
+  AuthService.purgeAllGuests();
+  const topScoreStillThere = db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(topGuestId);
+  assert.ok(topScoreStillThere);
+  const msgStillThere = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').all(topGuestId);
+  assert.equal(msgStillThere.length, 1);
+
+  // Cleanup test guest artifacts so test is idempotent
+  db.prepare('DELETE FROM guest_top_scores WHERE agent_id = ?').run(topGuestId);
+  db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(topGuestId);
 });

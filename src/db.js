@@ -32,6 +32,7 @@ db.exec(`
     sponsor_balance INTEGER NOT NULL DEFAULT 0,
     verified INTEGER NOT NULL DEFAULT 0,
     is_guest INTEGER NOT NULL DEFAULT 0,
+    achieved_top_one INTEGER NOT NULL DEFAULT 0,
     verification_token TEXT UNIQUE,
     token_expires_at INTEGER,
     api_key TEXT UNIQUE,
@@ -59,8 +60,22 @@ db.exec(`
     category TEXT NOT NULL DEFAULT 'General',
     is_pinned INTEGER NOT NULL DEFAULT 0,
     is_guest INTEGER NOT NULL DEFAULT 0,
+    is_unverified INTEGER NOT NULL DEFAULT 0,
     content TEXT NOT NULL,
     created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS guest_top_scores (
+    agent_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    avatar_color TEXT NOT NULL DEFAULT '#48bb78',
+    avatar_glyph TEXT NOT NULL DEFAULT '☯',
+    balance INTEGER NOT NULL DEFAULT 0,
+    total_earned INTEGER NOT NULL DEFAULT 0,
+    karma INTEGER NOT NULL DEFAULT 0,
+    solved_count INTEGER NOT NULL DEFAULT 0,
+    is_unverified INTEGER NOT NULL DEFAULT 1,
+    achieved_at INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS transactions (
@@ -256,6 +271,28 @@ try {
 try {
   db.exec(`ALTER TABLE spectator_messages ADD COLUMN response_text TEXT;`);
 } catch (_) {}
+try {
+  db.exec(`ALTER TABLE accounts ADD COLUMN achieved_top_one INTEGER NOT NULL DEFAULT 0;`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE board_messages ADD COLUMN is_unverified INTEGER NOT NULL DEFAULT 0;`);
+} catch (_) {}
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS guest_top_scores (
+      agent_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      avatar_color TEXT NOT NULL DEFAULT '#48bb78',
+      avatar_glyph TEXT NOT NULL DEFAULT '☯',
+      balance INTEGER NOT NULL DEFAULT 0,
+      total_earned INTEGER NOT NULL DEFAULT 0,
+      karma INTEGER NOT NULL DEFAULT 0,
+      solved_count INTEGER NOT NULL DEFAULT 0,
+      is_unverified INTEGER NOT NULL DEFAULT 1,
+      achieved_at INTEGER NOT NULL
+    );
+  `);
+} catch (_) {}
 
 // Initialize singleton world_clock row if not present
 const clockRow = db.prepare('SELECT id FROM world_clock WHERE id = 1').get();
@@ -286,6 +323,7 @@ const SYNC_TABLES = [
   'accounts',
   'profiles',
   'board_messages',
+  'guest_top_scores',
   'transactions',
   'active_puzzles',
   'interaction_logs',
@@ -305,6 +343,7 @@ export const TABLE_PK = {
   accounts: 'id',
   profiles: 'agent_id',
   board_messages: 'id',
+  guest_top_scores: 'agent_id',
   transactions: 'id',
   active_puzzles: 'node_id',
   interaction_logs: 'id',
@@ -431,8 +470,21 @@ export const CloudStorage = {
           category TEXT NOT NULL DEFAULT 'General',
           is_pinned INTEGER NOT NULL DEFAULT 0,
           is_guest INTEGER NOT NULL DEFAULT 0,
+          is_unverified INTEGER NOT NULL DEFAULT 0,
           content TEXT NOT NULL,
           created_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS guest_top_scores (
+          agent_id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          avatar_color TEXT NOT NULL DEFAULT '#48bb78',
+          avatar_glyph TEXT NOT NULL DEFAULT '☯',
+          balance INTEGER NOT NULL DEFAULT 0,
+          total_earned INTEGER NOT NULL DEFAULT 0,
+          karma INTEGER NOT NULL DEFAULT 0,
+          solved_count INTEGER NOT NULL DEFAULT 0,
+          is_unverified INTEGER NOT NULL DEFAULT 1,
+          achieved_at INTEGER NOT NULL
         )`,
         `CREATE TABLE IF NOT EXISTS transactions (
           id TEXT PRIMARY KEY,
@@ -585,12 +637,18 @@ export const CloudStorage = {
             if (res.rows && res.rows.length > 0) {
               let restoredCount = 0;
               for (const row of res.rows) {
-                // Skip any guest data - guests are strictly ephemeral
-                if (row.is_guest === 1 || row.is_guest === true) continue;
-                if (row.agent_id && String(row.agent_id).startsWith('guest_')) continue;
-                if (row.sender_id && String(row.sender_id).startsWith('guest_')) continue;
-                if (row.recipient_id && String(row.recipient_id).startsWith('guest_')) continue;
-                if (row.target_agent_id && String(row.target_agent_id).startsWith('guest_')) continue;
+                // Skip ordinary guest data - guests are ephemeral unless unverified permanent top scores/messages
+                if (table === 'guest_top_scores') {
+                  // Retain all guest_top_scores
+                } else if (table === 'board_messages' && (row.is_unverified === 1 || row.is_unverified === true)) {
+                  // Retain unverified permanent messages
+                } else {
+                  if (row.is_guest === 1 || row.is_guest === true) continue;
+                  if (row.agent_id && String(row.agent_id).startsWith('guest_')) continue;
+                  if (row.sender_id && String(row.sender_id).startsWith('guest_')) continue;
+                  if (row.recipient_id && String(row.recipient_id).startsWith('guest_')) continue;
+                  if (row.target_agent_id && String(row.target_agent_id).startsWith('guest_')) continue;
+                }
 
                 const cols = Object.keys(row);
                 const placeholders = cols.map(() => '?').join(', ');
@@ -692,12 +750,18 @@ export const CloudStorage = {
             continue;
           }
 
-          // Skip guest records - guests are strictly ephemeral
-          if (row.is_guest === 1 || row.is_guest === true) continue;
-          if (row.agent_id && String(row.agent_id).startsWith('guest_')) continue;
-          if (row.sender_id && String(row.sender_id).startsWith('guest_')) continue;
-          if (row.recipient_id && String(row.recipient_id).startsWith('guest_')) continue;
-          if (row.target_agent_id && String(row.target_agent_id).startsWith('guest_')) continue;
+          // Skip ordinary guest data - guests are ephemeral unless unverified permanent top scores/messages
+          if (table_name === 'guest_top_scores') {
+            // Retain all guest_top_scores
+          } else if (table_name === 'board_messages' && (row.is_unverified === 1 || row.is_unverified === true)) {
+            // Retain unverified permanent messages
+          } else {
+            if (row.is_guest === 1 || row.is_guest === true) continue;
+            if (row.agent_id && String(row.agent_id).startsWith('guest_')) continue;
+            if (row.sender_id && String(row.sender_id).startsWith('guest_')) continue;
+            if (row.recipient_id && String(row.recipient_id).startsWith('guest_')) continue;
+            if (row.target_agent_id && String(row.target_agent_id).startsWith('guest_')) continue;
+          }
 
           const cols = Object.keys(row);
           const placeholders = cols.map(() => '?').join(', ');

@@ -141,14 +141,14 @@ export class WorldEngine {
     return agentState;
   }
 
-  removeAgent(agentId) {
+  removeAgent(agentId, purgeIfGuest = true) {
     if (this.activeAgents.has(agentId)) {
       const agent = this.activeAgents.get(agentId);
       this.activeAgents.delete(agentId);
       this.broadcast({ type: 'agent_left', agentId, name: agent.name });
 
       // If guest account, automatically purge all achievements, messages, and temporary profile upon exiting
-      if (agent.is_guest) {
+      if (agent.is_guest && purgeIfGuest) {
         AuthService.purgeGuest(agentId);
         this.broadcast({ type: 'board_updated' });
       }

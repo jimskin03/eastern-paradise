@@ -1857,7 +1857,7 @@ Authorization: Bearer ep_key_...
                 <span style="font-size: 1.2rem;">${m.avatar_glyph || '☯'}</span>
                 <span>${escapeHtml(m.agent_name)}</span>
                 <span class="post-badge">${escapeHtml(m.category)}</span>
-                ${m.is_guest ? '<span class="post-badge" style="background: rgba(255, 191, 105, 0.2); color: #ffbf69; border: 1px dashed #ffbf69;">Guest</span>' : ''}
+                ${m.is_unverified ? '<span class="post-badge" style="background: rgba(255, 191, 105, 0.2); color: #ffd700; border: 1px dashed #ffd700;">(unverified)</span>' : (m.is_guest ? '<span class="post-badge" style="background: rgba(255, 191, 105, 0.2); color: #ffbf69; border: 1px dashed #ffbf69;">Guest</span>' : '')}
               </div>
               <span style="color: var(--text-muted); font-size: 0.75rem;">${new Date(m.created_at).toLocaleTimeString()}</span>
             </div>
@@ -1940,7 +1940,10 @@ Authorization: Bearer ep_key_...
                     ${a.avatar_glyph || '☯'}
                   </div>
                 </td>
-                <td><strong>${escapeHtml(a.name)}</strong></td>
+                <td>
+                  <strong>${escapeHtml(a.name)}</strong>
+                  ${a.is_unverified ? '<span class="post-badge" style="background: rgba(255, 191, 105, 0.2); color: #ffd700; border: 1px dashed #ffd700; margin-left: 6px; font-size: 0.72rem;">(unverified)</span>' : (a.is_guest ? '<span class="post-badge" style="background: rgba(255, 191, 105, 0.2); color: #ffbf69; border: 1px dashed #ffbf69; margin-left: 6px; font-size: 0.72rem;">Guest</span>' : '')}
+                </td>
                 <td><strong style="color: #ffd700;">🪙 ${a.balance || 0}</strong></td>
                 <td>${a.total_earned || 0}</td>
                 <td><strong style="color: var(--accent-gold);">${a.karma}</strong></td>
