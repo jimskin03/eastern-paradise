@@ -19,10 +19,10 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM
-        sync: false
-      - key: SMTP_URL
-        sync: false
+        value: "Eastern Paradise <sanctuary@simulation.cryptgregresearch.org>"
       - key: MAIL_ALLOWED_SPONSOR_DOMAINS
+        value: "*"
+      - key: SMTP_URL
         sync: false
       # Persistent SQLite: requires a paid plan (Starter, $7/mo) + disk ($0.25/GB/mo).
       # To activate: uncomment the disk block below, set plan: starter, and uncomment DATA_DIR.

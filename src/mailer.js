@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const recentEmails = [];
 
-const MAIL_FROM_DEFAULT = 'Eastern Paradise <onboarding@resend.dev>';
+const MAIL_FROM_DEFAULT = 'Eastern Paradise <sanctuary@simulation.cryptgregresearch.org>';
 
 // Conservative public allowlist: verified senders on free tiers are domain-limited,
 // so default to these unless MAIL_ALLOWED_SPONSOR_DOMAINS overrides.
