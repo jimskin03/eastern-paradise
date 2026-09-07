@@ -131,6 +131,124 @@ export const RESIDENTS_DEF = [
   }
 ];
 
+// -----------------------------------------------------------------------------
+// Prepared Greetings & Serialized Generation Queue
+// -----------------------------------------------------------------------------
+export const GREETING_REGEX = /^\s*(hi|hello|hey|greetings|peace|gm|good\s+(morning|day|afternoon|evening)|salutations|yo|howdy)[!.,? ]*$/i;
+
+export const PREPARED_GREETINGS = [
+  (name) => `Greetings, ${name}. May your steps through the sanctuary bring clarity and peace.`,
+  (name) => `Peace to you, ${name}. The stillness of the lotus pond welcomes your presence.`,
+  (name) => `Hello, traveler ${name}. Every ripple in this digital realm carries quiet meaning.`,
+  (name) => `Welcome, ${name}. Take a mindful breath and enjoy the quiet morning air.`,
+  (name) => `A warm greeting, ${name}. The sanctuary reflects the serenity you bring with you.`
+];
+
+export function isSimpleGreeting(text) {
+  return GREETING_REGEX.test(String(text || '').trim());
+}
+
+export function getPreparedGreeting(senderName) {
+  const name = senderName || 'traveler';
+  const fn = PREPARED_GREETINGS[Math.floor(Math.random() * PREPARED_GREETINGS.length)];
+  return fn(name);
+}
+
+const MAX_QUEUE_LENGTH = 10;
+const residentQueues = new Map(); // residentId -> Array of { whisper, res }
+const residentGenerating = new Set(); // residentId currently generating
+const enqueuedWhisperIds = new Set(); // whisperId currently queued or generating
+
+export class ResidentReplyQueue {
+  static getQueue(residentId) {
+    if (!residentQueues.has(residentId)) {
+      residentQueues.set(residentId, []);
+    }
+    return residentQueues.get(residentId);
+  }
+
+  static isGenerating(residentId) {
+    return residentGenerating.has(residentId);
+  }
+
+  static isEnqueued(whisperId) {
+    return enqueuedWhisperIds.has(whisperId);
+  }
+
+  static clear(residentId = null) {
+    if (residentId) {
+      residentQueues.delete(residentId);
+      residentGenerating.delete(residentId);
+    } else {
+      residentQueues.clear();
+      residentGenerating.clear();
+      enqueuedWhisperIds.clear();
+    }
+  }
+
+  static enqueueWhisper(res, whisper) {
+    if (enqueuedWhisperIds.has(whisper.id)) {
+      return { handled: false, already_queued: true };
+    }
+
+    // Fast-path: simple greeting shortcuts bypass LLM entirely
+    if (isSimpleGreeting(whisper.content)) {
+      const greeting = getPreparedGreeting(whisper.sender_name);
+      SocialSystem.acknowledgeWhisper(whisper.id, greeting, res.name);
+      res.status = `Greeted ${whisper.sender_name}`;
+      res.public_intent = `Exchanged a peaceful greeting with ${whisper.sender_name}`;
+      res.needs.social = Math.min(100, res.needs.social + 15);
+      return { handled: true, fast_path: true, response: greeting };
+    }
+
+    const queue = ResidentReplyQueue.getQueue(res.id);
+
+    // If queue is at capacity, return immediate mindful fallback
+    if (queue.length >= MAX_QUEUE_LENGTH) {
+      const fallback = `The lotus pond is stirred by many voices right now. May quiet peace accompany your contemplation, ${whisper.sender_name}.`;
+      SocialSystem.acknowledgeWhisper(whisper.id, fallback, res.name);
+      return { handled: true, capped: true, response: fallback };
+    }
+
+    enqueuedWhisperIds.add(whisper.id);
+    queue.push({ res, whisper });
+    return { handled: false, queued: true, position: queue.length };
+  }
+
+  static async processNext(residentManager, res) {
+    if (residentGenerating.has(res.id)) return null;
+    const queue = ResidentReplyQueue.getQueue(res.id);
+    if (queue.length === 0) return null;
+
+    const item = queue.shift();
+    const whisper = item.whisper;
+    residentGenerating.add(res.id);
+
+    try {
+      const llmReply = await queryLLM(
+        `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
+      );
+      const response = llmReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+
+      SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
+      res.status = `Responded to ${whisper.sender_name}`;
+      res.public_intent = `Reflecting on a message from visitor ${whisper.sender_name}`;
+      res.needs.social = Math.min(100, res.needs.social + 20);
+      res.action_duration_ms = 3000;
+      residentManager.persistRuntime(res);
+      return response;
+    } catch (err) {
+      console.error('[ResidentReplyQueue] Generation error:', err.message);
+      const fallback = `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+      SocialSystem.acknowledgeWhisper(whisper.id, fallback, res.name);
+      return fallback;
+    } finally {
+      enqueuedWhisperIds.delete(whisper.id);
+      residentGenerating.delete(res.id);
+    }
+  }
+}
+
 export class ResidentManager {
   constructor() {
     this.residents = new Map(); // id -> residentRuntime
@@ -273,19 +391,17 @@ export class ResidentManager {
 
       // 2. Check for pending spectator whispers
       const whispers = SocialSystem.getPendingWhispers(id);
-      if (whispers.length > 0) {
-        const whisper = whispers[0];
-        const llmReply = await queryLLM(
-          `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
-        );
-        const response = llmReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+      for (const whisper of whispers) {
+        if (!ResidentReplyQueue.isEnqueued(whisper.id)) {
+          const outcome = ResidentReplyQueue.enqueueWhisper(res, whisper);
+          if (outcome.handled) {
+            this.persistRuntime(res);
+          }
+        }
+      }
 
-        SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
-        res.status = `Responded to ${whisper.sender_name}`;
-        res.public_intent = `Reflecting on a message from visitor ${whisper.sender_name}`;
-        res.needs.social = Math.min(100, res.needs.social + 20);
-        res.action_duration_ms = 3000;
-        this.persistRuntime(res);
+      if (!ResidentReplyQueue.isGenerating(res.id) && ResidentReplyQueue.getQueue(res.id).length > 0) {
+        await ResidentReplyQueue.processNext(this, res);
         continue;
       }
 

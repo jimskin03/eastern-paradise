@@ -4,6 +4,8 @@ import { mailMode } from './mailer.js';
 import { isRetiredResident } from './resident-policy.js';
 import { MailboxService } from './mailbox.js';
 
+export const GUEST_SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 export class AuthService {
   static register({ name, email, avatar_color = '#48bb78', avatar_glyph = '☯' }) {
     const cleanName = String(name || '').trim();
@@ -143,16 +145,18 @@ export class AuthService {
     const apiKey = 'ep_guest_' + crypto.randomBytes(16).toString('hex');
     const email = `${accountId}@temporary.local`;
     const now = Date.now();
+    const sessionExpiresAt = now + GUEST_SESSION_TTL_MS;
 
     db.prepare(`
-      INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, verified, is_guest, api_key, created_at)
-      VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)
+      INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, verified, is_guest, token_expires_at, api_key, created_at)
+      VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
     `).run(
       accountId,
       cleanName,
       email,
       avatar_color,
       avatar_glyph,
+      sessionExpiresAt,
       apiKey,
       now
     );
@@ -166,6 +170,9 @@ export class AuthService {
     return {
       success: true,
       is_guest: true,
+      session_type: 'guest',
+      session_expires_at: sessionExpiresAt,
+      session_ttl_seconds: Math.floor(GUEST_SESSION_TTL_MS / 1000),
       agent_id: accountId,
       agent_name: cleanName,
       api_key: apiKey,
@@ -240,6 +247,18 @@ export class AuthService {
     }
 
     const account = db.prepare('SELECT * FROM accounts WHERE api_key = ? AND verified = 1').get(token);
-    return account && !isRetiredResident(account.id) ? account : null;
+    if (!account || isRetiredResident(account.id)) {
+      return null;
+    }
+
+    if (account.is_guest) {
+      const expiry = account.token_expires_at || (account.created_at + GUEST_SESSION_TTL_MS);
+      if (Date.now() > expiry) {
+        AuthService.purgeGuest(account.id);
+        return null;
+      }
+    }
+
+    return account;
   }
 }

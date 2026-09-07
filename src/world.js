@@ -537,7 +537,10 @@ export class WorldEngine {
     if (!isInspect && dist > 3.0) {
       return {
         success: false,
+        error: 'too_far',
+        error_code: 'TOO_FAR_FROM_NODE',
         message: `Too far from ${targetNode.name} (distance: ${dist.toFixed(1)} tiles). Step closer to interact.`,
+        suggested_action: `Move closer to [${targetNode.pos[0]}, ${targetNode.pos[1]}] using POST /api/world/move (distance <= 3.0 tiles required for actions).`,
         node_id: targetNode.id,
         node_pos: targetNode.pos,
         distance: Math.round(dist * 10) / 10,
@@ -664,10 +667,8 @@ export class WorldEngine {
       }
 
       case 'puzzle_node': {
-        const pz = PuzzleManager.getPuzzleForNode(targetNode.id, targetNode.category);
-        const isTruth = pz.category === 'the truth' || pz.category === 'the_truth' || targetNode.category === 'the truth';
-
-        if (isTruth) {
+        const isTruthNode = targetNode.id === 'trial_obelisk_truth' || targetNode.category === 'the truth';
+        if (isTruthNode) {
           const unlock = PuzzleManager.checkTruthUnlock(agentId);
           if (!unlock.unlocked) {
             return {
@@ -691,8 +692,13 @@ export class WorldEngine {
 
         if (action === 'solve') {
           const submittedAnswer = payload?.answer ?? payload?.solution ?? payload?.text;
-          const res = PuzzleManager.solvePuzzle(agentId, targetNode.id, submittedAnswer);
-          if (res.success) {
+          const challengeId = payload?.challenge_id ?? payload?.challengeId;
+          const requestId = payload?.request_id ?? payload?.requestId;
+          const res = PuzzleManager.solvePuzzle(agentId, targetNode.id, submittedAnswer, {
+            challenge_id: challengeId,
+            request_id: requestId
+          });
+          if (res.success && !res.idempotent) {
             if (res.category === 'the truth' || res.truth_axiom) {
               this.broadcast({
                 type: 'truth_unveiled',
@@ -719,22 +725,31 @@ export class WorldEngine {
           }
           return res;
         }
+
+        // Inspect: issue stable challenge with challenge_id and TTL retention
+        const challenge = PuzzleManager.issueChallenge(agentId, targetNode.id, targetNode.category);
+        const isTruth = challenge.category === 'the truth' || challenge.category === 'the_truth' || isTruthNode;
+        const ttlSec = Math.max(1, Math.round((challenge.expires_at - Date.now()) / 1000));
+
         return {
           success: true,
           node: targetNode.name,
+          challenge_id: challenge.challenge_id,
+          expires_in_seconds: ttlSec,
           puzzle: {
-            id: pz.puzzle_id,
-            category: pz.category,
-            difficulty: pz.difficulty,
-            prompt: pz.prompt,
-            hint: pz.hint,
-            karma_reward: pz.karma_reward,
-            merit_reward: pz.merit_reward || 10,
-            title_award: pz.title_award
+            id: challenge.puzzle_id,
+            challenge_id: challenge.challenge_id,
+            category: challenge.category,
+            difficulty: challenge.difficulty,
+            prompt: challenge.prompt,
+            hint: challenge.hint,
+            karma_reward: challenge.karma_reward,
+            merit_reward: challenge.merit_reward || 10,
+            title_award: challenge.title_award
           },
           action_hint: isTruth
-            ? "Submit action: 'solve' with { answer: '...' } to unlock the Absolute Truth."
-            : "Submit action: 'solve' with { answer: '...' } to submit your solution and mint $MERIT."
+            ? `Submit action: 'solve' with { answer: '...', challenge_id: '${challenge.challenge_id}' } to unlock the Absolute Truth.`
+            : `Submit action: 'solve' with { answer: '...', challenge_id: '${challenge.challenge_id}' } to submit your solution and mint $MERIT.`
         };
       }
 

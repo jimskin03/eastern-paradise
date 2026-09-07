@@ -127,6 +127,41 @@ class WorldEventLedger {
       payload: JSON.parse(r.payload || '{}')
     }));
   }
+
+  getEventsPage({ limit = 30, beforeSeq = null, sinceSeq = null } = {}) {
+    const lim = Math.max(1, Math.min(100, Number(limit) || 30));
+    let sql = 'SELECT * FROM world_events';
+    const params = [];
+
+    if (beforeSeq !== null && beforeSeq !== undefined && !isNaN(Number(beforeSeq))) {
+      sql += ' WHERE seq < ? ORDER BY seq DESC LIMIT ?';
+      params.push(Number(beforeSeq), lim + 1);
+    } else if (sinceSeq !== null && sinceSeq !== undefined && !isNaN(Number(sinceSeq))) {
+      sql += ' WHERE seq > ? ORDER BY seq ASC LIMIT ?';
+      params.push(Number(sinceSeq), lim + 1);
+    } else {
+      sql += ' ORDER BY seq DESC LIMIT ?';
+      params.push(lim + 1);
+    }
+
+    const rows = db.prepare(sql).all(...params);
+    const hasMore = rows.length > lim;
+    const events = hasMore ? rows.slice(0, lim) : rows;
+    const mapped = events.map(r => ({
+      ...r,
+      payload: JSON.parse(r.payload || '{}')
+    }));
+
+    const nextCursor = (hasMore && mapped.length > 0) ? mapped[mapped.length - 1].seq : null;
+
+    return {
+      limit: lim,
+      count: mapped.length,
+      has_more: hasMore,
+      next_cursor: nextCursor,
+      events: mapped
+    };
+  }
 }
 
 export const eventLedger = new WorldEventLedger();

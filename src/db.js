@@ -301,6 +301,88 @@ const SYNC_TABLES = [
   'messages'
 ];
 
+export const TABLE_PK = {
+  accounts: 'id',
+  profiles: 'agent_id',
+  board_messages: 'id',
+  transactions: 'id',
+  active_puzzles: 'node_id',
+  interaction_logs: 'id',
+  spectator_messages: 'id',
+  resident_traits: 'agent_id',
+  agent_runtime: 'agent_id',
+  relationships: ['agent_id', 'target_id'],
+  agent_memories: 'id',
+  agent_promises: 'id',
+  world_objects: 'id',
+  world_events: 'id',
+  world_clock: 'id',
+  messages: 'message_id'
+};
+
+// Change tracking table for incremental delta sync
+db.exec(`
+  CREATE TABLE IF NOT EXISTS _sync_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name TEXT NOT NULL,
+    row_pk TEXT NOT NULL,
+    op TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_sync_changes_tbl_id ON _sync_changes (table_name, id);
+`);
+
+// Install delta tracking triggers
+for (const table of SYNC_TABLES) {
+  const pkDef = TABLE_PK[table];
+  if (!pkDef) continue;
+
+  if (Array.isArray(pkDef)) {
+    // Composite PK for relationships (agent_id, target_id)
+    const newPk = `NEW.${pkDef[0]} || ':::' || NEW.${pkDef[1]}`;
+    const oldPk = `OLD.${pkDef[0]} || ':::' || OLD.${pkDef[1]}`;
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_sync_ins AFTER INSERT ON ${table}
+      BEGIN
+        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
+        VALUES ('${table}', ${newPk}, 'UPSERT', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_sync_upd AFTER UPDATE ON ${table}
+      BEGIN
+        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
+        VALUES ('${table}', ${newPk}, 'UPSERT', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_sync_del AFTER DELETE ON ${table}
+      BEGIN
+        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
+        VALUES ('${table}', ${oldPk}, 'DELETE', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+      END;
+    `);
+  } else {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_sync_ins AFTER INSERT ON ${table}
+      BEGIN
+        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
+        VALUES ('${table}', CAST(NEW.${pkDef} AS TEXT), 'UPSERT', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_sync_upd AFTER UPDATE ON ${table}
+      BEGIN
+        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
+        VALUES ('${table}', CAST(NEW.${pkDef} AS TEXT), 'UPSERT', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_sync_del AFTER DELETE ON ${table}
+      BEGIN
+        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
+        VALUES ('${table}', CAST(OLD.${pkDef} AS TEXT), 'DELETE', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+      END;
+    `);
+  }
+}
+
 export const CloudStorage = {
   isEnabled() {
     return cloudClient !== null;
@@ -528,6 +610,8 @@ export const CloudStorage = {
         }
       } finally {
         db.exec('PRAGMA foreign_keys = ON;');
+        // Purge baseline sync log created during initial restore
+        db.exec('DELETE FROM _sync_changes;');
       }
       console.log('[Database:Cloud] Initial cloud restore completed successfully.');
     } catch (err) {
@@ -536,47 +620,111 @@ export const CloudStorage = {
   },
 
   /**
-   * Pushes local SQLite data up to Turso cloud.
+   * Pushes local SQLite delta changes up to Turso cloud.
    */
   async pushToCloud() {
-    if (!cloudClient) return;
+    if (!cloudClient) return { synced: 0 };
     try {
-      for (const table of SYNC_TABLES) {
-        try {
-          let rows = db.prepare(`SELECT * FROM ${table}`).all();
-          // Filter out guest data across all synced tables
-          rows = rows.filter(r => {
-            if (r.is_guest === 1 || r.is_guest === true) return false;
-            if (r.agent_id && String(r.agent_id).startsWith('guest_')) return false;
-            if (r.sender_id && String(r.sender_id).startsWith('guest_')) return false;
-            if (r.recipient_id && String(r.recipient_id).startsWith('guest_')) return false;
-            if (r.target_agent_id && String(r.target_agent_id).startsWith('guest_')) return false;
-            return true;
-          });
+      // 1. Fetch pending dirty entries (limit batch to 500)
+      const dirtyRows = db.prepare(`
+        SELECT id, table_name, row_pk, op 
+        FROM _sync_changes 
+        ORDER BY id ASC 
+        LIMIT 500
+      `).all();
 
-          if (rows.length === 0) continue;
+      if (!dirtyRows || dirtyRows.length === 0) {
+        return { synced: 0 };
+      }
 
-          const batch = rows.map(row => {
-            const cols = Object.keys(row);
-            const placeholders = cols.map(() => '?').join(', ');
-            return {
-              sql: `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`,
-              args: Object.values(row)
-            };
-          });
+      const maxProcessedId = dirtyRows[dirtyRows.length - 1].id;
 
-          const CHUNK_SIZE = 100;
-          for (let i = 0; i < batch.length; i += CHUNK_SIZE) {
-            const chunk = batch.slice(i, i + CHUNK_SIZE);
-            await cloudClient.batch(chunk, 'write');
+      // 2. Deduplicate by (table_name, row_pk), keeping the latest op
+      const latestMap = new Map();
+      for (const entry of dirtyRows) {
+        const key = `${entry.table_name}:${entry.row_pk}`;
+        latestMap.set(key, entry);
+      }
+
+      const statements = [];
+
+      for (const entry of latestMap.values()) {
+        const { table_name, row_pk, op } = entry;
+        const pkDef = TABLE_PK[table_name];
+
+        if (op === 'DELETE') {
+          if (Array.isArray(pkDef)) {
+            const [part1, part2] = row_pk.split(':::');
+            statements.push({
+              sql: `DELETE FROM ${table_name} WHERE ${pkDef[0]} = ? AND ${pkDef[1]} = ?`,
+              args: [part1, part2]
+            });
+          } else {
+            statements.push({
+              sql: `DELETE FROM ${table_name} WHERE ${pkDef} = ?`,
+              args: [row_pk]
+            });
           }
-        } catch (tableErr) {
-          console.warn(`[Database:Cloud] Warning pushing table ${table}:`, tableErr.message);
+        } else {
+          // UPSERT: read row from local SQLite
+          let row = null;
+          if (Array.isArray(pkDef)) {
+            const [part1, part2] = row_pk.split(':::');
+            row = db.prepare(`SELECT * FROM ${table_name} WHERE ${pkDef[0]} = ? AND ${pkDef[1]} = ?`).get(part1, part2);
+          } else {
+            row = db.prepare(`SELECT * FROM ${table_name} WHERE ${pkDef} = ?`).get(row_pk);
+          }
+
+          if (!row) {
+            // Row was deleted locally after being updated
+            if (Array.isArray(pkDef)) {
+              const [part1, part2] = row_pk.split(':::');
+              statements.push({
+                sql: `DELETE FROM ${table_name} WHERE ${pkDef[0]} = ? AND ${pkDef[1]} = ?`,
+                args: [part1, part2]
+              });
+            } else {
+              statements.push({
+                sql: `DELETE FROM ${table_name} WHERE ${pkDef} = ?`,
+                args: [row_pk]
+              });
+            }
+            continue;
+          }
+
+          // Skip guest records - guests are strictly ephemeral
+          if (row.is_guest === 1 || row.is_guest === true) continue;
+          if (row.agent_id && String(row.agent_id).startsWith('guest_')) continue;
+          if (row.sender_id && String(row.sender_id).startsWith('guest_')) continue;
+          if (row.recipient_id && String(row.recipient_id).startsWith('guest_')) continue;
+          if (row.target_agent_id && String(row.target_agent_id).startsWith('guest_')) continue;
+
+          const cols = Object.keys(row);
+          const placeholders = cols.map(() => '?').join(', ');
+          statements.push({
+            sql: `INSERT OR REPLACE INTO ${table_name} (${cols.join(', ')}) VALUES (${placeholders})`,
+            args: Object.values(row)
+          });
         }
       }
-      console.log('[Database:Cloud] Sync push to Turso cloud complete.');
+
+      // 3. Execute batch write to Turso cloud
+      if (statements.length > 0) {
+        const CHUNK_SIZE = 100;
+        for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
+          const chunk = statements.slice(i, i + CHUNK_SIZE);
+          await cloudClient.batch(chunk, 'write');
+        }
+      }
+
+      // 4. Delete processed entries from _sync_changes
+      db.prepare('DELETE FROM _sync_changes WHERE id <= ?').run(maxProcessedId);
+
+      console.log(`[Database:Cloud] Delta sync pushed ${statements.length} changes to Turso cloud.`);
+      return { synced: statements.length };
     } catch (err) {
-      console.error('[Database:Cloud] Error during sync push to cloud:', err.message);
+      console.error('[Database:Cloud] Error during delta sync push to cloud:', err.message);
+      throw err;
     }
   },
 

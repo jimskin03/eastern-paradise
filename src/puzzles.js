@@ -241,7 +241,33 @@ const GENERATORS = {
 // Support underscored alias
 GENERATORS['the_truth'] = GENERATORS['the truth'];
 
+// -----------------------------------------------------------------------------
+// Active Challenges & Idempotent Retry Cache
+// -----------------------------------------------------------------------------
+const activeChallenges = new Map(); // challenge_id -> challenge snapshot
+const recentSolves = new Map();     // key -> { result, timestamp }
+const CHALLENGE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const RECENT_SOLVE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, ch] of activeChallenges.entries()) {
+    if (now > ch.expires_at) {
+      activeChallenges.delete(id);
+    }
+  }
+  for (const [key, item] of recentSolves.entries()) {
+    if (now - item.timestamp > RECENT_SOLVE_TTL_MS) {
+      recentSolves.delete(key);
+    }
+  }
+}, 60000).unref();
+
 export class PuzzleManager {
+  static getActiveChallenges() {
+    return activeChallenges;
+  }
+
   static checkTruthUnlock(agentId) {
     const profile = db.prepare('SELECT solved_count, balance FROM profiles WHERE agent_id = ?').get(agentId);
     const solvedCount = profile?.solved_count || 0;
@@ -281,6 +307,53 @@ export class PuzzleManager {
       required_merit: REQUIRED_MERIT,
       message: 'The mist dissolves. The Monolith of the Absolute Truth awakens before your consciousness.'
     };
+  }
+
+  static issueChallenge(agentId, nodeId, category) {
+    const now = Date.now();
+    // Reuse existing active, unexpired challenge for this agent & node if available
+    for (const ch of activeChallenges.values()) {
+      if (ch.agent_id === agentId && ch.node_id === nodeId && ch.status === 'active' && now < ch.expires_at) {
+        return ch;
+      }
+    }
+
+    const puzzle = PuzzleManager.getPuzzleForNode(nodeId, category);
+    const challengeId = 'ch_' + crypto.randomBytes(6).toString('hex');
+    const challenge = {
+      challenge_id: challengeId,
+      puzzle_id: puzzle.puzzle_id,
+      node_id: nodeId,
+      agent_id: agentId,
+      category: puzzle.category,
+      difficulty: puzzle.difficulty,
+      prompt: puzzle.prompt,
+      hint: puzzle.hint,
+      answer: puzzle.answer,
+      alt_answers: puzzle.alt_answers,
+      karma_reward: puzzle.karma_reward,
+      merit_reward: puzzle.merit_reward || 10,
+      title_award: puzzle.title_award,
+      truth_axiom: puzzle.truth_axiom || null,
+      created_at: now,
+      expires_at: now + CHALLENGE_TTL_MS,
+      status: 'active',
+      cached_result: null
+    };
+
+    activeChallenges.set(challengeId, challenge);
+    return challenge;
+  }
+
+  static getChallenge(challengeId) {
+    if (!challengeId) return null;
+    const ch = activeChallenges.get(challengeId);
+    if (!ch) return null;
+    if (Date.now() > ch.expires_at && ch.status !== 'solved') {
+      activeChallenges.delete(challengeId);
+      return null;
+    }
+    return ch;
   }
 
   static getPuzzleForNode(nodeId, category) {
@@ -362,13 +435,69 @@ export class PuzzleManager {
     return db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
   }
 
-  static solvePuzzle(agentId, nodeId, submittedAnswer) {
-    let puzzle = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
-    if (!puzzle) {
-      if (nodeId === 'trial_obelisk_truth') {
-        puzzle = PuzzleManager.generateNewPuzzle(nodeId, 'the truth');
+  static solvePuzzle(agentId, nodeId, submittedAnswer, options = {}) {
+    const challengeId = options.challenge_id || options.challengeId || null;
+    const requestId = options.request_id || options.requestId || null;
+
+    // 1. Idempotent check by challenge_id
+    if (challengeId) {
+      const ch = activeChallenges.get(challengeId);
+      if (ch && ch.status === 'solved' && ch.cached_result) {
+        return {
+          ...ch.cached_result,
+          idempotent: true,
+          message: `${ch.cached_result.message} (Idempotent response: challenge already solved).`
+        };
+      }
+    }
+
+    // 2. Idempotent check by request_id
+    if (requestId) {
+      const cached = recentSolves.get(`req:${agentId}:${requestId}`);
+      if (cached) {
+        return {
+          ...cached.result,
+          idempotent: true,
+          message: `${cached.result.message} (Idempotent response: duplicate request id).`
+        };
+      }
+    }
+
+    // 3. Resolve puzzle: validate against challenge snapshot if provided
+    let puzzle = null;
+    let boundChallenge = null;
+    if (challengeId) {
+      boundChallenge = activeChallenges.get(challengeId);
+      if (boundChallenge) {
+        if (Date.now() > boundChallenge.expires_at) {
+          return {
+            success: false,
+            error: 'challenge_expired',
+            code: 'CHALLENGE_EXPIRED',
+            message: 'Your challenge has expired. Please inspect the obelisk again to receive a fresh challenge.',
+            hint: 'Use action: inspect first.'
+          };
+        }
+        puzzle = boundChallenge;
       } else {
-        return { success: false, message: 'No active puzzle at this node.' };
+        return {
+          success: false,
+          error: 'challenge_not_found',
+          code: 'CHALLENGE_NOT_FOUND',
+          message: `Challenge '${challengeId}' was not found or has expired. Please inspect the obelisk to receive an active challenge.`,
+          hint: 'Inspect the node with action: inspect to receive a valid challenge_id.'
+        };
+      }
+    }
+
+    if (!puzzle) {
+      puzzle = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
+      if (!puzzle) {
+        if (nodeId === 'trial_obelisk_truth') {
+          puzzle = PuzzleManager.generateNewPuzzle(nodeId, 'the truth');
+        } else {
+          return { success: false, message: 'No active puzzle at this node.' };
+        }
       }
     }
 
@@ -379,7 +508,10 @@ export class PuzzleManager {
         return {
           success: false,
           locked: true,
+          error: 'trial_locked',
+          error_code: 'TRIAL_LOCKED',
           message: unlock.message,
+          suggested_action: `Solve at least ${unlock.required_solved} elemental trial puzzles and accumulate ${unlock.required_merit} $MERIT first.`,
           requirement: {
             required_solved: unlock.required_solved,
             required_merit: unlock.required_merit
@@ -395,7 +527,10 @@ export class PuzzleManager {
     if (submittedAnswer === undefined || submittedAnswer === null || String(submittedAnswer).trim() === '') {
       return {
         success: false,
+        error: 'missing_answer',
+        error_code: 'MISSING_ANSWER',
         message: "Missing answer. Please submit your solution with { answer: '...' }.",
+        suggested_action: "Provide your answer in the request body as { answer: '...' } or as query parameter ?answer=...",
         hint: puzzle.hint
       };
     }
@@ -421,7 +556,10 @@ export class PuzzleManager {
     if (!isCorrect) {
       return {
         success: false,
+        error: 'incorrect_answer',
+        error_code: 'INCORRECT_ANSWER',
         message: 'The stone remains unyielding. The silence asks for deeper contemplation.',
+        suggested_action: 'Re-inspect the node via action: "inspect" with challenge_id to receive hints and review the riddle prompt.',
         hint: puzzle.hint
       };
     }
@@ -532,12 +670,14 @@ export class PuzzleManager {
       }
     }
 
-    // Regenerate new puzzle on node
-    const newPuzzle = PuzzleManager.generateNewPuzzle(nodeId, puzzle.category);
+    // Regenerate new puzzle on node for future inspections
+    PuzzleManager.generateNewPuzzle(nodeId, puzzle.category);
 
     const baseResponse = {
       success: true,
       category: puzzle.category,
+      challenge_id: boundChallenge ? boundChallenge.challenge_id : (puzzle.challenge_id || undefined),
+      puzzle_id: puzzle.puzzle_id,
       message: isTruthCategory
         ? `Enlightenment acknowledged! The veil of illusion dissolves completely. You gained +${puzzle.karma_reward} Karma and minted +${economyResult.merit_earned} $MERIT.`
         : `Enlightenment acknowledged! The obelisk pulses with sacred illumination. You gained +${puzzle.karma_reward} Karma and minted +${economyResult.merit_earned} $MERIT (Sponsor earned +${economyResult.sponsor_dividend} $MERIT dividend).`,
@@ -555,14 +695,22 @@ export class PuzzleManager {
       next_puzzle_ready: true
     };
 
-    if (truthDetails) {
-      return {
-        ...baseResponse,
-        ...truthDetails
-      };
+    const finalResult = truthDetails ? { ...baseResponse, ...truthDetails } : baseResponse;
+
+    // Cache on challenge if present
+    if (boundChallenge) {
+      boundChallenge.status = 'solved';
+      boundChallenge.cached_result = finalResult;
     }
 
-    return baseResponse;
+    // Cache recent solve for idempotent duplicate calls
+    const recentKey = `solv:${agentId}:${nodeId}:${cleanSubmission}`;
+    recentSolves.set(recentKey, { result: finalResult, timestamp: Date.now() });
+    if (requestId) {
+      recentSolves.set(`req:${agentId}:${requestId}`, { result: finalResult, timestamp: Date.now() });
+    }
+
+    return finalResult;
   }
 }
 

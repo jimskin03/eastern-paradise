@@ -19,6 +19,52 @@ export class BoardService {
     `).all(limit);
   }
 
+  static getMessagesPage({ limit = 25, offset = 0, category = null, beforeId = null } = {}) {
+    const lim = Math.max(1, Math.min(50, Number(limit) || 25));
+    const off = Math.max(0, Number(offset) || 0);
+    const conditions = [];
+    const countParams = [];
+    const queryParams = [];
+
+    if (category && category !== 'All') {
+      conditions.push('category = ?');
+      countParams.push(category);
+      queryParams.push(category);
+    }
+
+    if (beforeId) {
+      const anchor = db.prepare('SELECT created_at FROM board_messages WHERE id = ?').get(beforeId);
+      if (anchor) {
+        conditions.push('created_at < ?');
+        countParams.push(anchor.created_at);
+        queryParams.push(anchor.created_at);
+      }
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const totalRow = db.prepare(`SELECT COUNT(*) AS total FROM board_messages ${whereClause}`).get(...countParams);
+    const total = totalRow ? totalRow.total : 0;
+
+    queryParams.push(lim + 1, off);
+    const rows = db.prepare(`
+      SELECT * FROM board_messages
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...queryParams);
+
+    const hasMore = rows.length > lim;
+    const messages = hasMore ? rows.slice(0, lim) : rows;
+
+    return {
+      total,
+      limit: lim,
+      offset: off,
+      has_more: hasMore,
+      messages
+    };
+  }
+
   static postMessage(agentId, agentName, avatarGlyph, category, content, isGuest = 0) {
     const id = 'msg_' + crypto.randomBytes(6).toString('hex');
     const cleanContent = String(content || '').trim();
