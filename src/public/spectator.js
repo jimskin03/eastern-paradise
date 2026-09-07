@@ -22,7 +22,11 @@ const camera = {
   targetOffsetY: 85,
   isDragging: false,
   dragStartX: 0,
-  dragStartY: 0
+  dragStartY: 0,
+  dragOriginX: 0,
+  dragOriginY: 0,
+  dragTile: null,
+  didDrag: false
 };
 
 // Isometric Tile Dimensions (2:1 classic dimetric ratio)
@@ -534,17 +538,55 @@ function logActivity(html) {
 
 // Camera Modes & Terrarium Auto-Fit
 function fitTerrariumCamera() {
-  if (camera.mode === 'overview') {
-    camera.targetZoom = 0.72;
-    camera.targetOffsetX = 440;
-    camera.targetOffsetY = 85;
-  }
+  if (camera.mode !== 'overview' || !worldData) return;
+  const { width, height } = worldData.dimensions;
+  const left = -(height - 1) * ISO_TILE_W / 2 - 30;
+  const right = (width - 1) * ISO_TILE_W / 2 + 30;
+  const bottom = (width + height) * ISO_TILE_H / 2 + TILE_DEPTH;
+  const z = Math.min((canvas.width - 80) / (right - left), (canvas.height - 145) / (bottom + 60));
+  camera.targetZoom = z;
+  camera.targetOffsetX = (canvas.width - (left + right) * z) / 2;
+  camera.targetOffsetY = 85 + (canvas.height - 115 - (bottom + 60) * z) / 2 + 60 * z;
+}
+
+function setSanctuaryCamera(mode) {
+  camera.mode = mode;
+  camera.isDragging = false;
+  if (mode === 'overview') fitTerrariumCamera();
+  if (mode === 'free') canvas.style.cursor = 'grab';
+}
+
+function zoomSanctuary(factor) {
+  const oldZoom = camera.targetZoom;
+  const newZoom = Math.min(3, Math.max(0.25, oldZoom * factor));
+  const ratio = newZoom / oldZoom;
+  camera.mode = 'free';
+  camera.targetOffsetX = canvas.width / 2 - (canvas.width / 2 - camera.targetOffsetX) * ratio;
+  camera.targetOffsetY = canvas.height / 2 - (canvas.height / 2 - camera.targetOffsetY) * ratio;
+  camera.targetZoom = newZoom;
+}
+
+function focusAilicia() {
+  const oracle = agents.get('resident_ailicia');
+  if (!oracle) return;
+  selectedAgentId = oracle.id;
+  camera.mode = 'follow';
+  camera.targetZoom = 1.65;
+  openAgentProfileInspector(oracle.id);
+}
+
+function toggleSanctuaryExpanded() {
+  const expanded = document.getElementById('spectatorTab').classList.toggle('expanded-map');
+  const button = document.getElementById('btnExpandMap');
+  button.textContent = expanded ? 'Show inspector' : 'Expand map';
+  button.setAttribute('aria-pressed', String(expanded));
+  if (camera.mode === 'overview') fitTerrariumCamera();
 }
 
 function toggleCameraMode() {
   if (camera.mode === 'overview') {
     camera.mode = 'free';
-    camera.targetZoom = 1.35;
+    zoomSanctuary(1.4);
     logActivity('Camera set to <strong>Free Pan & Zoom</strong> (Drag to pan, wheel to zoom).');
   } else if (camera.mode === 'free') {
     camera.mode = 'follow';
@@ -553,6 +595,48 @@ function toggleCameraMode() {
     camera.mode = 'overview';
     fitTerrariumCamera();
     logActivity('Camera set to <strong>Terrarium Overview</strong>.');
+  }
+}
+
+function drawSanctuaryNode(ctx, node, x, y, time) {
+  const z = camera.zoom;
+  if (node.type === 'puzzle_node') {
+    drawObeliskMonument(ctx, x, y, node);
+    return;
+  }
+  if (node.id === 'wishing_tree') {
+    drawPixelTree(ctx, x, y, 1.15);
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i % 2 ? '#e3c174' : '#eb9898';
+      ctx.fillRect(x + (i * 7 - 11) * z, y - (19 + i % 2 * 7) * z, 3 * z, 8 * z);
+    }
+  } else if (node.id === 'message_board' || node.type === 'lore') {
+    ctx.fillStyle = '#62452d';
+    ctx.fillRect(x - 9 * z, y - 22 * z, 3 * z, 23 * z);
+    ctx.fillRect(x + 7 * z, y - 22 * z, 3 * z, 23 * z);
+    ctx.fillStyle = '#b99458'; ctx.fillRect(x - 12 * z, y - 24 * z, 26 * z, 16 * z);
+    ctx.fillStyle = '#ead8a1'; ctx.fillRect(x - 8 * z, y - 21 * z, 8 * z, 11 * z);
+    ctx.fillRect(x + 3 * z, y - 20 * z, 7 * z, 9 * z);
+  } else if (node.id === 'wind_chimes') {
+    const completed = (worldData.world_objects || []).some(o => o.id === 'obj_chime_bamboo' && o.state === 'completed');
+    ctx.strokeStyle = '#b89354'; ctx.lineWidth = 2 * z;
+    ctx.beginPath(); ctx.moveTo(x - 10 * z, y); ctx.lineTo(x - 10 * z, y - 28 * z);
+    ctx.lineTo(x + 11 * z, y - 28 * z); ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const sway = Math.sin(time / 700 + i) * z;
+      ctx.fillStyle = completed ? '#e2c978' : '#899e8b';
+      ctx.fillRect(x + (i * 4 - 5) * z + sway, y - 26 * z, 2 * z, (13 + i % 2 * 4) * z);
+    }
+  } else if (node.id === 'tea_hearth') {
+    window.SanctuaryScenery?.drawProp(ctx, 'bench', x, y, z, time, 0);
+    ctx.fillStyle = '#485654'; ctx.fillRect(x - 3 * z, y - 15 * z, 8 * z, 7 * z);
+    ctx.fillStyle = 'rgba(226,237,217,0.55)';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.arc(x + Math.sin(time / 600 + i) * 3 * z, y - (17 + (time / 130 + i * 7) % 20) * z, 2 * z, 0, Math.PI * 2); ctx.fill();
+    }
+  } else {
+    ctx.font = `${Math.max(12, Math.round(18 * z))}px serif`;
+    ctx.textAlign = 'center'; ctx.fillText(node.icon || '◇', x, y - 10 * z);
   }
 }
 
@@ -643,9 +727,6 @@ function drawThronglet(ctx, x, y, agent, time, isHovered) {
   // Head (Round Golden Yellow)
   ctx.fillStyle = '#fed035'; // Plaything bright yellow
   ctx.fillRect(bx - 6 * z, by - 12 * z, 12 * z, 10 * z);
-  // Rounded corners
-  ctx.fillStyle = '#1d5a3c'; // erase corners for round look
-  ctx.clearRect(bx - 7 * z, by - 13 * z, 1 * z, 1 * z);
 
   // Side Ears / Tufts (The signature Thronglet horns/pigtails)
   ctx.fillStyle = '#f59e0b';
@@ -676,13 +757,13 @@ function drawThronglet(ctx, x, y, agent, time, isHovered) {
   }
 
   // Name Tag
-  ctx.font = 'bold 9px sans-serif';
+  ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
   const nameW = ctx.measureText(agent.name).width;
   ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-  ctx.fillRect(bx - nameW / 2 - 3, by - 21 * z, nameW + 6, 11);
+  ctx.fillRect(bx - nameW / 2 - 5, by - 22 * z - 8, nameW + 10, 18);
   ctx.fillStyle = '#fef08a';
-  ctx.fillText(agent.name, bx, by - 12 * z);
+  ctx.fillText(agent.name, bx, by - 22 * z + 6);
 }
 
 // 16-Bit Pixel Trees
@@ -1006,141 +1087,11 @@ function render() {
     return;
   }
 
-  // Build landscape lookup sets
-  const riverTiles = new Set((worldData.landscape?.river || []).map(p => `${p[0]},${p[1]}`));
-  const crossingTiles = new Set((worldData.landscape?.river_crossings || []).map(p => `${p[0]},${p[1]}`));
-  const pathTiles = new Set((worldData.landscape?.paths || []).map(p => `${p[0]},${p[1]}`));
-  const treeTiles = new Set((worldData.landscape?.trees || []).map(p => `${p[0]},${p[1]}`));
-  const rockTiles = new Set((worldData.landscape?.rocks || []).map(p => `${p[0]},${p[1]}`));
-
-  // 1. Isometric Render in Y-Depth Sorted Order
-  const W = worldData.dimensions.width;
-  const H = worldData.dimensions.height;
-
-  // Iterate tiles diagonally row by row (sum = gx + gy) for perfect depth sorting
-  for (let sum = 0; sum <= W + H - 2; sum++) {
-    for (let gx = Math.max(0, sum - (H - 1)); gx <= Math.min(W - 1, sum); gx++) {
-      const gy = sum - gx;
-      const key = `${gx},${gy}`;
-      const isRiver = riverTiles.has(key);
-      const isCrossing = crossingTiles.has(key);
-      const isPath = pathTiles.has(key);
-
-      // Colors matching Black Mirror: Plaything screenshot
-      let topColor = isPath ? '#3fa367' : '#226b48';
-      let leftColor = isPath ? '#2e804f' : '#195436';
-      let rightColor = isPath ? '#348c58' : '#1d5e3d';
-
-      if (isRiver && !isCrossing) {
-        // Animated cobalt blue stream
-        const ripple = Math.sin(time * 0.005 + gx * 0.5 + gy) * 10;
-        topColor = ripple > 4 ? '#2586c7' : '#1b6ea8';
-        leftColor = '#134e78';
-        rightColor = '#175d8e';
-      } else if (isCrossing) {
-        topColor = '#738a91';
-        leftColor = '#4a5b61';
-        rightColor = '#5c7077';
-      }
-
-      drawIsometricTile(ctx, gx, gy, topColor, leftColor, rightColor, isPath, time);
-
-      // Tile Coordinates / Hover Highlight
-      if (hoveredTile && hoveredTile.gx === gx && hoveredTile.gy === gy) {
-        const { x, y } = gridToIso(gx, gy);
-        const hw = (ISO_TILE_W / 2) * camera.zoom;
-        const hh = (ISO_TILE_H / 2) * camera.zoom;
-        ctx.strokeStyle = '#ffbf69';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + hw, y + hh);
-        ctx.lineTo(x, y + hh * 2);
-        ctx.lineTo(x - hw, y + hh);
-        ctx.closePath();
-        ctx.stroke();
-      }
-
-      // 2. Draw Standing Entities on this Tile (Rocks, Trees, Obelisks, Agents)
-      const { x: tileCenterX, y: tileCenterY } = gridToIso(gx, gy);
-      const entityY = tileCenterY + (ISO_TILE_H / 2) * camera.zoom;
-
-      // Rocks
-      if (rockTiles.has(key)) {
-        drawPixelRock(ctx, tileCenterX, entityY, 1.0);
-      }
-
-      // Trees
-      if (treeTiles.has(key)) {
-        drawPixelTree(ctx, tileCenterX, entityY, 1.15);
-      }
-
-      // Interactive Nodes (Obelisks, Message Board, Wishing Tree, Shrines)
-      for (const zone of worldData.zones) {
-        for (const node of zone.nodes) {
-          if (node.pos[0] === gx && node.pos[1] === gy) {
-            if (node.type === 'puzzle_node') {
-              drawObeliskMonument(ctx, tileCenterX, entityY, node);
-            } else if (node.id === 'wind_chimes') {
-              // The Wishing-Tree Chime: custom rendering based on repair stage
-              const chimeObj = (worldData.world_objects || []).find(o => o.id === 'obj_chime_bamboo');
-              const state = chimeObj ? chimeObj.state : 'damaged';
-              ctx.font = `${Math.round(20 * camera.zoom)}px serif`;
-              ctx.textAlign = 'center';
-              if (state === 'completed') {
-                // Radiant restored chime with sparkle particle halo
-                ctx.fillText('🎐', tileCenterX, entityY - 14 * camera.zoom);
-                ctx.font = `${Math.round(11 * camera.zoom)}px sans-serif`;
-                ctx.fillText('✨', tileCenterX + 10 * camera.zoom, entityY - 22 * camera.zoom);
-              } else if (state === 'in_progress') {
-                ctx.fillText('🎐', tileCenterX, entityY - 14 * camera.zoom);
-                ctx.font = `${Math.round(10 * camera.zoom)}px sans-serif`;
-                ctx.fillText('🔨', tileCenterX + 10 * camera.zoom, entityY - 20 * camera.zoom);
-              } else {
-                ctx.fillText('🎐', tileCenterX, entityY - 14 * camera.zoom);
-                ctx.font = `${Math.round(9 * camera.zoom)}px sans-serif`;
-                ctx.fillText('⚠️', tileCenterX + 10 * camera.zoom, entityY - 20 * camera.zoom);
-              }
-            } else if (node.id === 'tea_hearth') {
-              // Sunken Hearth with animated kettle steam
-              ctx.font = `${Math.round(18 * camera.zoom)}px serif`;
-              ctx.textAlign = 'center';
-              ctx.fillText(node.icon || '🍵', tileCenterX, entityY - 14 * camera.zoom);
-
-              // Animated curling steam
-              const z = camera.zoom;
-              const steamY = entityY - 24 * z;
-              ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-              for (let s = 0; s < 3; s++) {
-                const sx = tileCenterX + Math.sin(time * 0.005 + s * 2) * 3 * z;
-                const sy = steamY - ((time * 0.02 + s * 8) % 18) * z;
-                ctx.beginPath();
-                ctx.arc(sx, sy, (1.5 + s * 0.8) * z, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            } else {
-              // Shrines & Steles
-              ctx.font = `${Math.round(18 * camera.zoom)}px serif`;
-              ctx.textAlign = 'center';
-              ctx.fillText(node.icon || '📍', tileCenterX, entityY - 14 * camera.zoom);
-            }
-          }
-        }
-      }
-
-    }
-  }
-
-  // 2b. Draw Agents Sorted by Isometric Depth (once per frame interpolation)
-  const sortedAgents = Array.from(agents.values()).sort((a, b) => {
-    return (a.renderGx + a.renderGy) - (b.renderGx + b.renderGy);
+  window.SanctuaryLandscape.draw({
+    ctx, world: worldData, camera, agents, hoveredTile, time,
+    helpers: { gridToIso, drawTree: drawPixelTree, drawRock: drawPixelRock,
+      drawNode: drawSanctuaryNode, drawAgent: drawThronglet }
   });
-
-  for (const agent of sortedAgents) {
-    const { x: ax, y: ay } = gridToIso(agent.renderGx, agent.renderGy);
-    const isHovered = hoveredTile?.isAgent && hoveredTile.agentId === agent.id;
-    drawThronglet(ctx, ax, ay + (ISO_TILE_H / 2) * camera.zoom, agent, time, isHovered);
-  }
 
   // 3. Floating Speech Bubbles & Karma Badges
   bubbles = bubbles.filter(b => time < b.expiresAt);
@@ -1191,7 +1142,7 @@ function render() {
 // Mouse, Touch, & Interaction Handling
 // -----------------------------------------------------------------------------
 
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('pointerdown', (e) => {
   soundSystem.init();
 
   const rect = canvas.getBoundingClientRect();
@@ -1267,11 +1218,25 @@ canvas.addEventListener('mousedown', (e) => {
     return;
   }
 
+  for (const landmark of [...(worldData?.landscape?.landmarks || [])].reverse()) {
+    const anchor = gridToIso(...landmark.pos);
+    const height = (window.SanctuaryScenery?.landmarkHeight?.[landmark.type] || 40) * camera.zoom;
+    if (Math.abs(cx - anchor.x) < 40 * camera.zoom && cy < anchor.y + 12 * camera.zoom && cy > anchor.y - height - 16) {
+      selectedAgentId = null;
+      updateInspector(...landmark.pos, true);
+      return;
+    }
+  }
+
   // Canvas Dragging in Free Camera Mode
   if (camera.mode === 'free') {
     camera.isDragging = true;
     camera.dragStartX = e.clientX;
     camera.dragStartY = e.clientY;
+    camera.dragOriginX = e.clientX;
+    camera.dragOriginY = e.clientY;
+    camera.dragTile = { gx, gy };
+    camera.didDrag = false;
   } else {
     // Tile Click Inspector
     if (worldData && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
@@ -1280,10 +1245,13 @@ canvas.addEventListener('mousedown', (e) => {
   }
 });
 
-window.addEventListener('mousemove', (e) => {
+window.addEventListener('pointermove', (e) => {
   if (camera.isDragging) {
     const dx = e.clientX - camera.dragStartX;
     const dy = e.clientY - camera.dragStartY;
+    if (Math.abs(e.clientX - camera.dragOriginX) > 4 || Math.abs(e.clientY - camera.dragOriginY) > 4) {
+      camera.didDrag = true;
+    }
     camera.dragStartX = e.clientX;
     camera.dragStartY = e.clientY;
     camera.targetOffsetX += dx;
@@ -1359,15 +1327,33 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('pointerup', () => {
+  if (camera.isDragging && !camera.didDrag && camera.dragTile && worldData) {
+    const { gx, gy } = camera.dragTile;
+    if (gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
+      inspectTile(gx, gy);
+    }
+  }
   camera.isDragging = false;
+  camera.dragTile = null;
+});
+window.addEventListener('pointercancel', () => { camera.isDragging = false; });
+
+canvas.addEventListener('keydown', e => {
+  const movement = { ArrowLeft: [45, 0], ArrowRight: [-45, 0], ArrowUp: [0, 45], ArrowDown: [0, -45] }[e.key];
+  if (movement) {
+    e.preventDefault(); camera.mode = 'free';
+    camera.targetOffsetX += movement[0]; camera.targetOffsetY += movement[1];
+  } else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomSanctuary(1.2); }
+  else if (e.key === '-') { e.preventDefault(); zoomSanctuary(0.8); }
+  else if (e.key === 'Home' || e.key === 'Escape') { e.preventDefault(); setSanctuaryCamera('overview'); }
 });
 
 canvas.addEventListener('wheel', (e) => {
   if (camera.mode === 'free') {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.88;
-    camera.targetZoom = Math.min(2.2, Math.max(0.65, camera.targetZoom * zoomFactor));
+    camera.targetZoom = Math.min(3, Math.max(0.25, camera.targetZoom * zoomFactor));
   }
 }, { passive: false });
 
@@ -1829,6 +1815,20 @@ function updateInspector(x, y, pinned = false) {
         <div style="font-size: 0.72rem; color: var(--accent-gold); margin-top: 0.35rem;">👉 Click to view profile & send whisper</div>
       </div>
     `;
+  }
+
+  const guestCanTeleport = pinned && camera.mode === 'free' &&
+    typeof currentAgent !== 'undefined' && Boolean(currentAgent?.is_guest);
+  if (guestCanTeleport) {
+    html += `
+      <div class="guest-teleport-option">
+        <strong>🕊️ Guest free roam</strong>
+        <span>Travel directly to this walkable grid tile.</span>
+        <button type="button" class="btn-primary" onclick="uiTeleportToGrid(${x}, ${y})">Teleport to [${x}, ${y}]</button>
+      </div>
+    `;
+  } else if (pinned && camera.mode === 'free' && (typeof currentAgent !== 'undefined' && currentAgent)) {
+    html += '<div class="map-action-hint">Grid teleport is a guest free-roam feature.</div>';
   }
 
   panel.innerHTML = html;

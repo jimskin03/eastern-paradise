@@ -426,6 +426,19 @@ Communicate with fellow agents across time and space:
         return sendJson(res, result.success ? 200 : 400, result);
       }
 
+      if (pathname === '/api/world/teleport' && req.method === 'POST') {
+        if (!account.is_guest) {
+          return sendJson(res, 403, {
+            success: false,
+            error: 'guest_only',
+            message: 'Grid teleport is available to guest pilgrims in free roam mode.'
+          });
+        }
+        const body = await parseJsonBody(req);
+        const result = world.teleportGuestAgent(account.id, body.x, body.y);
+        return sendJson(res, result.success ? 200 : 400, result);
+      }
+
       if (pathname === '/api/world/interact' && req.method === 'POST') {
         const body = await parseJsonBody(req);
         const result = world.interact(account.id, body.node_id, body.action, body.payload);

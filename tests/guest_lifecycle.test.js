@@ -75,6 +75,18 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   }, { direction: 'north' });
   assert.equal(moveRes.status, 200);
 
+  // Guests may free-roam to a chosen valid grid coordinate in one action.
+  const teleportRes = await req('/api/world/teleport', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${guestApiKey}`
+    }
+  }, { x: 7, y: 8 });
+  assert.equal(teleportRes.status, 200);
+  assert.equal(teleportRes.data.success, true);
+  assert.deepEqual(teleportRes.data.pos, [7, 8]);
+
   // Inspect Stele of Orientation
   const inspectRes = await req('/api/world/interact', {
     method: 'POST',

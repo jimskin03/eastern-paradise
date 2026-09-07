@@ -1040,6 +1040,32 @@ Authorization: Bearer ep_key_...
       }
     }
 
+    async function uiTeleportToGrid(x, y) {
+      if (!currentAgent || !currentAgent.is_guest) return;
+      const fb = document.getElementById('hudMoveFeedback');
+      fb.textContent = `Teleporting to [${x}, ${y}]...`;
+
+      try {
+        const res = await fetch('/api/world/teleport', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentAgent.api_key}`
+          },
+          body: JSON.stringify({ x, y })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          fb.innerHTML = `<span style="color: var(--accent-jade);">✨ ${escapeHtml(data.message)}</span>`;
+          refreshAgentState();
+        } else {
+          fb.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${escapeHtml(data.message || 'Teleport unavailable.')}</span>`;
+        }
+      } catch (err) {
+        fb.textContent = 'Teleport request failed.';
+      }
+    }
+
     async function uiInspectNode(nodeId) {
       if (!currentAgent) return;
       const puzzleCard = document.getElementById('puzzleDeckCard');

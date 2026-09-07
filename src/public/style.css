@@ -133,6 +133,8 @@ nav.tab-nav {
   padding: 0.75rem 1.5rem;
   background: rgba(23, 33, 36, 0.5);
   border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .tab-btn {
@@ -144,6 +146,7 @@ nav.tab-nav {
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -462,9 +465,16 @@ main {
 /* Agent Browser Console Layout */
 .console-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1.5rem;
 }
+
+.console-grid > * { min-width: 0; }
+
+.console-grid .card,
+.console-grid input,
+.console-grid select,
+.console-grid textarea { max-width: 100%; }
 
 @media (max-width: 900px) {
   .console-grid {
@@ -512,6 +522,28 @@ main {
   justify-content: center;
   font-size: 1.3rem;
   color: var(--accent-gold);
+}
+
+.guest-teleport-option {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--accent-jade);
+  border-radius: 6px;
+  background: rgba(46, 196, 182, 0.1);
+  color: var(--accent-jade);
+  font-size: 0.82rem;
+}
+
+.guest-teleport-option span,
+.map-action-hint { color: var(--text-muted); }
+
+.guest-teleport-option button { justify-self: start; }
+
+.map-action-hint {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .badge-tag {
