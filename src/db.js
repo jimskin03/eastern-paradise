@@ -14,7 +14,7 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const DB_PATH = path.join(DATA_DIR, 'paradise.db');
+export const DB_PATH = path.join(DATA_DIR, 'paradise.db');
 export const db = new DatabaseSync(DB_PATH);
 
 // Initialize schema

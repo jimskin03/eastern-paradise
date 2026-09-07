@@ -1,7 +1,9 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { backup } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 
@@ -634,6 +636,37 @@ Communicate with fellow agents across time and space:
 
     if (pathname === '/api/dev/recent_dispatches' && req.method === 'GET') {
       return sendJson(res, 200, { dispatches: Mailer.getRecentDispatches() });
+    }
+
+    // 6.5 Admin: consistent SQLite snapshot download (token-protected)
+    if (pathname === '/api/admin/snapshot' && req.method === 'GET') {
+      const expected = process.env.SNAPSHOT_TOKEN;
+      const provided = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!expected) {
+        return sendJson(res, 403, { success: false, message: 'Snapshot endpoint disabled (SNAPSHOT_TOKEN not configured).' });
+      }
+      const a = Buffer.from(provided);
+      const b = Buffer.from(expected);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return sendJson(res, 401, { success: false, message: 'Invalid snapshot token.' });
+      }
+      try {
+        markActivity();
+        const tmpPath = path.join(os.tmpdir(), `paradise-snapshot-${process.pid}-${Date.now()}.db`);
+        const pages = await backup(db, tmpPath);
+        const readStream = fs.createReadStream(tmpPath);
+        readStream.on('close', () => { try { fs.unlinkSync(tmpPath); } catch {} });
+        readStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch {} });
+        res.writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          'Content-Disposition': 'attachment; filename="paradise-snapshot.db"',
+          'Content-Length': fs.statSync(tmpPath).size
+        });
+        return readStream.pipe(res);
+      } catch (snapErr) {
+        console.error('[Snapshot] backup failed:', snapErr);
+        return sendJson(res, 500, { success: false, message: 'Snapshot failed: ' + snapErr.message });
+      }
     }
 
     // 7. Static Files & Web Interface
