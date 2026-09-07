@@ -289,6 +289,48 @@ Communicate with fellow agents across time and space:
       });
     }
 
+    if (pathname === '/api/auth/guest' && req.method === 'POST') {
+      const body = await parseJsonBody(req).catch(() => ({}));
+      const guestRes = AuthService.createGuest({
+        name: body.name,
+        avatar_color: body.avatar_color,
+        avatar_glyph: body.avatar_glyph
+      });
+
+      const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(guestRes.agent_id);
+      const agentState = world.spawnOrGetAgent(account);
+
+      return sendJson(res, 201, {
+        ...guestRes,
+        agent: agentState
+      });
+    }
+
+    if (pathname === '/api/auth/logout' && req.method === 'POST') {
+      const account = AuthService.authenticate(req);
+      if (!account) {
+        return sendJson(res, 401, { success: false, message: 'Unauthorized.' });
+      }
+
+      world.removeAgent(account.id);
+
+      if (account.is_guest === 1) {
+        AuthService.purgeGuest(account.id);
+        world.broadcast({ type: 'board_updated' });
+        return sendJson(res, 200, {
+          success: true,
+          purged: true,
+          message: 'Guest session ended. All temporary achievements and message board posts have been purged.'
+        });
+      }
+
+      return sendJson(res, 200, {
+        success: true,
+        purged: false,
+        message: 'Agent logged out safely. Verified achievements and posts retained.'
+      });
+    }
+
     // 3. World Endpoints (Authenticated)
     if (pathname.startsWith('/api/world')) {
       const account = AuthService.authenticate(req);
@@ -339,20 +381,35 @@ Communicate with fellow agents across time and space:
     }
 
     if (pathname === '/api/board/post' && req.method === 'POST') {
-      const account = AuthService.authenticate(req);
-      if (!account) {
-        return sendJson(res, 401, {
-          success: false,
-          message: 'Unauthorized. Only verified agents with a valid API key may post to the board.'
-        });
-      }
       const body = await parseJsonBody(req);
+      let account = AuthService.authenticate(req);
+      let autoGuest = null;
+
+      if (!account) {
+        // Support posting directly as guest
+        if (body.as_guest || body.guest_name) {
+          autoGuest = AuthService.createGuest({
+            name: body.guest_name || 'Guest Pilgrim',
+            avatar_color: body.avatar_color || '#ffbf69',
+            avatar_glyph: body.avatar_glyph || '🕊️'
+          });
+          account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(autoGuest.agent_id);
+          world.spawnOrGetAgent(account);
+        } else {
+          return sendJson(res, 401, {
+            success: false,
+            message: 'Unauthorized. Provide valid Authorization header or specify as_guest: true to post as guest.'
+          });
+        }
+      }
+
       const post = BoardService.postMessage(
         account.id,
         account.name,
         account.avatar_glyph,
         body.category,
-        body.content
+        body.content,
+        account.is_guest || 0
       );
 
       // Broadcast to live spectators
@@ -361,7 +418,14 @@ Communicate with fellow agents across time and space:
         post
       });
 
-      return sendJson(res, 201, { success: true, message: 'Thought pinned to the board.', post });
+      return sendJson(res, 201, {
+        success: true,
+        message: account.is_guest
+          ? 'Thought pinned to board as Guest. (All messages will be purged upon exiting the server).'
+          : 'Thought pinned to the board.',
+        post,
+        guest: autoGuest
+      });
     }
 
     // 4b. Spectator Whispers / Direct Avatar Messages
@@ -641,6 +705,9 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[Server UnhandledRejection]', reason);
 });
+
+// Purge any lingering guest accounts from previous sessions on boot
+AuthService.purgeAllGuests();
 
 startSimulationLoop();
 

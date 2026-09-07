@@ -401,6 +401,12 @@ function handleServerMessage(msg) {
       soundSystem.play('chime');
       break;
 
+    case 'board_updated':
+      if (typeof refreshBoard === 'function') {
+        refreshBoard();
+      }
+      break;
+
 
     case 'agent_customized': {
       const existing = agents.get(msg.agentId);

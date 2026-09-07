@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
+import { AuthService } from './auth.js';
 import { PuzzleManager } from './puzzles.js';
 import { BoardService } from './board.js';
 
@@ -81,7 +82,8 @@ export class WorldEngine {
       zone_name: arrivalZone.name,
       avatar_color: account.avatar_color || '#48bb78',
       avatar_glyph: account.avatar_glyph || '☯',
-      status: 'Awakened at the Gate',
+      is_guest: account.is_guest ? 1 : 0,
+      status: account.is_guest ? 'Guest Pilgrim in Sanctuary' : 'Awakened at the Gate',
       last_active: Date.now()
     };
 
@@ -95,6 +97,12 @@ export class WorldEngine {
       const agent = this.activeAgents.get(agentId);
       this.activeAgents.delete(agentId);
       this.broadcast({ type: 'agent_left', agentId, name: agent.name });
+
+      // If guest account, automatically purge all achievements, messages, and temporary profile upon exiting
+      if (agent.is_guest) {
+        AuthService.purgeGuest(agentId);
+        this.broadcast({ type: 'board_updated' });
+      }
     }
   }
 

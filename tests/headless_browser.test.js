@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
+import http from 'node:http';
+import { spawn } from 'node:child_process';
 
 function getBrowserPath() {
   const candidates = [
@@ -16,11 +18,31 @@ function getBrowserPath() {
   return null;
 }
 
+async function isServerRunning(port = 3000) {
+  return new Promise(resolve => {
+    const req = http.get(`http://localhost:${port}/api/status`, res => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(400, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
 test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) => {
   const browserPath = getBrowserPath();
   if (!browserPath) {
     console.log('Skipping headless browser test: no Chrome or Edge binary found.');
     return;
+  }
+
+  let spawnedServer = null;
+  const running = await isServerRunning(3000);
+  if (!running) {
+    spawnedServer = spawn('node', ['src/server.js'], { cwd: process.cwd() });
+    await new Promise(r => setTimeout(r, 800));
   }
 
   const browser = await puppeteer.launch({
@@ -31,6 +53,9 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
 
   t.after(async () => {
     await browser.close();
+    if (spawnedServer) {
+      spawnedServer.kill();
+    }
   });
 
   const page = await browser.newPage();

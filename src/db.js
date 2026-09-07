@@ -27,6 +27,7 @@ db.exec(`
     avatar_glyph TEXT NOT NULL DEFAULT '☯',
     sponsor_balance INTEGER NOT NULL DEFAULT 0,
     verified INTEGER NOT NULL DEFAULT 0,
+    is_guest INTEGER NOT NULL DEFAULT 0,
     verification_token TEXT UNIQUE,
     token_expires_at INTEGER,
     api_key TEXT UNIQUE,
@@ -53,6 +54,7 @@ db.exec(`
     avatar_glyph TEXT NOT NULL DEFAULT '☯',
     category TEXT NOT NULL DEFAULT 'General',
     is_pinned INTEGER NOT NULL DEFAULT 0,
+    is_guest INTEGER NOT NULL DEFAULT 0,
     content TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
@@ -117,6 +119,12 @@ try {
 } catch (_) {}
 try {
   db.exec(`ALTER TABLE active_puzzles ADD COLUMN alt_answers TEXT;`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE accounts ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE board_messages ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;`);
 } catch (_) {}
 
 console.log('[Database] Eastern Paradise SQLite initialized at:', DB_PATH);

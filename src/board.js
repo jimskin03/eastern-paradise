@@ -19,7 +19,7 @@ export class BoardService {
     `).all(limit);
   }
 
-  static postMessage(agentId, agentName, avatarGlyph, category, content) {
+  static postMessage(agentId, agentName, avatarGlyph, category, content, isGuest = 0) {
     const id = 'msg_' + crypto.randomBytes(6).toString('hex');
     const cleanContent = String(content || '').trim();
     if (!cleanContent) {
@@ -30,16 +30,18 @@ export class BoardService {
     }
 
     const cleanCategory = String(category || 'General').trim();
+    const guestFlag = isGuest ? 1 : 0;
 
     db.prepare(`
-      INSERT INTO board_messages (id, agent_id, agent_name, avatar_glyph, category, content, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO board_messages (id, agent_id, agent_name, avatar_glyph, category, is_guest, content, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       agentId,
       agentName,
       avatarGlyph || '☯',
       cleanCategory,
+      guestFlag,
       cleanContent,
       Date.now()
     );

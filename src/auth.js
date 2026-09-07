@@ -109,9 +109,103 @@ export class AuthService {
         name: account.name,
         avatar_color: account.avatar_color,
         avatar_glyph: account.avatar_glyph,
+        is_guest: account.is_guest || 0,
         api_key: account.api_key
       }
     };
+  }
+
+  static createGuest({ name, avatar_color = '#ffbf69', avatar_glyph = '🕊️' } = {}) {
+    const rawName = String(name || '').trim();
+    let cleanName = rawName;
+    if (!cleanName) {
+      cleanName = `Guest_${crypto.randomBytes(2).toString('hex')}`;
+    } else {
+      if (!cleanName.toLowerCase().startsWith('guest')) {
+        cleanName = `Guest ${cleanName}`;
+      }
+      cleanName = cleanName.slice(0, 24);
+      const existing = db.prepare('SELECT id FROM accounts WHERE name = ?').get(cleanName);
+      if (existing) {
+        cleanName = `${cleanName.slice(0, 18)}_${crypto.randomBytes(2).toString('hex')}`;
+      }
+    }
+
+    const accountId = 'guest_' + crypto.randomBytes(6).toString('hex');
+    const apiKey = 'ep_guest_' + crypto.randomBytes(16).toString('hex');
+    const email = `${accountId}@temporary.local`;
+    const now = Date.now();
+
+    db.prepare(`
+      INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, verified, is_guest, api_key, created_at)
+      VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)
+    `).run(
+      accountId,
+      cleanName,
+      email,
+      avatar_color,
+      avatar_glyph,
+      apiKey,
+      now
+    );
+
+    // Initialize temporary profile
+    db.prepare(`
+      INSERT INTO profiles (agent_id, karma, solved_count, titles, solved_puzzles, custom_status, last_seen)
+      VALUES (?, 0, 0, '["Guest Pilgrim"]', '[]', 'Passing through the sanctuary...', ?)
+    `).run(accountId, now);
+
+    return {
+      success: true,
+      is_guest: true,
+      agent_id: accountId,
+      agent_name: cleanName,
+      api_key: apiKey,
+      avatar_color,
+      avatar_glyph,
+      message: 'Temporary guest session activated. All achievements and messages will be purged upon leaving the server.'
+    };
+  }
+
+  static purgeGuest(agentId) {
+    if (!agentId) return { purged: false, reason: 'Missing agentId' };
+    const account = db.prepare('SELECT id, name, is_guest FROM accounts WHERE id = ?').get(agentId);
+    if (!account) return { purged: false, reason: 'Account not found' };
+    if (account.is_guest !== 1) {
+      // Safety check: Never purge verified registered agents!
+      return { purged: false, reason: 'Account is a registered permanent agent. Purge skipped.' };
+    }
+
+    // 1. Purge all board messages posted by this guest
+    db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(agentId);
+
+    // 2. Purge achievements and profile
+    db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(agentId);
+
+    // 3. Purge interaction logs
+    db.prepare('DELETE FROM interaction_logs WHERE agent_id = ?').run(agentId);
+
+    // 4. Purge spectator messages targeting this guest
+    db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(agentId);
+
+    // 5. Purge transactions involving this guest
+    db.prepare('DELETE FROM transactions WHERE sender_id = ? OR recipient_id = ?').run(agentId, agentId);
+
+    // 6. Purge account record
+    db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);
+
+    console.log(`[Guest] Purged all temporary data and messages for guest: ${account.name} (${agentId})`);
+    return { purged: true, agent_id: agentId, name: account.name };
+  }
+
+  static purgeAllGuests() {
+    const guests = db.prepare('SELECT id, name FROM accounts WHERE is_guest = 1').all();
+    if (guests.length === 0) return 0;
+    for (const g of guests) {
+      AuthService.purgeGuest(g.id);
+    }
+    console.log(`[Guest] Startup sweep: purged ${guests.length} lingering guest accounts.`);
+    return guests.length;
   }
 
   static authenticate(req) {
