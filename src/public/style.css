@@ -704,4 +704,96 @@ main {
   transform: translateY(0);
 }
 
+/* Living Sanctuary: Resident Inspector & Journal Styles */
+.resident-badge-role {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(214, 158, 46, 0.2);
+  border: 1px solid #d69e2e;
+  color: #ecc94b;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.need-bar-wrap {
+  margin-bottom: 0.4rem;
+}
+
+.need-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.need-progress-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.need-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.need-progress-fill.energy { background: linear-gradient(90deg, #dd6b20, #ecc94b); }
+.need-progress-fill.curiosity { background: linear-gradient(90deg, #319795, #4fd1c5); }
+.need-progress-fill.social { background: linear-gradient(90deg, #805ad5, #b794f4); }
+
+.resident-relationships-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.resident-relationship-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.73rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.resident-memories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.resident-memory-item {
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: 0 4px 4px 0;
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+/* Journal tab elements */
+.journal-event-card {
+  background: rgba(20, 32, 33, 0.65);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.6rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.journal-event-card:hover {
+  border-color: var(--accent-jade);
+}
+
 

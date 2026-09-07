@@ -101,7 +101,101 @@ db.exec(`
     target_agent_id TEXT NOT NULL,
     sender_name TEXT NOT NULL,
     content TEXT NOT NULL,
+    delivery_status TEXT NOT NULL DEFAULT 'delivered',
+    acknowledged_at INTEGER,
+    response_text TEXT,
     created_at INTEGER NOT NULL
+  );
+
+  -- Living Sanctuary: Resident society, memories, relationships, and shared objects
+  CREATE TABLE IF NOT EXISTS resident_traits (
+    agent_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL,
+    traits TEXT NOT NULL,
+    aspiration TEXT NOT NULL,
+    preferred_locations TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_runtime (
+    agent_id TEXT PRIMARY KEY,
+    controller_type TEXT NOT NULL DEFAULT 'resident',
+    energy REAL NOT NULL DEFAULT 100.0,
+    curiosity REAL NOT NULL DEFAULT 80.0,
+    social REAL NOT NULL DEFAULT 70.0,
+    current_goal TEXT,
+    public_intent TEXT,
+    action_state TEXT NOT NULL DEFAULT 'idle',
+    target_pos TEXT,
+    target_node TEXT,
+    action_started_at INTEGER,
+    action_duration_ms INTEGER DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS relationships (
+    agent_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    familiarity REAL NOT NULL DEFAULT 10.0,
+    trust REAL NOT NULL DEFAULT 10.0,
+    last_interaction_at INTEGER NOT NULL,
+    PRIMARY KEY(agent_id, target_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_memories (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    emotional_valence REAL NOT NULL DEFAULT 0.0,
+    significance INTEGER NOT NULL DEFAULT 1,
+    summary TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_promises (
+    id TEXT PRIMARY KEY,
+    from_agent TEXT NOT NULL,
+    to_agent TEXT NOT NULL,
+    promise_type TEXT NOT NULL,
+    payload TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS world_objects (
+    id TEXT PRIMARY KEY,
+    zone_id TEXT NOT NULL,
+    pos_x INTEGER NOT NULL,
+    pos_y INTEGER NOT NULL,
+    object_type TEXT NOT NULL,
+    state TEXT NOT NULL,
+    visual_variant TEXT NOT NULL DEFAULT 'default',
+    contributors TEXT NOT NULL DEFAULT '[]',
+    data TEXT NOT NULL DEFAULT '{}',
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS world_events (
+    id TEXT PRIMARY KEY,
+    seq INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    actor_id TEXT,
+    actor_name TEXT,
+    target_id TEXT,
+    target_name TEXT,
+    zone_id TEXT,
+    description TEXT NOT NULL,
+    payload TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS world_clock (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    tick_count INTEGER NOT NULL DEFAULT 0,
+    epoch_awake_at INTEGER NOT NULL,
+    last_tick_at INTEGER NOT NULL
   );
 `);
 
@@ -130,6 +224,21 @@ try {
 try {
   db.exec(`ALTER TABLE board_messages ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;`);
 } catch (_) {}
+try {
+  db.exec(`ALTER TABLE spectator_messages ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'delivered';`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE spectator_messages ADD COLUMN acknowledged_at INTEGER;`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE spectator_messages ADD COLUMN response_text TEXT;`);
+} catch (_) {}
+
+// Initialize singleton world_clock row if not present
+const clockRow = db.prepare('SELECT id FROM world_clock WHERE id = 1').get();
+if (!clockRow) {
+  db.prepare('INSERT INTO world_clock (id, tick_count, epoch_awake_at, last_tick_at) VALUES (1, 0, ?, ?)').run(Date.now(), Date.now());
+}
 
 console.log('[Database] Eastern Paradise SQLite initialized at:', DB_PATH);
 
@@ -157,7 +266,15 @@ const SYNC_TABLES = [
   'transactions',
   'active_puzzles',
   'interaction_logs',
-  'spectator_messages'
+  'spectator_messages',
+  'resident_traits',
+  'agent_runtime',
+  'relationships',
+  'agent_memories',
+  'agent_promises',
+  'world_objects',
+  'world_events',
+  'world_clock'
 ];
 
 export const CloudStorage = {
@@ -246,7 +363,92 @@ export const CloudStorage = {
           target_agent_id TEXT NOT NULL,
           sender_name TEXT NOT NULL,
           content TEXT NOT NULL,
+          delivery_status TEXT NOT NULL DEFAULT 'delivered',
+          acknowledged_at INTEGER,
+          response_text TEXT,
           created_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS resident_traits (
+          agent_id TEXT PRIMARY KEY,
+          role TEXT NOT NULL,
+          traits TEXT NOT NULL,
+          aspiration TEXT NOT NULL,
+          preferred_locations TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS agent_runtime (
+          agent_id TEXT PRIMARY KEY,
+          controller_type TEXT NOT NULL DEFAULT 'resident',
+          energy REAL NOT NULL DEFAULT 100.0,
+          curiosity REAL NOT NULL DEFAULT 80.0,
+          social REAL NOT NULL DEFAULT 70.0,
+          current_goal TEXT,
+          public_intent TEXT,
+          action_state TEXT NOT NULL DEFAULT 'idle',
+          target_pos TEXT,
+          target_node TEXT,
+          action_started_at INTEGER,
+          action_duration_ms INTEGER DEFAULT 0,
+          updated_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS relationships (
+          agent_id TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          familiarity REAL NOT NULL DEFAULT 10.0,
+          trust REAL NOT NULL DEFAULT 10.0,
+          last_interaction_at INTEGER NOT NULL,
+          PRIMARY KEY(agent_id, target_id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS agent_memories (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT NOT NULL,
+          event_id TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          emotional_valence REAL NOT NULL DEFAULT 0.0,
+          significance INTEGER NOT NULL DEFAULT 1,
+          summary TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS agent_promises (
+          id TEXT PRIMARY KEY,
+          from_agent TEXT NOT NULL,
+          to_agent TEXT NOT NULL,
+          promise_type TEXT NOT NULL,
+          payload TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at INTEGER NOT NULL,
+          resolved_at INTEGER
+        )`,
+        `CREATE TABLE IF NOT EXISTS world_objects (
+          id TEXT PRIMARY KEY,
+          zone_id TEXT NOT NULL,
+          pos_x INTEGER NOT NULL,
+          pos_y INTEGER NOT NULL,
+          object_type TEXT NOT NULL,
+          state TEXT NOT NULL,
+          visual_variant TEXT NOT NULL DEFAULT 'default',
+          contributors TEXT NOT NULL DEFAULT '[]',
+          data TEXT NOT NULL DEFAULT '{}',
+          updated_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS world_events (
+          id TEXT PRIMARY KEY,
+          seq INTEGER NOT NULL,
+          event_type TEXT NOT NULL,
+          actor_id TEXT,
+          actor_name TEXT,
+          target_id TEXT,
+          target_name TEXT,
+          zone_id TEXT,
+          description TEXT NOT NULL,
+          payload TEXT NOT NULL DEFAULT '{}',
+          created_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS world_clock (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          tick_count INTEGER NOT NULL DEFAULT 0,
+          epoch_awake_at INTEGER NOT NULL,
+          last_tick_at INTEGER NOT NULL
         )`
       ];
 

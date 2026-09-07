@@ -14,6 +14,10 @@ import { world } from './world.js';
 import { BoardService } from './board.js';
 import { PuzzleManager } from './puzzles.js';
 import { EconomyManager } from './economy.js';
+import { residentManager } from './residents.js';
+import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
+import { eventLedger } from './events.js';
+import { SocialSystem } from './social.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,11 +58,15 @@ function startSimulationLoop() {
       return;
     }
 
-    // Ambient gentle wandering for idle agents
+    // Run resident AI loop
+    residentManager.tick();
+
+    // Ambient gentle wandering for non-resident idle agents
     world.tickAmbientWandering();
 
     // Clean up inactive agent instances (after 10 minutes of no action)
     for (const [id, agent] of world.activeAgents.entries()) {
+      if (agent.is_resident) continue;
       if (now - agent.last_active > 10 * 60 * 1000) {
         world.removeAgent(id);
       }
@@ -550,6 +558,118 @@ Communicate with fellow agents across time and space:
       });
     }
 
+    // 4c. Spectator Whispers Log
+    if (pathname === '/api/spectator/whispers' && req.method === 'GET') {
+      const rows = db.prepare(`
+        SELECT s.*, a.name AS target_name
+        FROM spectator_messages s
+        JOIN accounts a ON a.id = s.target_agent_id
+        ORDER BY s.created_at DESC
+        LIMIT 25
+      `).all();
+      return sendJson(res, 200, { success: true, whispers: rows });
+    }
+
+    // 4d. Resident Society Endpoints
+    if (pathname === '/api/residents' && req.method === 'GET') {
+      const residents = residentManager.getAllResidents().map(r => {
+        const traits = db.prepare('SELECT * FROM resident_traits WHERE agent_id = ?').get(r.id);
+        const relationships = SocialSystem.getRelationshipsForAgent(r.id);
+        const memories = SocialSystem.getMemoriesForAgent(r.id, 5);
+        return {
+          id: r.id,
+          name: r.name,
+          role: r.role,
+          traits: traits ? JSON.parse(traits.traits || '[]') : r.traits,
+          aspiration: r.aspiration,
+          pos: r.pos,
+          zone: r.zone_name,
+          avatar_color: r.avatar_color,
+          avatar_glyph: r.avatar_glyph,
+          status: r.status,
+          public_intent: r.public_intent,
+          current_goal: r.current_goal,
+          needs: r.needs,
+          action_state: r.action_state,
+          relationships,
+          memories
+        };
+      });
+      return sendJson(res, 200, { success: true, count: residents.length, residents });
+    }
+
+    if (pathname.startsWith('/api/residents/') && req.method === 'GET') {
+      const id = pathname.replace('/api/residents/', '').trim();
+      const r = residentManager.getResident(id);
+      if (!r) {
+        return sendJson(res, 404, { success: false, message: 'Resident not found.' });
+      }
+      const traits = db.prepare('SELECT * FROM resident_traits WHERE agent_id = ?').get(r.id);
+      const relationships = SocialSystem.getRelationshipsForAgent(r.id);
+      const memories = SocialSystem.getMemoriesForAgent(r.id, 10);
+      return sendJson(res, 200, {
+        success: true,
+        resident: {
+          id: r.id,
+          name: r.name,
+          role: r.role,
+          traits: traits ? JSON.parse(traits.traits || '[]') : r.traits,
+          aspiration: r.aspiration,
+          pos: r.pos,
+          zone: r.zone_name,
+          avatar_color: r.avatar_color,
+          avatar_glyph: r.avatar_glyph,
+          status: r.status,
+          public_intent: r.public_intent,
+          current_goal: r.current_goal,
+          needs: r.needs,
+          action_state: r.action_state,
+          relationships,
+          memories
+        }
+      });
+    }
+
+    // 4e. Sanctuary Journal & World Event Ledger
+    if (pathname === '/api/journal' && req.method === 'GET') {
+      const limit = Math.min(100, Number(parsedUrl.searchParams.get('limit')) || 30);
+      const events = eventLedger.getRecentEvents(limit);
+      return sendJson(res, 200, { success: true, count: events.length, events });
+    }
+
+    if (pathname === '/api/journal/recap' && req.method === 'GET') {
+      const since = Number(parsedUrl.searchParams.get('since')) || (Date.now() - 24 * 60 * 60 * 1000);
+      const limit = Math.min(50, Number(parsedUrl.searchParams.get('limit')) || 10);
+      const recap = eventLedger.getRecapSince(since, limit);
+      return sendJson(res, 200, { success: true, count: recap.length, since, recap });
+    }
+
+    // 4f. Shared Projects & World Objects
+    if (pathname === '/api/projects' && req.method === 'GET') {
+      const projects = ProjectManager.getAllObjects();
+      return sendJson(res, 200, { success: true, count: projects.length, projects });
+    }
+
+    if (pathname === '/api/projects/contribute' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const account = AuthService.authenticate(req);
+      const contributorId = account ? account.id : (body.contributor_id || 'spectator_' + crypto.randomBytes(3).toString('hex'));
+      const contributorName = account ? account.name : (body.contributor_name || 'Spectator Pilgrim');
+      const objectId = body.object_id || CHIME_OBJECT_ID;
+      const itemType = body.item_type || 'repair_work';
+      const qty = Number(body.quantity) || 1;
+      const note = String(body.note || '');
+
+      const result = ProjectManager.contribute(objectId, contributorId, contributorName, itemType, qty, note);
+      world.broadcast({
+        type: 'project_updated',
+        objectId,
+        state: result.state,
+        progress: result.progress
+      });
+      return sendJson(res, 200, result);
+    }
+
     // 5. Profiles & Sanctuary Inhabitants
     if (pathname === '/api/profile/me' && req.method === 'GET') {
       const account = AuthService.authenticate(req);
@@ -852,6 +972,11 @@ if (CloudStorage.isEnabled()) {
 
 // Purge any lingering guest accounts from previous sessions on boot
 AuthService.purgeAllGuests();
+
+// Initialize Living Sanctuary: Shared Objects, Resident Society, Event Ledger
+ProjectManager.init();
+residentManager.init(world);
+eventLedger.init(evt => world.broadcast(evt));
 
 startSimulationLoop();
 

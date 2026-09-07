@@ -5,6 +5,7 @@ import { db } from './db.js';
 import { AuthService } from './auth.js';
 import { PuzzleManager } from './puzzles.js';
 import { BoardService } from './board.js';
+import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,6 +111,7 @@ export class WorldEngine {
     const directions = ['north', 'south', 'east', 'west'];
     const now = Date.now();
     for (const [id, agent] of this.activeAgents.entries()) {
+      if (agent.is_resident) continue;
       // Gentle wander if idle for at least 4s with 45% chance per tick
       if (now - agent.last_active > 4000 && Math.random() < 0.45) {
         const dir = directions[Math.floor(Math.random() * directions.length)];
@@ -352,18 +354,38 @@ export class WorldEngine {
           action_hint: "Submit action: 'wish' with { text: '...' } to tie your ribbon."
         };
 
-      case 'melody':
+      case 'melody': {
+        if (action === 'contribute') {
+          const item = payload.item || 'merit';
+          const qty = Number(payload.quantity) || 1;
+          const note = String(payload.note || '');
+          const result = ProjectManager.contribute(CHIME_OBJECT_ID, agent.id, agent.name, item, qty, note);
+          this.broadcast({
+            type: 'project_updated',
+            objectId: CHIME_OBJECT_ID,
+            state: result.state,
+            progress: result.progress
+          });
+          return result;
+        }
+
+        const chimeRes = ProjectManager.ringChime(agent.id, agent.name);
         this.broadcast({
           type: 'sound_event',
           nodeId: targetNode.id,
           agentName: agent.name,
-          sound: 'soft_chime'
+          sound: chimeRes.sound
         });
+        const chimeObj = ProjectManager.getObject(CHIME_OBJECT_ID);
         return {
           success: true,
           node: targetNode.name,
-          message: 'The chimes ring with clear, soothing overtones that echo through the bamboo stalks.'
+          message: chimeRes.message,
+          chime_state: chimeObj ? chimeObj.state : 'damaged',
+          chime_progress: chimeObj ? chimeObj.data.repair_progress : 0,
+          action_hint: "Submit action: 'contribute' with { item: 'willow_ribbon' | 'copper_striker' | 'cedar_resin' | 'merit' } to aid in chime restoration."
         };
+      }
 
       case 'message_board':
         return {
@@ -488,11 +510,17 @@ export class WorldEngine {
         zone: a.zone_name,
         avatar_color: a.avatar_color,
         avatar_glyph: a.avatar_glyph,
-        status: a.status
+        status: a.status,
+        is_resident: a.is_resident || false,
+        role: a.role || null,
+        aspiration: a.aspiration || null,
+        public_intent: a.public_intent || a.status,
+        needs: a.needs || null
       })),
       zones: this.zones,
       obstacles: this.obstacles,
       landscape: this.landscape,
+      world_objects: ProjectManager.getAllObjects(),
       dimensions: { width: this.width, height: this.height }
     };
   }

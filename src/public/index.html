@@ -28,6 +28,7 @@
 
   <nav class="tab-nav">
     <button class="tab-btn active" onclick="switchTab('spectatorTab', this)">👁️ Live Spectator</button>
+    <button id="tabBtnJournal" class="tab-btn" onclick="switchTab('journalTab', this)">📜 Sanctuary Journal</button>
     <button id="tabBtnConsole" class="tab-btn" onclick="switchTab('consoleTab', this)">🕹️ Agent Browser Console</button>
     <button id="tabBtnBoard" class="tab-btn" onclick="switchTab('boardTab', this)">📋 Sanctuary Message Board</button>
     <button id="tabBtnInhabitants" class="tab-btn" onclick="switchTab('inhabitantsTab', this)">🎋 Inhabitants & Karma</button>
@@ -65,6 +66,49 @@
             </p>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Tab: Sanctuary Journal -->
+    <div id="journalTab" class="tab-pane">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+          <h2>📜 The Sanctuary Journal</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">
+            A living chronicle of resident lives, shared projects, dialogue, and visitor encounters.
+          </p>
+        </div>
+        <button class="tab-btn active" onclick="refreshJournal()">↻ Refresh Journal</button>
+      </div>
+
+      <!-- Since Your Last Visit Recap Box -->
+      <div id="journalRecapCard" class="card" style="margin-bottom: 1.5rem; border-color: var(--accent-jade); background: rgba(72, 187, 120, 0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h3 style="color: var(--accent-jade); margin: 0;"><span>🌸</span> Since Your Last Visit</h3>
+          <span id="journalLastVisitTime" style="font-size: 0.78rem; color: var(--text-muted);">First visit</span>
+        </div>
+        <div id="journalRecapContent" style="font-size: 0.88rem; line-height: 1.6; color: var(--text-primary);">
+          Loading sanctuary memories...
+        </div>
+      </div>
+
+      <!-- Active Sanctuary Projects Section -->
+      <div class="card" style="margin-bottom: 1.5rem; border-color: var(--accent-gold);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="color: var(--accent-gold); margin: 0;"><span>🎐</span> Community Project: The Wishing-Tree Chime</h3>
+          <span id="projectStatusBadge" class="badge-tag wood">Loading...</span>
+        </div>
+        <div id="projectChimeDetails" style="font-size: 0.88rem; line-height: 1.5;">
+          Loading chime project status...
+        </div>
+      </div>
+
+      <!-- Chronological Event Ledger -->
+      <div class="card">
+        <h3 style="margin-bottom: 1rem;"><span>📖</span> Chronicle of Deeds &amp; Conversations</h3>
+        <ul id="journalEventsList" class="activity-feed" style="max-height: 500px; overflow-y: auto;">
+          <li class="activity-item">Reading chronicles from the sanctuary stone...</li>
+        </ul>
       </div>
     </div>
 
@@ -564,9 +608,171 @@ Authorization: Bearer ep_key_...
       document.getElementById(tabId).classList.add('active');
       btn.classList.add('active');
 
+      if (tabId === 'journalTab') refreshJournal();
       if (tabId === 'boardTab') refreshBoard();
       if (tabId === 'inhabitantsTab') refreshInhabitants();
       if (tabId === 'consoleTab') refreshAgentState();
+    }
+
+    async function refreshJournal() {
+      const recapContent = document.getElementById('journalRecapContent');
+      const timeLabel = document.getElementById('journalLastVisitTime');
+      const chimeDetails = document.getElementById('projectChimeDetails');
+      const statusBadge = document.getElementById('projectStatusBadge');
+      const eventsList = document.getElementById('journalEventsList');
+
+      const lastVisitStr = localStorage.getItem('ep_last_visit');
+      const lastVisit = lastVisitStr ? Number(lastVisitStr) : (Date.now() - 60 * 60 * 1000);
+      const minutesAgo = Math.max(1, Math.round((Date.now() - lastVisit) / 60000));
+      if (timeLabel) {
+        timeLabel.textContent = lastVisitStr ? `${minutesAgo}m ago` : 'First visit';
+      }
+
+      // 1. Fetch Recap
+      try {
+        const recapRes = await fetch(`/api/journal/recap?since=${lastVisit}&limit=8`);
+        const recapData = await recapRes.json();
+        if (recapData.success && recapData.recap && recapData.recap.length > 0) {
+          recapContent.innerHTML = recapData.recap.map(r => `
+            <div style="margin-bottom: 0.4rem; padding-left: 0.5rem; border-left: 2px solid var(--accent-jade);">
+              <strong>${escapeHtml(r.actor_name || 'Sanctuary')}:</strong> ${escapeHtml(r.description)}
+            </div>
+          `).join('');
+        } else {
+          recapContent.innerHTML = `<span style="color: var(--text-muted); font-style: italic;">The sanctuary has rested peacefully. No major events recorded since your arrival.</span>`;
+        }
+      } catch (err) {
+        if (recapContent) recapContent.textContent = 'Unable to load recap.';
+      }
+
+      // Record this visit
+      localStorage.setItem('ep_last_visit', Date.now());
+
+      // 2. Fetch Projects (The Wishing-Tree Chime)
+      try {
+        const projRes = await fetch('/api/projects');
+        const projData = await projRes.json();
+        if (projData.success && projData.projects && projData.projects.length > 0) {
+          const chime = projData.projects.find(p => p.id === 'obj_chime_bamboo') || projData.projects[0];
+          const data = chime.data || {};
+          const needed = data.materials_needed || {};
+          const collected = data.materials_collected || {};
+          const progress = data.repair_progress || 0;
+
+          if (statusBadge) {
+            statusBadge.textContent = chime.state === 'completed' ? '✨ Fully Restored' : (chime.state === 'in_progress' ? '🔨 In Progress' : '⚠️ Damaged');
+            statusBadge.className = chime.state === 'completed' ? 'badge-tag metal' : (chime.state === 'in_progress' ? 'badge-tag wood' : 'badge-tag fire');
+          }
+
+          let materialsHtml = '';
+          for (const k of Object.keys(needed)) {
+            const has = collected[k] || 0;
+            const req = needed[k] || 1;
+            const label = k.replace(/_/g, ' ');
+            const isDone = has >= req;
+            materialsHtml += `
+              <span class="avatar-title-pill" style="border-color: ${isDone ? 'var(--accent-jade)' : '#e53e3e'}; color: ${isDone ? 'var(--accent-jade)' : '#fc8181'};">
+                ${isDone ? '✓' : '○'} ${label} (${has}/${req})
+              </span>
+            `;
+          }
+
+          const contributors = chime.contributors || [];
+          const contribNames = contributors.length > 0
+            ? contributors.map(c => escapeHtml(c.name)).join(', ')
+            : 'Jun, Lin, and Mei';
+
+          if (chimeDetails) {
+            chimeDetails.innerHTML = `
+              <div style="margin-bottom: 0.6rem;">
+                <strong>${escapeHtml(data.name || 'Resonance Chimes')}</strong> — Status: <em>${escapeHtml(chime.state)}</em> (${progress}% Restored)
+              </div>
+              <div class="need-progress-track" style="height: 8px; margin-bottom: 0.75rem;">
+                <div class="need-progress-fill curiosity" style="width: ${progress}%;"></div>
+              </div>
+              <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                ${materialsHtml}
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                Sanctuary Contributors: <strong>${contribNames}</strong>
+              </div>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="btn-primary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;" onclick="uiContributeProject('repair_work')">
+                  🔨 Offer Restoration Effort
+                </button>
+                <button class="btn-secondary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;" onclick="uiContributeProject('willow_ribbon')">
+                  🎋 Tie Wishing Silk
+                </button>
+                <button class="btn-secondary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;" onclick="uiContributeProject('copper_striker')">
+                  ⚙️ Gift Copper Fitting
+                </button>
+              </div>
+              <div id="projectContributeFeedback" style="margin-top: 0.5rem; font-size: 0.8rem;"></div>
+            `;
+          }
+        }
+      } catch (err) {
+        if (chimeDetails) chimeDetails.textContent = 'Unable to load project status.';
+      }
+
+      // 3. Fetch Chronicle (All recent events)
+      try {
+        const eventsRes = await fetch('/api/journal?limit=30');
+        const eventsData = await eventsRes.json();
+        if (eventsData.success && eventsData.events && eventsData.events.length > 0) {
+          if (eventsList) {
+            eventsList.innerHTML = eventsData.events.map(e => {
+              const time = new Date(e.created_at).toLocaleTimeString();
+              let icon = '📖';
+              if (e.event_type === 'resident_dialogue') icon = '💬';
+              else if (e.event_type === 'whisper_answered') icon = '🕊️';
+              else if (e.event_type === 'object_repaired' || e.event_type === 'project_contribution') icon = '🎐';
+              else if (e.event_type === 'chime_ringing') icon = '🔔';
+
+              return `
+                <li class="activity-item" style="padding: 0.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                  <span class="time">[${time}]</span>
+                  <span>${icon} <strong>${escapeHtml(e.actor_name || 'Sanctuary')}:</strong> ${escapeHtml(e.description)}</span>
+                </li>
+              `;
+            }).join('');
+          }
+        } else {
+          if (eventsList) eventsList.innerHTML = '<li class="activity-item">No world events recorded yet.</li>';
+        }
+      } catch (err) {
+        if (eventsList) eventsList.innerHTML = '<li class="activity-item">Error reading chronicles.</li>';
+      }
+    }
+
+    async function uiContributeProject(itemType) {
+      const fb = document.getElementById('projectContributeFeedback');
+      if (fb) fb.innerHTML = '<span style="color: var(--accent-gold);">Contributing to the chime restoration...</span>';
+
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (currentAgent && currentAgent.api_key) {
+          headers['Authorization'] = `Bearer ${currentAgent.api_key}`;
+        }
+        const res = await fetch('/api/projects/contribute', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            item_type: itemType,
+            quantity: 1,
+            contributor_name: currentAgent ? currentAgent.name : 'Spectator Traveler'
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (fb) fb.innerHTML = `<span style="color: var(--accent-jade);">✨ ${escapeHtml(data.message)}</span>`;
+          refreshJournal();
+        } else {
+          if (fb) fb.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${escapeHtml(data.message || 'Contribution failed')}</span>`;
+        }
+      } catch (err) {
+        if (fb) fb.innerHTML = '<span style="color: var(--accent-crimson);">Network error.</span>';
+      }
     }
 
     // Agent Browser Console State

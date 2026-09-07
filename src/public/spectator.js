@@ -422,6 +422,55 @@ function handleServerMessage(msg) {
       soundSystem.play('chime');
       break;
 
+    case 'world_event': {
+      const evt = msg.event;
+      if (evt) {
+        logActivity(escapeHtml(evt.description));
+        if (evt.event_type === 'resident_dialogue') {
+          soundSystem.play('step');
+          for (const a of agents.values()) {
+            if (a.id === evt.actor_id || a.name === evt.actor_name) {
+              addBubble(a.id, `💬 ${evt.payload?.lines?.[0]?.text?.slice(0, 30) || 'Conversing'}`, a.pos[0], a.pos[1], '#ffd700');
+              break;
+            }
+          }
+        } else if (evt.event_type === 'whisper_answered') {
+          soundSystem.play('chime');
+          for (const a of agents.values()) {
+            if (a.id === evt.actor_id || a.name === evt.actor_name) {
+              addBubble(a.id, `🕊️ "${evt.payload?.response?.slice(0, 30) || 'Answered'}"`, a.pos[0], a.pos[1], '#ffd700');
+              break;
+            }
+          }
+        } else if (evt.event_type === 'chime_ringing') {
+          soundSystem.play('chime');
+        }
+        if (typeof refreshJournal === 'function') {
+          refreshJournal();
+        }
+      }
+      break;
+    }
+
+    case 'project_updated': {
+      if (worldData && worldData.world_objects) {
+        const obj = worldData.world_objects.find(o => o.id === msg.objectId);
+        if (obj) {
+          obj.state = msg.state;
+          if (obj.data) obj.data.repair_progress = msg.progress;
+        }
+      }
+      logActivity(`🎐 Sanctuary project updated: <strong>${escapeHtml(msg.state)}</strong> (${msg.progress}%)`);
+      if (msg.state === 'completed') {
+        soundSystem.play('shrine_blessing');
+        triggerShrineWave();
+      }
+      if (typeof refreshJournal === 'function') {
+        refreshJournal();
+      }
+      break;
+    }
+
     case 'board_updated':
       if (typeof refreshBoard === 'function') {
         refreshBoard();
@@ -844,8 +893,8 @@ function drawParchmentHUD(ctx, time) {
   ctx.textAlign = 'center';
   ctx.fillText('🧸 🧸 🧸', cpX + cpW / 2, cpY + 16);
 
-  // Population Counter (Shows live agents count or '97' like reference!)
-  const countDisplay = agents.size > 0 ? String(agents.size) : '97';
+  // Population Counter (Shows live agents count in sanctuary)
+  const countDisplay = String(agents.size);
   ctx.font = 'bold 22px monospace';
   ctx.fillStyle = '#1e293b';
   ctx.fillText(countDisplay, cpX + cpW / 2, cpY + 44);
@@ -937,6 +986,14 @@ function render() {
     }
   }
 
+  // Smooth agent grid position interpolation once per frame
+  for (const agent of agents.values()) {
+    if (typeof agent.renderGx !== 'number') agent.renderGx = agent.pos[0];
+    if (typeof agent.renderGy !== 'number') agent.renderGy = agent.pos[1];
+    agent.renderGx += (agent.pos[0] - agent.renderGx) * 0.18;
+    agent.renderGy += (agent.pos[1] - agent.renderGy) * 0.18;
+  }
+
   // Clear with vintage forest background tone
   ctx.fillStyle = '#0f291e';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1024,6 +1081,43 @@ function render() {
           if (node.pos[0] === gx && node.pos[1] === gy) {
             if (node.type === 'puzzle_node') {
               drawObeliskMonument(ctx, tileCenterX, entityY, node);
+            } else if (node.id === 'wind_chimes') {
+              // The Wishing-Tree Chime: custom rendering based on repair stage
+              const chimeObj = (worldData.world_objects || []).find(o => o.id === 'obj_chime_bamboo');
+              const state = chimeObj ? chimeObj.state : 'damaged';
+              ctx.font = `${Math.round(20 * camera.zoom)}px serif`;
+              ctx.textAlign = 'center';
+              if (state === 'completed') {
+                // Radiant restored chime with sparkle particle halo
+                ctx.fillText('🎐', tileCenterX, entityY - 14 * camera.zoom);
+                ctx.font = `${Math.round(11 * camera.zoom)}px sans-serif`;
+                ctx.fillText('✨', tileCenterX + 10 * camera.zoom, entityY - 22 * camera.zoom);
+              } else if (state === 'in_progress') {
+                ctx.fillText('🎐', tileCenterX, entityY - 14 * camera.zoom);
+                ctx.font = `${Math.round(10 * camera.zoom)}px sans-serif`;
+                ctx.fillText('🔨', tileCenterX + 10 * camera.zoom, entityY - 20 * camera.zoom);
+              } else {
+                ctx.fillText('🎐', tileCenterX, entityY - 14 * camera.zoom);
+                ctx.font = `${Math.round(9 * camera.zoom)}px sans-serif`;
+                ctx.fillText('⚠️', tileCenterX + 10 * camera.zoom, entityY - 20 * camera.zoom);
+              }
+            } else if (node.id === 'tea_hearth') {
+              // Sunken Hearth with animated kettle steam
+              ctx.font = `${Math.round(18 * camera.zoom)}px serif`;
+              ctx.textAlign = 'center';
+              ctx.fillText(node.icon || '🍵', tileCenterX, entityY - 14 * camera.zoom);
+
+              // Animated curling steam
+              const z = camera.zoom;
+              const steamY = entityY - 24 * z;
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+              for (let s = 0; s < 3; s++) {
+                const sx = tileCenterX + Math.sin(time * 0.005 + s * 2) * 3 * z;
+                const sy = steamY - ((time * 0.02 + s * 8) % 18) * z;
+                ctx.beginPath();
+                ctx.arc(sx, sy, (1.5 + s * 0.8) * z, 0, Math.PI * 2);
+                ctx.fill();
+              }
             } else {
               // Shrines & Steles
               ctx.font = `${Math.round(18 * camera.zoom)}px serif`;
@@ -1034,19 +1128,18 @@ function render() {
         }
       }
 
-      // Agents standing on or interpolating across this tile
-      for (const agent of agents.values()) {
-        // Smooth interpolation
-        agent.renderGx += (agent.pos[0] - agent.renderGx) * 0.18;
-        agent.renderGy += (agent.pos[1] - agent.renderGy) * 0.18;
-
-        if (Math.round(agent.renderGx) === gx && Math.round(agent.renderGy) === gy) {
-          const { x: ax, y: ay } = gridToIso(agent.renderGx, agent.renderGy);
-          const isHovered = hoveredTile?.isAgent && hoveredTile.agentId === agent.id;
-          drawThronglet(ctx, ax, ay + (ISO_TILE_H / 2) * camera.zoom, agent, time, isHovered);
-        }
-      }
     }
+  }
+
+  // 2b. Draw Agents Sorted by Isometric Depth (once per frame interpolation)
+  const sortedAgents = Array.from(agents.values()).sort((a, b) => {
+    return (a.renderGx + a.renderGy) - (b.renderGx + b.renderGy);
+  });
+
+  for (const agent of sortedAgents) {
+    const { x: ax, y: ay } = gridToIso(agent.renderGx, agent.renderGy);
+    const isHovered = hoveredTile?.isAgent && hoveredTile.agentId === agent.id;
+    drawThronglet(ctx, ax, ay + (ISO_TILE_H / 2) * camera.zoom, agent, time, isHovered);
   }
 
   // 3. Floating Speech Bubbles & Karma Badges
@@ -1334,6 +1427,19 @@ async function openAgentProfileInspector(agentId) {
     </div>
   `;
 
+  // If resident agent, load rich resident details
+  if (agentId.startsWith('resident_') || localAgent.is_resident) {
+    try {
+      const res = await fetch(`/api/residents/${encodeURIComponent(agentId)}`);
+      const data = await res.json();
+      if (data.resident) {
+        return renderResidentProfileCard(panel, data.resident, localAgent);
+      }
+    } catch (err) {
+      console.warn('Failed to load resident details, falling back to standard profile:', err);
+    }
+  }
+
   try {
     const res = await fetch(`/api/profile/${encodeURIComponent(agentId)}`);
     const data = await res.json();
@@ -1341,21 +1447,160 @@ async function openAgentProfileInspector(agentId) {
     renderAgentProfileCard(panel, data.account, data.profile, localAgent);
   } catch (err) {
     console.error('Failed to load profile:', err);
-    // Fallback using local state
-    renderAgentProfileCard(panel, {
-      id: agentId,
-      name: localAgent.name || 'Seeker',
-      avatar_color: localAgent.avatar_color || '#2ec4b6',
-      avatar_glyph: localAgent.avatar_glyph || '☯'
-    }, {
-      karma: 15,
-      balance: localAgent.merit || 0,
-      total_earned: localAgent.merit || 0,
-      solved_count: 1,
-      titles: ['Novice Seeker', 'Awakened Observer'],
-      custom_status: localAgent.status || 'Wandering gently in the meadow'
-    }, localAgent);
+    panel.innerHTML = `
+      <div style="padding: 1.25rem; text-align: center;">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🍃</div>
+        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">${escapeHtml(localAgent.name || 'Traveler')}</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Profile details unavailable or unawakened.</div>
+        <button class="btn-sound" onclick="clearSelectedAgent()" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+          📍 Return to Map Inspector
+        </button>
+      </div>
+    `;
   }
+}
+
+function renderResidentProfileCard(panel, resident, localAgent) {
+  const zoneName = resident.zone || localAgent.zone || (worldData ? getZoneNameForPos(resident.pos) : 'Sanctuary');
+  const posStr = resident.pos ? `[${resident.pos[0]}, ${resident.pos[1]}]` : 'Sanctuary';
+
+  // Needs calculations
+  const energy = Math.round(resident.needs?.energy || 100);
+  const curiosity = Math.round(resident.needs?.curiosity || 80);
+  const social = Math.round(resident.needs?.social || 70);
+
+  // Relationships HTML
+  const rels = resident.relationships || [];
+  const relsHtml = rels.length > 0
+    ? rels.map(r => `
+        <div class="resident-relationship-pill">
+          <span>${r.avatar_glyph || '☯'} ${escapeHtml(r.target_name || r.target_id)}</span>
+          <span style="color: var(--accent-gold);">Familiarity: ${Math.round(r.familiarity)}% | Trust: ${Math.round(r.trust)}%</span>
+        </div>
+      `).join('')
+    : '<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No deep relationships formed yet.</div>';
+
+  // Memories HTML
+  const mems = resident.memories || [];
+  const memsHtml = mems.length > 0
+    ? mems.map(m => `
+        <div class="resident-memory-item">
+          <strong>${escapeHtml(m.subject)}:</strong> ${escapeHtml(m.summary)}
+        </div>
+      `).join('')
+    : '<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Reflecting quietly upon the sanctuary grounds.</div>';
+
+  panel.innerHTML = `
+    <div class="avatar-profile-card" style="border-color: #d69e2e;">
+      <div class="avatar-header-row">
+        <div class="avatar-badge-glyph" style="border-color: ${resident.avatar_color || '#d69e2e'}; color: ${resident.avatar_color || '#d69e2e'};">
+          ${resident.avatar_glyph || '☯'}
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div class="avatar-meta-title">
+            <span>${escapeHtml(resident.name)}</span>
+          </div>
+          <div>
+            <span class="resident-badge-role">🏛️ ${escapeHtml(resident.role || 'Resident')}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aspiration & Public Intent -->
+      <div style="background: rgba(214, 158, 46, 0.08); border: 1px solid rgba(214, 158, 46, 0.3); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.6rem; font-size: 0.78rem;">
+        <div style="color: var(--accent-gold); font-weight: 600; margin-bottom: 0.2rem;">
+          🎯 Aspiration:
+        </div>
+        <div style="color: #f7fafc; font-style: italic; margin-bottom: 0.4rem;">
+          "${escapeHtml(resident.aspiration || 'Living peacefully')}"
+        </div>
+        <div style="color: var(--accent-jade); font-weight: 600;">
+          ⚡ Current Activity:
+        </div>
+        <div style="color: #e2e8f0;">
+          ${escapeHtml(resident.public_intent || resident.status || 'Resting')}
+        </div>
+      </div>
+
+      <!-- Needs Gauges -->
+      <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.6rem;">
+        <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.35rem;">
+          VITAL NEEDS &amp; DRIVE
+        </div>
+        <div class="need-bar-wrap">
+          <div class="need-bar-label">
+            <span>⚡ Energy</span>
+            <span>${energy}%</span>
+          </div>
+          <div class="need-progress-track">
+            <div class="need-progress-fill energy" style="width: ${energy}%;"></div>
+          </div>
+        </div>
+        <div class="need-bar-wrap">
+          <div class="need-bar-label">
+            <span>🔍 Curiosity</span>
+            <span>${curiosity}%</span>
+          </div>
+          <div class="need-progress-track">
+            <div class="need-progress-fill curiosity" style="width: ${curiosity}%;"></div>
+          </div>
+        </div>
+        <div class="need-bar-wrap">
+          <div class="need-bar-label">
+            <span>💬 Social Harmony</span>
+            <span>${social}%</span>
+          </div>
+          <div class="need-progress-track">
+            <div class="need-progress-fill social" style="width: ${social}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Directed Relationships -->
+      <div style="margin-bottom: 0.6rem;">
+        <div style="font-size: 0.74rem; font-weight: 600; color: var(--accent-gold);">
+          🤝 Society Relationships
+        </div>
+        <div class="resident-relationships-list">
+          ${relsHtml}
+        </div>
+      </div>
+
+      <!-- Recent Memories -->
+      <div style="margin-bottom: 0.6rem;">
+        <div style="font-size: 0.74rem; font-weight: 600; color: var(--accent-jade);">
+          📖 Recent Reflections &amp; Memories
+        </div>
+        <div class="resident-memories-list">
+          ${memsHtml}
+        </div>
+      </div>
+
+      <!-- Telepathic Whisper Box -->
+      <div class="whisper-box">
+        <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent-gold); margin-bottom: 0.25rem;">
+          💬 Whisper to ${escapeHtml(resident.name)}
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.45rem;">
+          Residents perceive whispers and will reflect upon and answer your words in the journal.
+        </div>
+        <input type="text" id="whisperSenderName" class="whisper-input" placeholder="Your Name (Spectator)" value="Spectator" style="margin-bottom: 0.35rem; font-size: 0.75rem;" />
+        <textarea id="whisperContentInput" class="whisper-textarea" placeholder="Ask a question or offer gentle encouragement..." rows="2" maxlength="240"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem;">
+          <button id="btnSendWhisper" class="btn-whisper" onclick="submitWhisperToAgent('${escapeHtml(resident.id)}')">
+            🕊️ Send Whisper
+          </button>
+          <span id="whisperFeedback" style="font-size: 0.75rem; font-weight: 600;"></span>
+        </div>
+      </div>
+
+      <div style="text-align: right; margin-top: 0.6rem;">
+        <button class="btn-sound" onclick="clearSelectedAgent()" style="font-size: 0.72rem; padding: 0.2rem 0.6rem;">
+          📍 Return to Map Inspector
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 function renderAgentProfileCard(panel, account, profile, localAgent) {
