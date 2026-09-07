@@ -771,6 +771,15 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, result);
       }
 
+      if (pathname === '/api/world/teleport' && req.method === 'POST') {
+        if (!account.is_guest) {
+          return sendJson(res, 403, { success: false, error: 'guest_only', message: 'Grid teleport is available to guest pilgrims in free roam mode.' });
+        }
+        const body = await parseJsonBody(req);
+        const result = world.teleportGuestAgent(account.id, body.x, body.y);
+        return sendJson(res, result.success ? 200 : 400, result);
+      }
+
       if (pathname === '/api/world/move_to' && (req.method === 'POST' || req.method === 'GET')) {
         let body = {};
         if (req.method === 'POST') {

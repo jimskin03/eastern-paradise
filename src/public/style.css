@@ -515,9 +515,15 @@ main {
 /* Agent Browser Console Layout */
 .console-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1.5rem;
 }
+
+.console-grid > * { min-width: 0; }
+.console-grid .card,
+.console-grid input,
+.console-grid select,
+.console-grid textarea { max-width: 100%; }
 
 @media (max-width: 900px) {
   .console-grid {
@@ -566,6 +572,21 @@ main {
   font-size: 1.3rem;
   color: var(--accent-gold);
 }
+
+.guest-teleport-option {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--accent-jade);
+  border-radius: 6px;
+  background: rgba(46, 196, 182, 0.1);
+  color: var(--accent-jade);
+  font-size: 0.82rem;
+}
+
+.guest-teleport-option span { color: var(--text-muted); }
+.guest-teleport-option button { justify-self: start; }
 
 .badge-tag {
   display: inline-block;

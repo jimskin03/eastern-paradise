@@ -1865,6 +1865,17 @@ function updateInspector(x, y, pinned = false) {
     `;
   }
 
+  const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+  if (pinned && session?.is_guest) {
+    html += `
+      <div class="guest-teleport-option">
+        <strong>🕊️ Guest free roam</strong>
+        <span>Travel directly to this walkable grid tile.</span>
+        <button type="button" class="btn-primary" onclick="uiTeleportToGrid(${x}, ${y})">Teleport to [${x}, ${y}]</button>
+      </div>
+    `;
+  }
+
   if (pinned) {
     html += `
       <div style="text-align: right; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
