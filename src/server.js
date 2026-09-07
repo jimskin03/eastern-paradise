@@ -1278,6 +1278,28 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
       }
     }
 
+    // 6.6 Admin: wipe non-A.Ilicia logs, memories, and messages across local SQLite and Turso
+    if (pathname === '/api/admin/wipe_logs' && req.method === 'POST') {
+      const expected = process.env.SNAPSHOT_TOKEN;
+      const provided = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!expected) {
+        return sendJson(res, 403, { success: false, message: 'Endpoint disabled (SNAPSHOT_TOKEN not configured).' });
+      }
+      const a = Buffer.from(provided);
+      const b = Buffer.from(expected);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return sendJson(res, 401, { success: false, message: 'Invalid admin token.' });
+      }
+      try {
+        markActivity();
+        const wipeResult = await CloudStorage.wipeNonAiliciaLogs();
+        return sendJson(res, 200, { success: true, ...wipeResult });
+      } catch (wipeErr) {
+        console.error('[Admin:WipeLogs] failed:', wipeErr);
+        return sendJson(res, 500, { success: false, message: 'Wipe failed: ' + wipeErr.message });
+      }
+    }
+
     // 7. Static Files & Web Interface
     let filePath = pathname === '/' ? path.join(PUBLIC_DIR, 'index.html') : path.join(PUBLIC_DIR, pathname);
     if (pathname === '/verify') {

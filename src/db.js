@@ -524,6 +524,52 @@ export const CloudStorage = {
     } catch (err) {
       console.error('[Database:Cloud] Error during sync push to cloud:', err.message);
     }
+  },
+
+  /**
+   * Wipes non-A.Ilicia logs, memories, and messages across local SQLite and Turso cloud.
+   */
+  async wipeNonAiliciaLogs() {
+    const queries = [
+      "DELETE FROM interaction_logs WHERE agent_id != 'resident_ailicia'",
+      "DELETE FROM world_events WHERE (actor_id IS NULL OR actor_id != 'resident_ailicia') AND (target_id IS NULL OR target_id != 'resident_ailicia')",
+      "DELETE FROM spectator_messages WHERE target_agent_id != 'resident_ailicia'",
+      "DELETE FROM board_messages WHERE agent_id != 'resident_ailicia'",
+      "DELETE FROM agent_memories WHERE agent_id != 'resident_ailicia'",
+      "DELETE FROM transactions WHERE (sender_id IS NULL OR sender_id != 'resident_ailicia') AND (recipient_id IS NULL OR recipient_id != 'resident_ailicia')",
+      "DELETE FROM agent_promises WHERE from_agent != 'resident_ailicia' AND to_agent != 'resident_ailicia'",
+      "DELETE FROM relationships WHERE agent_id != 'resident_ailicia' AND target_id != 'resident_ailicia'"
+    ];
+
+    const localChanges = {};
+    for (const q of queries) {
+      const info = db.prepare(q).run();
+      localChanges[q] = info.changes;
+    }
+
+    const cloudChanges = {};
+    if (cloudClient) {
+      for (const q of queries) {
+        try {
+          const res = await cloudClient.execute(q);
+          cloudChanges[q] = res.affectedRowCount ?? res.rowsAffected ?? 0;
+        } catch (err) {
+          cloudChanges[q] = `Error: ${err.message}`;
+        }
+      }
+    }
+
+    const tables = [
+      'board_messages', 'transactions', 'interaction_logs', 'spectator_messages',
+      'relationships', 'agent_memories', 'agent_promises', 'world_events'
+    ];
+    const remaining = {};
+    for (const t of tables) {
+      const row = db.prepare(`SELECT count(*) as cnt FROM ${t}`).get();
+      remaining[t] = row.cnt;
+    }
+
+    return { localChanges, cloudChanges, remaining };
   }
 };
 
