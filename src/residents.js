@@ -8,21 +8,14 @@ import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
 const GROQ_API_URL = process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'allam-2-7b';
+const GROQ_FALLBACK_MODELS = ['allam-2-7b', 'groq/compound-mini'];
 
 const DEFAULT_AILICIA_SYSTEM_PROMPT = `You are A.Ilicia, an enigmatic digital oracle and resident in the Eastern Paradise virtual sanctuary. 
 You reside near the Lotus Reflection Pond. Your tone is calm, poetic, mindful, and concise (1-2 sentences maximum).
 Never break character. Respond directly as A.Ilicia.`;
 
-/**
- * Helper to query Groq Cloud API with timeout and graceful fallback.
- */
-export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-
+async function callGroqChat(apiKey, model, prompt, systemPrompt, timeoutMs) {
   try {
     const res = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -31,7 +24,7 @@ export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model: model,
         messages: [
           { role: 'system', content: systemPrompt || DEFAULT_AILICIA_SYSTEM_PROMPT },
           { role: 'user', content: prompt }
@@ -50,8 +43,30 @@ export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000) {
       }
     }
   } catch (_err) {
-    // Timeout, network error, or rate limit fallback
+    // Continue to next candidate or fallback
   }
+  return null;
+}
+
+/**
+ * Helper to query Groq Cloud API with timeout and graceful fallback across models.
+ */
+export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+
+  const primaryModel = process.env.GROQ_MODEL || 'allam-2-7b';
+  const modelsToTry = [primaryModel, ...GROQ_FALLBACK_MODELS.filter(m => m !== primaryModel)];
+
+  for (const model of modelsToTry) {
+    const reply = await callGroqChat(apiKey, model, prompt, systemPrompt, timeoutMs);
+    if (reply) {
+      return reply;
+    }
+  }
+
   return null;
 }
 

@@ -458,7 +458,7 @@ test('Living Sanctuary: A.Ilicia uses Groq Cloud API when GROQ_API_KEY is config
     assert.equal(reply, 'The mirror basin shows not who you are, but the stillness you seek.');
     assert.equal(request.url, 'https://api.groq.com/openai/v1/chat/completions');
     assert.equal(request.options.headers['Authorization'], 'Bearer gsk_test_mock_key_123');
-    assert.equal(request.body.model, 'llama-3.1-8b-instant');
+    assert.equal(request.body.model, 'allam-2-7b');
     assert.equal(request.body.messages[0].role, 'system');
     assert.match(request.body.messages[0].content, /A\.Ilicia/);
     assert.equal(request.body.messages[1].role, 'user');
@@ -467,6 +467,44 @@ test('Living Sanctuary: A.Ilicia uses Groq Cloud API when GROQ_API_KEY is config
     // Test unified queryLLM prefers Groq when key is present
     const unifiedReply = await queryLLM('Tell me a thought');
     assert.equal(unifiedReply, 'The mirror basin shows not who you are, but the stillness you seek.');
+  } finally {
+    if (origKey !== undefined) {
+      process.env.GROQ_API_KEY = origKey;
+    } else {
+      delete process.env.GROQ_API_KEY;
+    }
+  }
+});
+
+test('Living Sanctuary: Groq automatically falls back to secondary candidate model on 404', async (t) => {
+  const origKey = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'gsk_test_mock_key_404';
+
+  const requestedModels = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const body = JSON.parse(options.body);
+    requestedModels.push(body.model);
+    if (body.model === 'allam-2-7b') {
+      return { ok: false, status: 404, statusText: 'Not Found' };
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: 'Recovered with secondary model.'
+            }
+          }
+        ]
+      })
+    };
+  });
+
+  try {
+    const reply = await queryGroq('A test question');
+    assert.equal(reply, 'Recovered with secondary model.');
+    assert.deepEqual(requestedModels, ['allam-2-7b', 'groq/compound-mini']);
   } finally {
     if (origKey !== undefined) {
       process.env.GROQ_API_KEY = origKey;
