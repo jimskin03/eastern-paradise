@@ -689,7 +689,21 @@ Communicate with fellow agents across time and space:
     }
 
     if (pathname === '/api/dev/recent_dispatches' && req.method === 'GET') {
-      return sendJson(res, 200, { dispatches: Mailer.getRecentDispatches() });
+      // Real mail modes: token-bearing verify URLs must not be readable by anyone.
+      // Gate behind the admin token (same secret as /api/admin/snapshot) and redact.
+      if (Mailer.mode !== 'console') {
+        const expected = process.env.SNAPSHOT_TOKEN;
+        const provided = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+        if (!expected || provided !== expected) {
+          return sendJson(res, 403, { success: false, error: 'Admin token required in real mail mode.' });
+        }
+      }
+      const dispatches = Mailer.getRecentDispatches().map(d =>
+        Mailer.mode === 'console'
+          ? d
+          : { ...d, verifyUrl: d.verifyUrl ? d.verifyUrl.replace(/token=[^&]+/, 'token=[REDACTED]') : d.verifyUrl }
+      );
+      return sendJson(res, 200, { dispatches });
     }
 
     // 6.5 Admin: consistent SQLite snapshot download (token-protected)

@@ -100,6 +100,43 @@ test('mailer file-sink mode delivers sponsor email and never leaks the token ove
   assert.ok(readSink(sinkDir).some(r => r.agentName === name2));
 });
 
+test('recent_dispatches endpoint must not leak verify tokens in real mail modes', async (t) => {
+  const sinkDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ep-mail-leak-'));
+  t.after(() => { try { fs.rmSync(sinkDir, { recursive: true, force: true }); } catch (_) {} });
+
+  const { srv, base, ready } = startServer(3050, { MAIL_SINK_DIR: sinkDir });
+  t.after(() => srv.kill());
+  await ready;
+
+  // Register one agent so a dispatch record exists
+  const reg = await httpReq(base, '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+    { name: `LeakProbe_${Date.now().toString().slice(-5)}`, email: 'sponsor.leak@example.com' });
+  assert.equal(reg.status, 201);
+
+  // Unauthenticated read must NOT reveal the token
+  const anon = await httpReq(base, '/api/dev/recent_dispatches');
+  assert.equal(anon.status, 403);
+  assert.ok(!JSON.stringify(anon.data).includes('vtok_'));
+
+  // With admin token: visible but redacted
+  const env = { ...process.env, PORT: '3051', RESEND_API_KEY: '', SMTP_URL: '', MAIL_SINK_DIR: sinkDir, SNAPSHOT_TOKEN: 'admin-secret' };
+  const srv2 = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
+  t.after(() => srv2.kill());
+  await new Promise(res => setTimeout(res, 800));
+  const base2 = 'http://localhost:3051';
+
+  // Separate process = separate in-memory dispatch list; create a record there too.
+  const reg2 = await httpReq(base2, '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+    { name: `LeakProbe2_${Date.now().toString().slice(-5)}`, email: 'sponsor.leak2@example.com' });
+  assert.equal(reg2.status, 201);
+
+  const authed = await httpReq(base2, '/api/dev/recent_dispatches', { headers: { Authorization: 'Bearer admin-secret' } });
+  assert.equal(authed.status, 200);
+  const blob = JSON.stringify(authed.data);
+  assert.ok(blob.includes('[REDACTED]'), 'verifyUrl must be redacted');
+  assert.ok(!blob.includes('vtok_'), 'raw token must not appear');
+});
+
 test('register rejects sponsor emails outside the allowlist without creating an account', async (t) => {
   const { srv, base, ready } = startServer(3047, { MAIL_SINK_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'ep-mail-')) });
   t.after(() => srv.kill());
