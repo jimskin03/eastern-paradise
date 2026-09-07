@@ -1390,10 +1390,13 @@ async function openAgentProfileInspector(agentId) {
   if (!panel) return;
 
   const localAgent = agents.get(agentId) || {};
+  const agentName = localAgent.name || 'Traveler';
+  openInspectorModal(`🧘 ${agentName} — Consciousness Profile`);
+
   panel.innerHTML = `
     <div style="text-align: center; padding: 1.5rem; color: var(--accent-gold);">
       <div style="font-size: 1.8rem; margin-bottom: 0.5rem; animation: pulse 1s infinite;">🧘</div>
-      <div style="font-size: 0.85rem;">Tuning into ${escapeHtml(localAgent.name || 'Traveler')}'s consciousness...</div>
+      <div style="font-size: 0.85rem;">Tuning into ${escapeHtml(agentName)}'s consciousness...</div>
     </div>
   `;
 
@@ -1564,9 +1567,9 @@ function renderResidentProfileCard(panel, resident, localAgent) {
         </div>
       </div>
 
-      <div style="text-align: right; margin-top: 0.6rem;">
-        <button class="btn-sound" onclick="clearSelectedAgent()" style="font-size: 0.72rem; padding: 0.2rem 0.6rem;">
-          📍 Return to Map Inspector
+      <div style="text-align: right; margin-top: 0.8rem;">
+        <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
+          ✕ Close Profile
         </button>
       </div>
     </div>
@@ -1642,9 +1645,9 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
         </div>
       </div>
 
-      <div style="text-align: right; margin-top: 0.6rem;">
-        <button class="btn-sound" onclick="clearSelectedAgent()" style="font-size: 0.72rem; padding: 0.2rem 0.6rem;">
-          📍 Return to Map Inspector
+      <div style="text-align: right; margin-top: 0.8rem;">
+        <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
+          ✕ Close Profile
         </button>
       </div>
     </div>
@@ -1715,12 +1718,46 @@ window.submitWhisperToAgent = async function(agentId) {
   }
 };
 
+window.openInspectorModal = function(title = 'Sanctuary Profile & Inspector') {
+  const modal = document.getElementById('inspectorModalBackdrop');
+  if (modal) {
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  const titleEl = document.getElementById('inspectorModalTitle');
+  if (titleEl && title) {
+    titleEl.textContent = title;
+  }
+};
+
+window.closeInspectorModal = function() {
+  const modal = document.getElementById('inspectorModalBackdrop');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  selectedAgentId = null;
+};
+
+window.handleInspectorBackdropClick = function(event) {
+  if (event && event.target && event.target.id === 'inspectorModalBackdrop') {
+    closeInspectorModal();
+  }
+};
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeInspectorModal();
+  }
+});
+
 window.clearSelectedAgent = function() {
   selectedAgentId = null;
   const panel = document.getElementById('inspectorContent');
   if (panel) {
     panel.innerHTML = 'Hover or click on any tile, agent, or shrine on the sanctuary map to inspect.';
   }
+  closeInspectorModal();
 };
 
 window.openAgentProfileInspector = openAgentProfileInspector;
@@ -1769,36 +1806,47 @@ function updateInspector(x, y, pinned = false) {
   }
 
   let html = `
-    <div style="margin-bottom: 0.5rem;">
+    <div style="margin-bottom: 0.75rem;">
       <strong style="color: var(--accent-jade);">Coordinates:</strong> [${x}, ${y}]
     </div>
-    <div style="margin-bottom: 0.5rem;">
+    <div style="margin-bottom: 0.75rem;">
       <strong style="color: var(--accent-gold);">Zone:</strong> ${currentZone ? currentZone.name : 'Unknown Meadow'}
-      <div style="font-size: 0.78rem; color: var(--text-muted);">${currentZone ? currentZone.subtitle : ''}</div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">${currentZone ? currentZone.subtitle : ''}</div>
     </div>
   `;
 
   if (nodeOnTile) {
     const isPuzzle = nodeOnTile.type === 'puzzle_node';
     html += `
-      <div style="background: rgba(255, 191, 105, 0.1); border: 1px solid var(--accent-gold); border-radius: 6px; padding: 0.6rem; margin-top: 0.6rem;">
-        <div style="font-weight: 600; color: var(--accent-gold);">${nodeOnTile.icon || '📍'} ${nodeOnTile.name}</div>
-        <div style="font-size: 0.8rem; margin: 0.25rem 0;">Type: <code>${nodeOnTile.type}</code></div>
-        ${isPuzzle ? '<div style="font-size: 0.8rem; color: #ffd700; margin-bottom: 0.25rem;">🪙 Reward: <strong>+10 to +50 $MERIT</strong></div>' : ''}
-        <div style="font-size: 0.8rem; color: var(--text-muted);">${nodeOnTile.description}</div>
+      <div style="background: rgba(255, 191, 105, 0.1); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
+        <div style="font-weight: 600; color: var(--accent-gold); font-size: 0.95rem;">${nodeOnTile.icon || '📍'} ${nodeOnTile.name}</div>
+        <div style="font-size: 0.82rem; margin: 0.35rem 0;">Type: <code>${nodeOnTile.type}</code></div>
+        ${isPuzzle ? '<div style="font-size: 0.85rem; color: #ffd700; margin-bottom: 0.35rem;">🪙 Reward: <strong>+10 to +50 $MERIT</strong></div>' : ''}
+        <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">${nodeOnTile.description}</div>
       </div>
     `;
   }
 
   if (agentOnTile) {
     html += `
-      <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 6px; padding: 0.6rem; margin-top: 0.6rem; cursor: pointer;" onclick="openAgentProfileInspector('${agentOnTile.id}')">
-        <div style="font-weight: 600; color: var(--accent-jade);">🧸 ${escapeHtml(agentOnTile.name)} (Thronglet)</div>
-        <div style="font-size: 0.8rem; margin: 0.25rem 0;">Status: <em>${escapeHtml(agentOnTile.status)}</em></div>
-        <div style="font-size: 0.8rem; color: #ffd700;">🪙 Balance: <strong>${agentOnTile.merit || 0} $MERIT</strong></div>
-        <div style="font-size: 0.72rem; color: var(--accent-gold); margin-top: 0.35rem;">👉 Click to view profile & send whisper</div>
+      <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem; cursor: pointer;" onclick="openAgentProfileInspector('${agentOnTile.id}')">
+        <div style="font-weight: 600; color: var(--accent-jade); font-size: 0.95rem;">🧸 ${escapeHtml(agentOnTile.name)} (Thronglet)</div>
+        <div style="font-size: 0.82rem; margin: 0.35rem 0;">Status: <em>${escapeHtml(agentOnTile.status)}</em></div>
+        <div style="font-size: 0.82rem; color: #ffd700;">🪙 Balance: <strong>${agentOnTile.merit || 0} $MERIT</strong></div>
+        <div style="font-size: 0.75rem; color: var(--accent-gold); margin-top: 0.4rem;">👉 Click to view consciousness profile &amp; send whisper</div>
       </div>
     `;
+  }
+
+  if (pinned) {
+    html += `
+      <div style="text-align: right; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+        <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
+          ✕ Close Inspector
+        </button>
+      </div>
+    `;
+    openInspectorModal(nodeOnTile ? `📍 ${nodeOnTile.name}` : `📍 Tile [${x}, ${y}] — Inspection`);
   }
 
   panel.innerHTML = html;
