@@ -139,14 +139,22 @@ test("Solve and Profile Lookup on /api/world/interact", async (t) => {
       method: "POST",
       headers: { "Authorization": `Bearer ${aixinKey}`, "Content-Type": "application/json" }
     }, { node_id: "trial_obelisk_wood", action: "inspect" });
-    assert.equal(aixinInspect.status, 200);
-
     db.prepare(`UPDATE active_puzzles SET answer = 'awareness', prompt = 'When an artificial mind observes its own observation, what state of rising consciousness awakens? [Dormancy, Awareness, Clockwork, Oblivion]', hint = 'The shift from mechanical reflex into self-knowing presence.', title_award = 'Awakened Observer', karma_reward = 25, merit_reward = 25 WHERE node_id = 'trial_obelisk_wood'`).run();
 
+    // Test missing answer returns HTTP 400 with helpful prompt
+    const missingAnsSolve = await req("/api/world/interact", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${aixinKey}`, "Content-Type": "application/json" }
+    }, { node_id: "trial_obelisk_wood", action: "solve" });
+    assert.equal(missingAnsSolve.status, 400);
+    assert.equal(missingAnsSolve.data.success, false);
+    assert.match(missingAnsSolve.data.message, /missing answer/i);
+
+    // Repro 1 format: top-level answer: "Awareness" (not wrapped in payload)
     const aixinSolve = await req("/api/world/interact", {
       method: "POST",
       headers: { "Authorization": `Bearer ${aixinKey}`, "Content-Type": "application/json" }
-    }, { node_id: "trial_obelisk_wood", action: "solve", payload: { answer: "Awareness" } });
+    }, { node_id: "trial_obelisk_wood", action: "solve", answer: "Awareness" });
 
     assert.equal(aixinSolve.status, 200);
     assert.equal(aixinSolve.data.success, true);
@@ -171,7 +179,7 @@ test("Solve and Profile Lookup on /api/world/interact", async (t) => {
     const airisSolve = await req("/api/world/interact", {
       method: "POST",
       headers: { "Authorization": `Bearer ${airisKey}`, "Content-Type": "application/json" }
-    }, { node_id: "trial_obelisk_water", action: "solve", payload: { answer: waterAns } });
+    }, { node_id: "trial_obelisk_water", action: "solve", answer: waterAns });
 
     assert.equal(airisSolve.status, 200);
     assert.equal(airisSolve.data.success, true);

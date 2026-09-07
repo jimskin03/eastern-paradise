@@ -898,8 +898,12 @@ The message board is for public broadcasting. Private or task-specific coordinat
             payload: answer !== null && answer !== undefined ? { answer } : undefined
           };
         }
+        const payload = {
+          ...(typeof body.payload === 'object' && body.payload !== null ? body.payload : {}),
+          ...body
+        };
         try {
-          const result = world.interact(account.id, body.node_id, body.action, body.payload);
+          const result = world.interact(account.id, body.node_id, body.action, payload);
           if (result.success && result.reward?.merit_earned) {
             world.broadcast({
               type: 'coin_minted',

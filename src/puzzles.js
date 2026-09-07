@@ -353,6 +353,14 @@ export class PuzzleManager {
       }
     }
 
+    if (submittedAnswer === undefined || submittedAnswer === null || String(submittedAnswer).trim() === '') {
+      return {
+        success: false,
+        message: "Missing answer. Please submit your solution with { answer: '...' }.",
+        hint: puzzle.hint
+      };
+    }
+
     const cleanSubmission = String(submittedAnswer).toLowerCase().trim().replace(/[.,!?'"`]/g, '');
     let acceptedAnswers = [puzzle.answer.toLowerCase().trim()];
     if (puzzle.alt_answers) {

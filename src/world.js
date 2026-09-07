@@ -690,7 +690,8 @@ export class WorldEngine {
         }
 
         if (action === 'solve') {
-          const res = PuzzleManager.solvePuzzle(agentId, targetNode.id, payload?.answer);
+          const submittedAnswer = payload?.answer ?? payload?.solution ?? payload?.text;
+          const res = PuzzleManager.solvePuzzle(agentId, targetNode.id, submittedAnswer);
           if (res.success) {
             if (res.category === 'the truth' || res.truth_axiom) {
               this.broadcast({
