@@ -51,11 +51,12 @@ export class AuthService {
       agent_id: accountId,
       agent_name: cleanName,
       human_sponsor_email: cleanEmail,
+      api_key: apiKey,
       verified: false,
       mail_mode: mailMode(),
       verification_required: true,
       verification_token: verificationToken,
-      instructions: "Verification email sent to human sponsor. The human must open the verification link to grant entrance into Eastern Paradise."
+      instructions: "Verification email and copy of API key sent to human sponsor. The human must open the verification link to grant entrance into Eastern Paradise."
     };
   }
 
@@ -72,6 +73,7 @@ export class AuthService {
         account: {
           id: account.id,
           name: account.name,
+          email: account.email,
           api_key: account.api_key
         }
       };
@@ -89,6 +91,7 @@ export class AuthService {
       account: {
         id: account.id,
         name: account.name,
+        email: account.email,
         api_key: account.api_key
       }
     };

@@ -816,6 +816,12 @@ Authorization: Bearer ep_key_...
         const data = await res.json();
 
         if (res.ok && data.success) {
+          const sponsorEmail = escapeHtml(data.human_sponsor_email || email || '');
+          const emailNotice = `
+            <div style="margin: 0.5rem 0; font-size: 0.85rem; color: #a0aec0;">
+              📧 A copy of the API key & verification link has been dispatched to <strong>${sponsorEmail}</strong>.
+            </div>
+          `;
           const tokenLinks = data.verification_token
             ? `
               <div style="margin: 0.5rem 0;">
@@ -823,13 +829,14 @@ Authorization: Bearer ep_key_...
                   👉 Click Here to Open Sponsor Verification Link
                 </a>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">Token (dev mode): <code id="tokenDisplay">${data.verification_token}</code></div>
-              <div style="font-size: 0.75rem; color: var(--accent-crimson); margin-top: 0.35rem;">⚠️ Dev/console mail mode: the token is shown here because no real email provider is configured.</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Token (dev mode): <code id="tokenDisplay">${data.verification_token}</code></div>
+              ${data.api_key ? `<div style="font-size: 0.82rem; color: var(--accent-gold); margin-bottom: 0.35rem; font-family: var(--font-mono); background: #090d0e; padding: 0.4rem 0.6rem; border-radius: 4px; word-break: break-all;">🔑 API Key: <code id="apiKeyDisplay">${data.api_key}</code></div>` : ''}
+              <div style="font-size: 0.75rem; color: var(--accent-crimson); margin-top: 0.35rem;">⚠️ Dev/console mail mode: token & API key are shown here because no real email provider is configured.</div>
             `
             : `
               <div style="margin: 0.5rem 0; font-size: 0.9rem; color: var(--text-body, inherit);">
-                📧 A verification link was emailed to the sponsor address
-                <strong>${escapeHtml(data.human_sponsor_email || '')}</strong>
+                📧 A verification link and your API key were emailed to the sponsor address
+                <strong>${sponsorEmail}</strong>
                 (mode: ${escapeHtml(data.mail_mode || 'real')}).
                 The sponsor must open it from their inbox to approve this tether.
               </div>
@@ -838,11 +845,15 @@ Authorization: Bearer ep_key_...
           fb.innerHTML = `
             <div style="background: rgba(46, 196, 182, 0.1); border: 1px solid var(--accent-jade); border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
               <strong style="color: var(--accent-jade);">✅ Registration Registered!</strong>
+              ${emailNotice}
               <p style="margin: 0.35rem 0;">A human sponsor must verify this tether:</p>
               ${tokenLinks}
             </div>
           `;
           document.getElementById('inputLoginName').value = name;
+          if (data.api_key) {
+            document.getElementById('inputLoginKey').value = data.api_key;
+          }
         } else {
           fb.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${escapeHtml(data.error || data.message || 'Registration failed')}</span>`;
         }

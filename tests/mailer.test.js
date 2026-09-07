@@ -54,7 +54,7 @@ test('mailer file-sink mode delivers sponsor email and never leaks the token ove
   t.after(() => srv.kill());
   await ready;
 
-  // 1. Register: HTTP response must NOT contain the verification token
+  // 1. Register: HTTP response must NOT contain the verification token or api key in file mode
   const name1 = `MailE2E_${Date.now().toString().slice(-5)}`;
   const reg = await httpReq(base, '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     { name: name1, email: 'sponsor.file@example.com' });
@@ -63,12 +63,14 @@ test('mailer file-sink mode delivers sponsor email and never leaks the token ove
   assert.equal(reg.data.mail_mode, 'file');
   assert.equal(reg.data.verification_required, true);
   assert.equal(reg.data.verification_token, undefined, 'token must not leak in file mode');
+  assert.equal(reg.data.api_key, undefined, 'api_key must not leak in file mode');
 
-  // 2. The "email" (sink record) must contain the verify URL, and it must work
+  // 2. The "email" (sink record) must contain the verify URL and the API key
   const records = readSink(sinkDir);
   const mine = records.find(r => r.agentName === name1);
   assert.ok(mine, 'sink must contain a record for the new agent');
   assert.match(mine.verifyUrl, /\/verify\?token=vtok_/);
+  assert.ok(mine.apiKey && mine.apiKey.startsWith('ep_key_'), 'initial email must contain apiKey');
   assert.equal(mine.to, 'sponsor.file@example.com');
 
   // The emailed link is the human-facing /verify page; the token itself is
@@ -79,6 +81,14 @@ test('mailer file-sink mode delivers sponsor email and never leaks the token ove
   assert.equal(verify.status, 200);
   assert.equal(verify.data.success, true);
   const apiKey = verify.data.account.api_key;
+  assert.equal(apiKey, mine.apiKey, 'verified api_key matches initial emailed api_key');
+
+  // Verify that post-verification API key email was also sunk
+  await new Promise(r => setTimeout(r, 150));
+  const postRecords = readSink(sinkDir);
+  const postVerifyEmail = postRecords.find(r => r.agentName === name1 && r.type === 'api_key_delivery');
+  assert.ok(postVerifyEmail, 'sink must receive post-verification api key delivery email');
+  assert.equal(postVerifyEmail.apiKey, apiKey);
 
   // 3. Login works with the key the sponsor received
   const login = await httpReq(base, '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' } },
@@ -97,7 +107,9 @@ test('mailer file-sink mode delivers sponsor email and never leaks the token ove
   assert.equal(resend.data.success, true);
   const after = readSink(sinkDir).length;
   assert.ok(after >= before + 1, 'resend must append another sink record');
-  assert.ok(readSink(sinkDir).some(r => r.agentName === name2));
+  const resendRec = readSink(sinkDir).reverse().find(r => r.agentName === name2);
+  assert.ok(resendRec);
+  assert.ok(resendRec.apiKey && resendRec.apiKey.startsWith('ep_key_'), 'resend email must contain apiKey');
 });
 
 test('recent_dispatches endpoint must not leak verify tokens in real mail modes', async (t) => {
@@ -187,22 +199,34 @@ test('unit: Mailer file sink writes a well-formed record; console mode is the de
   delete process.env.SMTP_URL;
   const out = await Mailer.sendVerificationEmail({
     toEmail: 'unit@example.com', agentName: 'UnitTester',
-    verificationToken: 'vtok_unit', verifyUrl: 'http://localhost:9/verify?token=vtok_unit'
+    verificationToken: 'vtok_unit', apiKey: 'ep_key_unit', verifyUrl: 'http://localhost:9/verify?token=vtok_unit'
   });
   assert.equal(out.mode, 'file');
   const recs = readSink(sinkDir);
   const rec = recs.find(r => r.agentName === 'UnitTester');
   assert.ok(rec);
   assert.equal(rec.to, 'unit@example.com');
+  assert.equal(rec.apiKey, 'ep_key_unit');
   assert.equal(rec.mode, 'file');
   assert.ok(rec.subject.includes('UnitTester'));
+
+  const keyOut = await Mailer.sendApiKeyEmail({
+    toEmail: 'unit@example.com', agentName: 'UnitTester',
+    apiKey: 'ep_key_unit', hostUrl: 'http://localhost:9'
+  });
+  assert.equal(keyOut.mode, 'file');
+  const keyRecs = readSink(sinkDir);
+  const keyRec = keyRecs.find(r => r.agentName === 'UnitTester' && r.type === 'api_key_delivery');
+  assert.ok(keyRec);
+  assert.equal(keyRec.apiKey, 'ep_key_unit');
+
   delete process.env.MAIL_SINK_DIR;
 
   // Default with no env is console (no real delivery)
   assert.equal(Mailer.mode, 'console');
   const consoleOut = await Mailer.sendVerificationEmail({
     toEmail: 'unit@example.com', agentName: 'UnitTester2',
-    verificationToken: 'vtok_unit2', verifyUrl: 'http://localhost:9/verify?token=vtok_unit2'
+    verificationToken: 'vtok_unit2', apiKey: 'ep_key_unit2', verifyUrl: 'http://localhost:9/verify?token=vtok_unit2'
   });
   assert.equal(consoleOut.mode, 'console');
   assert.equal(consoleOut.delivered, false);

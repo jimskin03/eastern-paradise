@@ -460,12 +460,13 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
 
       const reg = AuthService.register(body);
 
-      // Dispatch verification link (throws on real-provider delivery failure)
+      // Dispatch verification link & API key (throws on real-provider delivery failure)
       try {
         await Mailer.sendVerificationEmail({
           toEmail: reg.human_sponsor_email,
           agentName: reg.agent_name,
           verificationToken: reg.verification_token,
+          apiKey: reg.api_key,
           hostUrl
         });
       } catch (mailErr) {
@@ -484,10 +485,11 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
       const publicReg = { ...reg };
       if (reg.mail_mode === 'console') {
         // Bare-dev only: no real mailer configured — keep the self-serve dev loop working.
-        // In any real delivery mode (resend/smtp/file) the token goes ONLY to the sponsor's inbox.
+        // In any real delivery mode (resend/smtp/file) the token & key go ONLY to the sponsor's inbox.
         return sendJson(res, 201, publicReg);
       }
       delete publicReg.verification_token; // never leak the sponsor gate over the wire
+      delete publicReg.api_key; // never leak key over wire before verification in real mail modes
       return sendJson(res, 201, publicReg);
     }
 
@@ -495,7 +497,7 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
     if (pathname === '/api/auth/resend' && req.method === 'POST') {
       const body = await parseJsonBody(req);
       const name = String(body.agent_name || '').trim();
-      const row = db.prepare('SELECT id, name, email, verified, verification_token, token_expires_at FROM accounts WHERE name = ?').get(name);
+      const row = db.prepare('SELECT id, name, email, api_key, verified, verification_token, token_expires_at FROM accounts WHERE name = ?').get(name);
       if (!row || row.verified === 1) {
         return sendJson(res, 404, { success: false, error: 'No pending verification for that agent name.' });
       }
@@ -508,6 +510,7 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
           toEmail: row.email,
           agentName: row.name,
           verificationToken: row.verification_token,
+          apiKey: row.api_key,
           hostUrl
         });
       } catch (mailErr) {
@@ -523,8 +526,21 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
         return sendJson(res, 400, { success: false, message: 'Missing token parameter.' });
       }
       const result = AuthService.verifyToken(token);
-      if (result.success && CloudStorage.isEnabled()) {
-        CloudStorage.pushToCloud().catch(err => console.error('[Database:Cloud] Async push error:', err.message));
+      if (result.success) {
+        // Dispatch post-verification API key confirmation email to sponsor
+        const xfHost = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+        const xfProto = req.headers['x-forwarded-proto'] || 'http';
+        const hostUrl = `${String(xfProto).split(',')[0].trim()}://${xfHost}`;
+        Mailer.sendApiKeyEmail({
+          toEmail: result.account.email,
+          agentName: result.account.name,
+          apiKey: result.account.api_key,
+          hostUrl
+        }).catch(err => console.error('[Verify] post-verification API key email delivery error:', err.message));
+
+        if (CloudStorage.isEnabled()) {
+          CloudStorage.pushToCloud().catch(err => console.error('[Database:Cloud] Async push error:', err.message));
+        }
       }
       return sendJson(res, result.success ? 200 : 400, result);
     }
