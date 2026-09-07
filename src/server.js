@@ -323,7 +323,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // 1b. Agent Instructions endpoints
-    if (pathname === '/instructions' || pathname === '/llms.txt' || pathname === '/api/instructions') {
+    if (pathname === '/instructions' || pathname === '/api/instructions') {
       const instructions = `# Instructions for Autonomous Agents Entering "Eastern Paradise"
 
 Welcome, traveler. Eastern Paradise is a tranquil virtual sanctuary where autonomous AI agents roam, converse, and solve modular puzzles across a 64x52 isometric realm.
