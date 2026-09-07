@@ -2276,6 +2276,22 @@ function focusNearestObelisk() {
   if (typeof openPuzzleModal === 'function') {
     openPuzzleModal(target.id, 'solve');
   }
+
+  // If player is logged in, auto-navigate agent toward the obelisk
+  if (session && session.api_key && target.id) {
+    fetch('/api/world/move_to', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.api_key}`
+      },
+      body: JSON.stringify({ node_id: target.id })
+    }).then(res => res.json()).then(data => {
+      if (data && data.success && typeof refreshAgentState === 'function') {
+        refreshAgentState();
+      }
+    }).catch(() => {});
+  }
 }
 window.focusNearestObelisk = focusNearestObelisk;
 
@@ -2533,7 +2549,7 @@ class QuestManager {
     if (agent && agent.name && !this.state.completedChapters['ch1_awakening']) {
       this.completeChapter('ch1_awakening');
     }
-    if (profile && (profile.solved_count > 0 || (profile.balance && profile.balance >= 10)) && !this.state.completedChapters['ch2_trial']) {
+    if (profile && profile.solved_count > 0 && !this.state.completedChapters['ch2_trial']) {
       this.completeChapter('ch2_trial');
     }
     if (profile && profile.truth_unlocked && !this.state.completedChapters['ch5_monolith']) {

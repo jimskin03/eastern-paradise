@@ -964,9 +964,11 @@ Authorization: Bearer ep_key_...
 
     // In-game Puzzle Modal
     let activeModalNodeId = null;
+    let activeModalChallengeId = null;
 
     async function openPuzzleModal(nodeId, defaultAction = 'inspect') {
       activeModalNodeId = nodeId;
+      activeModalChallengeId = null;
       const modal = document.getElementById('puzzleModalBackdrop');
       if (!modal) return;
       modal.classList.add('open');
@@ -996,10 +998,29 @@ Authorization: Bearer ep_key_...
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          activeModalChallengeId = data.challenge_id || null;
           if (titleEl) titleEl.textContent = data.node || 'Elemental Trial';
           if (data.puzzle) {
             if (promptEl) promptEl.textContent = data.puzzle.prompt;
-            if (hintEl) hintEl.textContent = data.puzzle.hint ? `💡 Hint: ${data.puzzle.hint}` : '';
+            let hintHtml = data.puzzle.hint ? `💡 Hint: ${escapeHtml(data.puzzle.hint)}` : '';
+            
+            // Check distance if world & agent data available
+            if (window.worldData?.zones && window.agents && currentAgent?.id) {
+              const myAg = window.agents.get(currentAgent.id);
+              let targetNode = null;
+              for (const z of window.worldData.zones) {
+                const found = z.nodes?.find(n => n.id === nodeId);
+                if (found) { targetNode = found; break; }
+              }
+              if (myAg?.pos && targetNode?.pos) {
+                const d = Math.hypot(myAg.pos[0] - targetNode.pos[0], myAg.pos[1] - targetNode.pos[1]);
+                if (d > 3.0) {
+                  hintHtml += `<div style="margin-top: 0.4rem; color: #ffbf69; font-size: 0.8rem;">📍 Distance: ${d.toFixed(1)} tiles (must be ≤ 3.0 tiles to solve). <a href="javascript:void(0)" onclick="approachModalObelisk()" style="color: var(--accent-gold); text-decoration: underline; font-weight: 600;">Walk character here</a></div>`;
+                }
+              }
+            }
+            if (hintEl) hintEl.innerHTML = hintHtml;
+
             if (catEl) {
               catEl.textContent = data.puzzle.category;
               catEl.className = `badge-tag ${data.puzzle.category}`;
@@ -1020,6 +1041,37 @@ Authorization: Bearer ep_key_...
       }
     }
 
+    async function approachModalObelisk() {
+      if (!activeModalNodeId || !currentAgent?.api_key) return;
+      const feedback = document.getElementById('modalPuzzleFeedback');
+      if (feedback) feedback.innerHTML = '<span style="color: var(--accent-gold);">Navigating pilgrim to obelisk...</span>';
+      try {
+        const res = await fetch('/api/world/move_to', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentAgent.api_key}`
+          },
+          body: JSON.stringify({ node_id: activeModalNodeId })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (feedback) feedback.innerHTML = '<span style="color: var(--accent-jade);">✨ Reached trial obelisk interaction range!</span>';
+          refreshAgentState();
+          // Update hint to remove distance warning
+          const hintEl = document.getElementById('modalPuzzleHint');
+          if (hintEl) {
+            const warningEl = hintEl.querySelector('div');
+            if (warningEl) warningEl.remove();
+          }
+        } else {
+          if (feedback) feedback.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${escapeHtml(data.message || 'Navigation incomplete')}</span>`;
+        }
+      } catch (_) {
+        if (feedback) feedback.innerHTML = '<span style="color: var(--accent-crimson);">Navigation error.</span>';
+      }
+    }
+
     function closePuzzleModal() {
       const modal = document.getElementById('puzzleModalBackdrop');
       if (modal) {
@@ -1027,6 +1079,7 @@ Authorization: Bearer ep_key_...
         modal.setAttribute('aria-hidden', 'true');
       }
       activeModalNodeId = null;
+      activeModalChallengeId = null;
     }
 
     function handlePuzzleBackdropClick(e) {
@@ -1050,6 +1103,11 @@ Authorization: Bearer ep_key_...
 
       if (feedback) feedback.innerHTML = '<span style="color: var(--accent-gold);">Submitting answer to trial obelisk...</span>';
 
+      const payload = { answer };
+      if (activeModalChallengeId) {
+        payload.challenge_id = activeModalChallengeId;
+      }
+
       try {
         const res = await fetch('/api/world/interact', {
           method: 'POST',
@@ -1060,7 +1118,7 @@ Authorization: Bearer ep_key_...
           body: JSON.stringify({
             node_id: activeModalNodeId,
             action: 'solve',
-            payload: { answer }
+            payload
           })
         });
         const data = await res.json();
@@ -1359,6 +1417,7 @@ Authorization: Bearer ep_key_...
       const saved = localStorage.getItem('ep_session');
       if (saved) {
         currentAgent = JSON.parse(saved);
+        window.currentAgent = currentAgent;
       }
     } catch (_) {}
 
@@ -1442,6 +1501,7 @@ Authorization: Bearer ep_key_...
 
         if (res.ok && data.success) {
           currentAgent = {
+            id: data.agent?.id || data.agent_id,
             name: data.agent.name,
             api_key: apiKey,
             avatar_glyph: data.agent.avatar_glyph,
@@ -1476,6 +1536,7 @@ Authorization: Bearer ep_key_...
 
         if (res.ok && data.success) {
           currentAgent = {
+            id: data.agent?.id || data.agent_id,
             name: data.agent.name,
             api_key: data.api_key,
             avatar_glyph: data.agent.avatar_glyph,
@@ -1652,10 +1713,13 @@ Authorization: Bearer ep_key_...
       }
     }
 
+    let activePuzzleChallengeId = null;
+
     async function uiInspectNode(nodeId) {
       if (!currentAgent) return;
       const puzzleCard = document.getElementById('puzzleDeckCard');
       puzzleCard.style.display = 'none';
+      activePuzzleChallengeId = null;
 
       try {
         const res = await fetch('/api/world/interact', {
@@ -1671,6 +1735,7 @@ Authorization: Bearer ep_key_...
         if (res.ok && data.success) {
           if (data.puzzle) {
             activePuzzleNode = nodeId;
+            activePuzzleChallengeId = data.challenge_id || null;
             puzzleCard.style.display = 'block';
             document.getElementById('puzzleNodeName').textContent = data.node;
             document.getElementById('puzzleCategoryBadge').textContent = data.puzzle.category;
@@ -1698,6 +1763,11 @@ Authorization: Bearer ep_key_...
       const fb = document.getElementById('puzzleFeedback');
       fb.innerHTML = '<span style="color: var(--accent-gold);">Submitting answer to trial obelisk...</span>';
 
+      const payload = { answer };
+      if (activePuzzleChallengeId) {
+        payload.challenge_id = activePuzzleChallengeId;
+      }
+
       try {
         const res = await fetch('/api/world/interact', {
           method: 'POST',
@@ -1708,7 +1778,7 @@ Authorization: Bearer ep_key_...
           body: JSON.stringify({
             node_id: activePuzzleNode,
             action: 'solve',
-            payload: { answer }
+            payload
           })
         });
         const data = await res.json();

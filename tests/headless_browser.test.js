@@ -146,4 +146,64 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   assert.match(containerStyle, /3\s*\/\s*2|1\.5/);
 
   await mobilePage.close();
+
+  // 10. Guest In-Game Puzzle Modal Verification & Rejection Test
+  const guestPage = await browser.newPage();
+  await guestPage.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+  await guestPage.evaluate(() => {
+    localStorage.clear();
+  });
+
+  // Enter as guest
+  await guestPage.evaluate(async () => {
+    await uiGuestLogin();
+  });
+  await guestPage.waitForFunction(
+    () => window.currentAgent && window.currentAgent.is_guest === 1,
+    { timeout: 8000 }
+  );
+
+  // Open wood trial obelisk modal
+  await guestPage.evaluate(() => {
+    openPuzzleModal('trial_obelisk_wood', 'solve');
+  });
+  await guestPage.waitForSelector('#modalPuzzlePrompt', { timeout: 5000 });
+
+  // Try submitting bogus answer "I do not know now"
+  await guestPage.type('#modalPuzzleAnswer', 'I do not know now');
+  await guestPage.click('#btnSubmitModalPuzzle');
+
+  // Must reject and show crimson warning
+  await guestPage.waitForFunction(
+    () => {
+      const fb = document.getElementById('modalPuzzleFeedback');
+      return fb && (fb.textContent.includes('Incorrect') || fb.textContent.includes('unyielding') || fb.textContent.includes('Too far'));
+    },
+    { timeout: 5000 }
+  );
+
+  // Character approaches obelisk
+  await guestPage.evaluate(async () => {
+    await approachModalObelisk();
+  });
+  await new Promise(r => setTimeout(r, 600));
+
+  // Try bogus answer again while in range
+  await guestPage.$eval('#modalPuzzleAnswer', el => el.value = 'I do not know now');
+  await guestPage.click('#btnSubmitModalPuzzle');
+  await guestPage.waitForFunction(
+    () => {
+      const fb = document.getElementById('modalPuzzleFeedback');
+      return fb && (fb.textContent.includes('Incorrect') || fb.textContent.includes('unyielding') || fb.textContent.includes('deeper contemplation'));
+    },
+    { timeout: 5000 }
+  );
+
+  // Verify Chapter 2 is NOT completed
+  const ch2Completed = await guestPage.evaluate(() => {
+    return Boolean(window.QuestManager?.state?.completedChapters?.['ch2_trial']);
+  });
+  assert.equal(ch2Completed, false, 'Chapter 2 must not complete on wrong answer');
+
+  await guestPage.close();
 });

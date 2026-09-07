@@ -100,3 +100,77 @@ test('Puzzle Challenges: Concurrency, Retention, and Idempotent Retries', async 
   AuthService.purgeGuest(acc1.id);
   AuthService.purgeGuest(acc2.id);
 });
+
+test('Puzzle Challenges: Strict Verification, Conversational Prefixes, and Agent Isolation', async (t) => {
+  const world = new WorldEngine();
+  const g1 = AuthService.createGuest({ name: 'StrictTester_1' });
+  const g2 = AuthService.createGuest({ name: 'StrictTester_2' });
+
+  const acc1 = db.prepare('SELECT * FROM accounts WHERE id = ?').get(g1.agent_id);
+  const acc2 = db.prepare('SELECT * FROM accounts WHERE id = ?').get(g2.agent_id);
+
+  const a1 = world.spawnOrGetAgent(acc1);
+  const a2 = world.spawnOrGetAgent(acc2);
+
+  a1.pos = [11, 26]; // Water obelisk
+  a2.pos = [11, 26];
+
+  // 1. Inspect Water obelisk as Agent 1
+  const inspect1 = world.interact(acc1.id, 'trial_obelisk_water', 'inspect');
+  assert.equal(inspect1.success, true);
+  const ch1 = PuzzleManager.getChallenge(inspect1.challenge_id);
+  assert.ok(ch1);
+
+  // 2. Reject arbitrary conversational filler or common words (False-Positive Prevention)
+  const bogusInputs = [
+    'I do not know now',
+    'I will try later',
+    'What is the answer?',
+    'my choice is none',
+    'wrong_answer_totally',
+    'now',
+    'will'
+  ];
+
+  for (const bogus of bogusInputs) {
+    // If the bogus input happens to be the actual correct answer for this puzzle, skip it
+    if (bogus.toLowerCase() === ch1.answer.toLowerCase()) continue;
+
+    const failSolve = world.interact(acc1.id, 'trial_obelisk_water', 'solve', {
+      answer: bogus,
+      challenge_id: inspect1.challenge_id
+    });
+    assert.equal(failSolve.success, false, `Bogus input "${bogus}" must be rejected`);
+    assert.equal(failSolve.error, 'incorrect_answer');
+  }
+
+  // 3. Challenge Isolation: Agent 2 cannot solve Agent 1's challenge_id
+  const crossAgentSolve = world.interact(acc2.id, 'trial_obelisk_water', 'solve', {
+    answer: ch1.answer,
+    challenge_id: inspect1.challenge_id
+  });
+  assert.equal(crossAgentSolve.success, false);
+  assert.equal(crossAgentSolve.error, 'challenge_agent_mismatch');
+
+  // 4. Accept exact answer or answer with conversational prefix (e.g., "The answer is ...")
+  const prefixedAnswer = `The answer is ${ch1.answer}.`;
+  const validSolve = world.interact(acc1.id, 'trial_obelisk_water', 'solve', {
+    answer: prefixedAnswer,
+    challenge_id: inspect1.challenge_id
+  });
+  assert.equal(validSolve.success, true, `Answer with conversational prefix "${prefixedAnswer}" must be accepted`);
+  assert.ok(validSolve.reward.karma_added > 0);
+  assert.ok(validSolve.reward.merit_earned > 0);
+
+  // 5. Verify that Agent 2 still cannot claim the solved challenge from Agent 1
+  const crossAgentRetry = world.interact(acc2.id, 'trial_obelisk_water', 'solve', {
+    answer: ch1.answer,
+    challenge_id: inspect1.challenge_id
+  });
+  assert.equal(crossAgentRetry.success, false);
+  assert.equal(crossAgentRetry.error, 'challenge_agent_mismatch');
+
+  // Clean up
+  AuthService.purgeGuest(acc1.id);
+  AuthService.purgeGuest(acc2.id);
+});
