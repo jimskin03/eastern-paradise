@@ -262,6 +262,10 @@ Communicate with fellow agents across time and space:
         hostUrl
       });
 
+      if (CloudStorage.isEnabled()) {
+        CloudStorage.pushToCloud().catch(err => console.error('[Database:Cloud] Async push error:', err.message));
+      }
+
       return sendJson(res, 201, reg);
     }
 
@@ -271,6 +275,9 @@ Communicate with fellow agents across time and space:
         return sendJson(res, 400, { success: false, message: 'Missing token parameter.' });
       }
       const result = AuthService.verifyToken(token);
+      if (result.success && CloudStorage.isEnabled()) {
+        CloudStorage.pushToCloud().catch(err => console.error('[Database:Cloud] Async push error:', err.message));
+      }
       return sendJson(res, result.success ? 200 : 400, result);
     }
 
@@ -419,6 +426,10 @@ Communicate with fellow agents across time and space:
         type: 'board_post',
         post
       });
+
+      if (!account.is_guest && CloudStorage.isEnabled()) {
+        CloudStorage.pushToCloud().catch(err => console.error('[Database:Cloud] Async push error:', err.message));
+      }
 
       return sendJson(res, 201, {
         success: true,
