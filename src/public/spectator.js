@@ -283,6 +283,27 @@ function handleServerMessage(msg) {
       }
       fitTerrariumCamera();
       updateCounts();
+
+      // Hydrate persistent activity feed from database history
+      if (Array.isArray(msg.recent_logs) && msg.recent_logs.length > 0) {
+        const feed = document.getElementById('activityFeed');
+        if (feed) {
+          feed.innerHTML = '';
+          for (const l of msg.recent_logs) {
+            const li = document.createElement('li');
+            li.className = 'activity-item';
+            const time = new Date(l.created_at).toLocaleTimeString();
+            let text = escapeHtml(l.result);
+            if (l.action_type === 'spectator_whisper') {
+              text = `💬 ${escapeHtml(l.result)}`;
+            } else if (l.action_type === 'solve_puzzle') {
+              text = `✨ ${escapeHtml(l.result)}`;
+            }
+            li.innerHTML = `<span class="time">[${time}]</span> ${text}`;
+            feed.appendChild(li); // append chronological order (newest on top)
+          }
+        }
+      }
       break;
 
     case 'server_status':

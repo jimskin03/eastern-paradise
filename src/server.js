@@ -675,11 +675,20 @@ wss.on('connection', (ws) => {
     spectatorClients.delete(ws);
   });
 
+  // Query recent persistent logs from SQLite
+  const recentLogs = db.prepare(`
+    SELECT id, agent_id, node_id, action_type, result, created_at 
+    FROM interaction_logs 
+    ORDER BY created_at DESC 
+    LIMIT 25
+  `).all();
+
   // Send initial snapshot safely
   safeSend(ws, JSON.stringify({
     type: 'init_world',
     data: world.getAllEntitiesForSpectator(),
-    server_state: serverState
+    server_state: serverState,
+    recent_logs: recentLogs
   }));
 
   ws.on('message', (data) => {
