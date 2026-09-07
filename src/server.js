@@ -473,7 +473,7 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
         console.error('[Register] verification email delivery failed:', mailErr.message);
         return sendJson(res, 502, {
           success: false,
-          error: 'Registration stored, but the sponsor verification email could not be delivered. Try again or contact the sanctuary keeper.',
+          error: `Verification email could not be delivered: ${mailErr.message}`,
           mail_mode: reg.mail_mode
         });
       }
@@ -1168,6 +1168,7 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
         server_name: 'Eastern Paradise',
         lifecycle_state: serverState,
         cloud_storage_enabled: CloudStorage.isEnabled(),
+        mail_mode: Mailer.mode,
         idle_threshold_seconds: IDLE_TIMEOUT_MS / 1000,
         active_agents_count: world.activeAgents.size,
         connected_spectators_count: spectatorClients.size,

@@ -29,9 +29,9 @@ export function sponsorDomainAllowed(email) {
 }
 
 function sendMode() {
-  if (process.env.RESEND_API_KEY) return 'resend';
-  if (process.env.SMTP_URL) return 'smtp';
-  if (process.env.MAIL_SINK_DIR) return 'file';
+  if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()) return 'resend';
+  if (process.env.SMTP_URL && process.env.SMTP_URL.trim()) return 'smtp';
+  if (process.env.MAIL_SINK_DIR && process.env.MAIL_SINK_DIR.trim()) return 'file';
   return 'console';
 }
 
@@ -87,8 +87,9 @@ export class Mailer {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
+        const detail = data.message || `HTTP ${r.status}`;
         console.error(`[Mailer] Resend delivery FAILED (${r.status}) to ${toEmail}:`, JSON.stringify(data).slice(0, 300));
-        throw new Error(`Resend delivery failed: HTTP ${r.status}`);
+        throw new Error(`Resend delivery failed: ${detail}`);
       }
       console.log(`[Mailer] Verification email SENT via Resend to ${toEmail} (id=${data.id || '?'})`);
       return { sent: true, mode, provider_id: data.id };
@@ -186,8 +187,9 @@ export class Mailer {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
+        const detail = data.message || `HTTP ${r.status}`;
         console.error(`[Mailer] Resend API Key delivery FAILED (${r.status}) to ${toEmail}:`, JSON.stringify(data).slice(0, 300));
-        return { sent: false, error: `HTTP ${r.status}` };
+        return { sent: false, error: detail };
       }
       console.log(`[Mailer] API Key email SENT via Resend to ${toEmail} (id=${data.id || '?'})`);
       return { sent: true, mode, provider_id: data.id };

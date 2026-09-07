@@ -14,16 +14,16 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22" # latest v22 LTS (>=22.13 required: node:sqlite is flag-free there)
-      # Real sponsor-email delivery (optional). Set RESEND_API_KEY as a secret in the
-      # Render dashboard, or SMTP_URL (requires `npm i nodemailer`). With none set,
-      # the server falls back to console mode: token logged + returned in the
-      # register response (self-serve dev loop, no real email).
-      # - key: RESEND_API_KEY
-      #   sync: false
-      # - key: MAIL_FROM
-      #   value: "Eastern Paradise <sponsor@yourdomain.tld>"
-      # - key: MAIL_ALLOWED_SPONSOR_DOMAINS
-      #   value: "gmail.com,yahoo.com,mozmail.com"
+      # Real sponsor-email delivery (optional). Set RESEND_API_KEY or SMTP_URL as a secret in the
+      # Render dashboard. With none set, the server falls back to console mode.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_ALLOWED_SPONSOR_DOMAINS
+        sync: false
       # Persistent SQLite: requires a paid plan (Starter, $7/mo) + disk ($0.25/GB/mo).
       # To activate: uncomment the disk block below, set plan: starter, and uncomment DATA_DIR.
       # - key: DATA_DIR
