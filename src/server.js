@@ -898,19 +898,28 @@ The message board is for public broadcasting. Private or task-specific coordinat
             payload: answer !== null && answer !== undefined ? { answer } : undefined
           };
         }
-        const result = world.interact(account.id, body.node_id, body.action, body.payload);
-        if (result.success && result.reward?.merit_earned) {
-          world.broadcast({
-            type: 'coin_minted',
-            agent_id: account.id,
-            agent_name: account.name,
-            node_id: body.node_id,
-            merit_earned: result.reward.merit_earned,
-            total_merit: result.reward.total_merit,
-            sponsor_dividend: result.reward.sponsor_dividend
+        try {
+          const result = world.interact(account.id, body.node_id, body.action, body.payload);
+          if (result.success && result.reward?.merit_earned) {
+            world.broadcast({
+              type: 'coin_minted',
+              agent_id: account.id,
+              agent_name: account.name,
+              node_id: body.node_id,
+              merit_earned: result.reward.merit_earned,
+              total_merit: result.reward.total_merit,
+              sponsor_dividend: result.reward.sponsor_dividend
+            });
+          }
+          return sendJson(res, (result.success || result.locked) ? 200 : 400, result);
+        } catch (interactErr) {
+          console.error('[World Interact Error]', interactErr.message);
+          return sendJson(res, 400, {
+            success: false,
+            error: interactErr.message,
+            message: interactErr.message
           });
         }
-        return sendJson(res, (result.success || result.locked) ? 200 : 400, result);
       }
     }
 

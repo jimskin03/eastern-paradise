@@ -493,27 +493,41 @@ export const CloudStorage = {
         await cloudClient.execute(sql);
       }
 
-      // Restore each table
-      for (const table of SYNC_TABLES) {
-        try {
-          const res = await cloudClient.execute(`SELECT * FROM ${table}`);
-          if (res.rows && res.rows.length > 0) {
-            let restoredCount = 0;
-            for (const row of res.rows) {
-              if (row.is_guest === 1) continue;
-              if (table === 'messages' && (String(row.sender_id).startsWith('guest_') || String(row.recipient_id).startsWith('guest_'))) continue;
+      // Temporarily disable foreign keys during restore so existing records can restore cleanly
+      db.exec('PRAGMA foreign_keys = OFF;');
+      try {
+        // Restore each table
+        for (const table of SYNC_TABLES) {
+          try {
+            const res = await cloudClient.execute(`SELECT * FROM ${table}`);
+            if (res.rows && res.rows.length > 0) {
+              let restoredCount = 0;
+              for (const row of res.rows) {
+                // Skip any guest data - guests are strictly ephemeral
+                if (row.is_guest === 1 || row.is_guest === true) continue;
+                if (row.agent_id && String(row.agent_id).startsWith('guest_')) continue;
+                if (row.sender_id && String(row.sender_id).startsWith('guest_')) continue;
+                if (row.recipient_id && String(row.recipient_id).startsWith('guest_')) continue;
+                if (row.target_agent_id && String(row.target_agent_id).startsWith('guest_')) continue;
 
-              const cols = Object.keys(row);
-              const placeholders = cols.map(() => '?').join(', ');
-              const query = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
-              db.prepare(query).run(...Object.values(row));
-              restoredCount++;
+                const cols = Object.keys(row);
+                const placeholders = cols.map(() => '?').join(', ');
+                const query = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
+                try {
+                  db.prepare(query).run(...Object.values(row));
+                  restoredCount++;
+                } catch (rowErr) {
+                  console.warn(`[Database:Cloud] Skip record in ${table}:`, rowErr.message);
+                }
+              }
+              console.log(`[Database:Cloud] Restored ${restoredCount} records for table: ${table}`);
             }
-            console.log(`[Database:Cloud] Restored ${restoredCount} records for table: ${table}`);
+          } catch (tableErr) {
+            console.warn(`[Database:Cloud] Warning restoring table ${table}:`, tableErr.message);
           }
-        } catch (tableErr) {
-          console.warn(`[Database:Cloud] Warning restoring table ${table}:`, tableErr.message);
         }
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON;');
       }
       console.log('[Database:Cloud] Initial cloud restore completed successfully.');
     } catch (err) {
@@ -530,12 +544,15 @@ export const CloudStorage = {
       for (const table of SYNC_TABLES) {
         try {
           let rows = db.prepare(`SELECT * FROM ${table}`).all();
-          if (table === 'accounts' || table === 'board_messages') {
-            rows = rows.filter(r => !r.is_guest);
-          }
-          if (table === 'messages') {
-            rows = rows.filter(r => !r.sender_id.startsWith('guest_') && !r.recipient_id.startsWith('guest_'));
-          }
+          // Filter out guest data across all synced tables
+          rows = rows.filter(r => {
+            if (r.is_guest === 1 || r.is_guest === true) return false;
+            if (r.agent_id && String(r.agent_id).startsWith('guest_')) return false;
+            if (r.sender_id && String(r.sender_id).startsWith('guest_')) return false;
+            if (r.recipient_id && String(r.recipient_id).startsWith('guest_')) return false;
+            if (r.target_agent_id && String(r.target_agent_id).startsWith('guest_')) return false;
+            return true;
+          });
 
           if (rows.length === 0) continue;
 

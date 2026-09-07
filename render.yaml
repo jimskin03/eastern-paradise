@@ -29,6 +29,11 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: "allam-2-7b"
+      # Turso LibSQL Cloud Persistence
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
       # Persistent SQLite: requires a paid plan (Starter, $7/mo) + disk ($0.25/GB/mo).
       # To activate: uncomment the disk block below, set plan: starter, and uncomment DATA_DIR.
       # - key: DATA_DIR

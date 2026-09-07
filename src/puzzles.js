@@ -379,8 +379,16 @@ export class PuzzleManager {
       };
     }
 
-    // Success: Update Profile
-    const profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
+    // Success: Ensure and Update Profile
+    let profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
+    if (!profile) {
+      db.prepare(`
+        INSERT INTO profiles (agent_id, karma, balance, total_earned, solved_count, titles, solved_puzzles, custom_status, last_seen)
+        VALUES (?, 0, 0, 0, 0, '["Novice Seeker"]', '[]', 'Awakening...', ?)
+      `).run(agentId, Date.now());
+      profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
+    }
+
     let titles = [];
     let solvedPuzzles = [];
     try {
