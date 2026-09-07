@@ -115,4 +115,35 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   assert.equal(mirrorJson.agent, agentName);
   assert.deepEqual(mirrorJson.position, [8, 8]);
   assert.ok(mirrorJson.available_directions.length > 0);
+
+  // 9. Mobile Responsive Viewport & Quest HUD Collapse Verification
+  const mobilePage = await browser.newPage();
+  await mobilePage.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await mobilePage.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+
+  // Verify HUD starts collapsed on mobile viewport (width <= 768)
+  const isCollapsedInitial = await mobilePage.$eval('#questHud', el => el.classList.contains('collapsed'));
+  assert.equal(isCollapsedInitial, true);
+
+  // When collapsed, body must be hidden
+  const bodyDisplay = await mobilePage.$eval('#questHudBody', el => window.getComputedStyle(el).display);
+  assert.equal(bodyDisplay, 'none');
+
+  // Toggle expand
+  await mobilePage.click('#btnToggleQuestHud');
+  const isExpanded = await mobilePage.$eval('#questHud', el => !el.classList.contains('collapsed'));
+  assert.equal(isExpanded, true);
+  const bodyDisplayExpanded = await mobilePage.$eval('#questHudBody', el => window.getComputedStyle(el).display);
+  assert.notEqual(bodyDisplayExpanded, 'none');
+
+  // Toggle collapse again
+  await mobilePage.click('#btnToggleQuestHud');
+  const isCollapsedAgain = await mobilePage.$eval('#questHud', el => el.classList.contains('collapsed'));
+  assert.equal(isCollapsedAgain, true);
+
+  // Verify canvas container aspect-ratio on mobile (3 / 2)
+  const containerStyle = await mobilePage.$eval('#mapContainer', el => window.getComputedStyle(el).aspectRatio);
+  assert.match(containerStyle, /3\s*\/\s*2|1\.5/);
+
+  await mobilePage.close();
 });

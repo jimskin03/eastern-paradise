@@ -1467,11 +1467,21 @@ main.game-container {
 }
 
 .quest-hud-widget.collapsed {
-  padding: 0.4rem 0.85rem;
+  padding: 0.35rem 0.8rem;
   max-width: fit-content;
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(14, 22, 24, 0.85);
+  border-color: rgba(255, 191, 105, 0.4);
+  background: rgba(14, 22, 24, 0.92);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   cursor: pointer;
+}
+
+.quest-hud-widget.collapsed .quest-hud-body {
+  display: none !important;
+}
+
+.quest-hud-widget.collapsed .quest-hud-header {
+  margin-bottom: 0;
+  gap: 0.65rem;
 }
 
 .quest-hud-header {
@@ -2024,18 +2034,73 @@ main.game-container {
 /* Responsive adjustments */
 @media (max-width: 900px) {
   .canvas-container.map-dominant {
-    height: clamp(420px, 72vh, 600px);
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 3 / 2;
+    max-height: 55vh;
   }
   .quest-hud-widget {
     top: 0.5rem;
     left: 0.5rem;
+    right: 0.5rem;
     max-width: calc(100% - 1rem);
+    padding: 0.55rem 0.75rem;
+  }
+  .quest-hud-widget.collapsed {
+    max-width: fit-content !important;
+    padding: 0.3rem 0.65rem;
+    right: auto;
+  }
+  .quest-hud-title {
+    font-size: 0.88rem;
+    margin-bottom: 0.2rem;
+  }
+  .quest-hud-desc {
+    font-size: 0.75rem;
+    margin-bottom: 0.35rem;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .quest-hud-reward {
+    font-size: 0.7rem;
+    padding: 0.12rem 0.4rem;
+    margin-bottom: 0.45rem;
+  }
+  .quest-hud-actions {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .btn-quest-sm, .btn-quest-skip {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .floating-map-bar {
+    bottom: 0.5rem;
+    max-width: calc(100% - 1rem);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.25rem 0.5rem;
+    gap: 0.3rem;
+  }
+  .floating-map-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .floating-map-bar button {
+    font-size: 0.72rem;
+    padding: 0.22rem 0.5rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .proximity-action-banner {
-    bottom: 4rem;
+    bottom: 3.5rem;
     flex-direction: column;
     align-items: stretch;
     text-align: center;
+    padding: 0.5rem 0.75rem;
   }
   .proximity-left {
     flex-direction: column;
@@ -2043,6 +2108,34 @@ main.game-container {
   }
   .proximity-buttons {
     justify-content: center;
+  }
+  .tab-nav {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    padding: 0.2rem 0;
+  }
+  .tab-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .tab-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.55rem;
+    flex-shrink: 0;
+  }
+  .header-telemetry {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    gap: 0.5rem;
+  }
+  .header-modes button {
+    font-size: 0.74rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .header-status {
+    font-size: 0.75rem;
   }
 }
 

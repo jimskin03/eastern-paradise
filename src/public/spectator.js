@@ -1301,27 +1301,27 @@ canvas.addEventListener('pointerdown', (e) => {
     }
   }
 
-  // Canvas Dragging in Free Camera Mode
-  if (camera.mode === 'free') {
-    camera.isDragging = true;
-    camera.dragStartX = e.clientX;
-    camera.dragStartY = e.clientY;
-  } else {
-    // Tile Click Inspector
-    if (worldData && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
-      inspectTile(gx, gy);
-    }
-  }
+  // Canvas Dragging & Touch Panning
+  camera.isDragging = true;
+  camera.dragStartX = e.clientX;
+  camera.dragStartY = e.clientY;
+  camera.hasDragged = false;
+  camera.clickGx = gx;
+  camera.clickGy = gy;
 });
 
 window.addEventListener('pointermove', (e) => {
   if (camera.isDragging) {
     const dx = e.clientX - camera.dragStartX;
     const dy = e.clientY - camera.dragStartY;
-    camera.dragStartX = e.clientX;
-    camera.dragStartY = e.clientY;
-    camera.targetOffsetX += dx;
-    camera.targetOffsetY += dy;
+    if (camera.hasDragged || Math.hypot(dx, dy) > 5) {
+      camera.hasDragged = true;
+      camera.mode = 'free';
+      camera.dragStartX = e.clientX;
+      camera.dragStartY = e.clientY;
+      camera.targetOffsetX += dx;
+      camera.targetOffsetY += dy;
+    }
     return;
   }
 
@@ -1364,7 +1364,7 @@ window.addEventListener('pointermove', (e) => {
     const feetY = ay + (ISO_TILE_H / 2) * camera.zoom;
     const centerY = feetY - 14 * camera.zoom;
     const dist = Math.hypot(cx - ax, cy - centerY);
-    if (dist <= 22 * Math.max(0.75, camera.zoom)) {
+    if (dist <= 26 * Math.max(0.75, camera.zoom)) {
       hoveredAgent = a;
       break;
     }
@@ -1394,9 +1394,51 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', () => {
+  if (camera.isDragging && !camera.hasDragged) {
+    const gx = camera.clickGx;
+    const gy = camera.clickGy;
+    if (worldData && gx !== undefined && gy !== undefined && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
+      inspectTile(gx, gy);
+    }
+  }
   camera.isDragging = false;
+  camera.hasDragged = false;
 });
-window.addEventListener('pointercancel', () => { camera.isDragging = false; });
+window.addEventListener('pointercancel', () => {
+  camera.isDragging = false;
+  camera.hasDragged = false;
+});
+
+// Mobile Pinch-to-Zoom Gesture
+let touchStartDist = 0;
+let touchStartZoom = 1;
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    touchStartDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    touchStartZoom = camera.targetZoom;
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2 && touchStartDist > 0) {
+    const currentDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const factor = currentDist / touchStartDist;
+    camera.mode = 'free';
+    camera.targetZoom = Math.min(3, Math.max(0.25, touchStartZoom * factor));
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length < 2) {
+    touchStartDist = 0;
+  }
+}, { passive: true });
 
 canvas.addEventListener('keydown', e => {
   const movement = { ArrowLeft: [45, 0], ArrowRight: [-45, 0], ArrowUp: [0, 45], ArrowDown: [0, -45] }[e.key];
@@ -1409,11 +1451,10 @@ canvas.addEventListener('keydown', e => {
 });
 
 canvas.addEventListener('wheel', (e) => {
-  if (camera.mode === 'free') {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.88;
-    camera.targetZoom = Math.min(3, Math.max(0.25, camera.targetZoom * zoomFactor));
-  }
+  e.preventDefault();
+  camera.mode = 'free';
+  const zoomFactor = e.deltaY < 0 ? 1.15 : 0.88;
+  camera.targetZoom = Math.min(3, Math.max(0.25, camera.targetZoom * zoomFactor));
 }, { passive: false });
 
 function handleHudAction(toolId) {

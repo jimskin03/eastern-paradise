@@ -77,18 +77,20 @@
         <canvas id="worldCanvas" width="1440" height="960" tabindex="0" aria-label="Eastern Paradise sanctuary map. Use WASD or arrows to navigate, or controls below to explore."></canvas>
 
         <!-- Floating In-Canvas Quest HUD (First-5-Minutes Journey Loop with Skip Option) -->
-        <div id="questHud" class="quest-hud-widget" role="region" aria-label="Sanctuary Journey Guide">
+        <div id="questHud" class="quest-hud-widget" role="region" aria-label="Sanctuary Journey Guide" onclick="handleQuestHudClick(event)">
           <div class="quest-hud-header">
             <span class="quest-hud-badge" id="questHudBadge">🌸 Chapter 1 • Awakening</span>
-            <button class="btn-drawer-close" type="button" onclick="toggleQuestHud(event)" title="Toggle Journey HUD" style="font-size: 0.9rem; padding: 0 4px;">–</button>
+            <button class="btn-drawer-close" id="btnToggleQuestHud" type="button" onclick="toggleQuestHud(event)" title="Toggle Journey HUD" aria-label="Toggle Journey HUD" style="font-size: 0.9rem; padding: 0 4px;">–</button>
           </div>
-          <div class="quest-hud-title" id="questHudTitle">Step 1: Awaken in the Sanctuary</div>
-          <div class="quest-hud-desc" id="questHudDesc">Take your first steps into the sanctuary or awaken as a guest pilgrim.</div>
-          <div class="quest-hud-reward" id="questHudReward"><span>🎁</span> Reward: +10 Karma • First Steps</div>
-          <div class="quest-hud-actions">
-            <button class="btn-quest-sm" id="btnQuestAction" onclick="handleQuestAction()">Enter as Guest</button>
-            <button class="btn-quest-skip" id="btnQuestSkip" onclick="skipQuestTutorial()" title="Skip tutorial to explore freely">⏩ Skip Tutorial / Free Roam</button>
-            <button class="btn-quest-sm" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text-muted);" onclick="openQuestModal()">📜 All Quests</button>
+          <div class="quest-hud-body" id="questHudBody">
+            <div class="quest-hud-title" id="questHudTitle">Step 1: Awaken in the Sanctuary</div>
+            <div class="quest-hud-desc" id="questHudDesc">Take your first steps into the sanctuary or awaken as a guest pilgrim.</div>
+            <div class="quest-hud-reward" id="questHudReward"><span>🎁</span> Reward: +10 Karma • First Steps</div>
+            <div class="quest-hud-actions">
+              <button class="btn-quest-sm" id="btnQuestAction" onclick="handleQuestAction()">Enter as Guest</button>
+              <button class="btn-quest-skip" id="btnQuestSkip" onclick="skipQuestTutorial()" title="Skip tutorial to explore freely">⏩ Skip Tutorial / Free Roam</button>
+              <button class="btn-quest-sm" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text-muted);" onclick="openQuestModal()">📜 All Quests</button>
+            </div>
           </div>
         </div>
 
@@ -1123,7 +1125,24 @@ Authorization: Bearer ep_key_...
     function toggleQuestHud(e) {
       if (e) e.stopPropagation();
       const hud = document.getElementById('questHud');
-      if (hud) hud.classList.toggle('collapsed');
+      const btn = document.getElementById('btnToggleQuestHud');
+      if (!hud) return;
+      const isCollapsed = hud.classList.toggle('collapsed');
+      if (btn) {
+        btn.textContent = isCollapsed ? '+' : '–';
+        btn.setAttribute('title', isCollapsed ? 'Expand Journey HUD' : 'Collapse Journey HUD');
+        btn.setAttribute('aria-label', isCollapsed ? 'Expand Journey HUD' : 'Collapse Journey HUD');
+      }
+      try {
+        localStorage.setItem('ep_quest_hud_collapsed', isCollapsed ? '1' : '0');
+      } catch (_) {}
+    }
+
+    function handleQuestHudClick(e) {
+      const hud = document.getElementById('questHud');
+      if (hud && hud.classList.contains('collapsed')) {
+        toggleQuestHud(e);
+      }
     }
 
     // Dispatch AI Modal
@@ -2212,6 +2231,24 @@ Steps:
       if (btn) openConsoleDrawer('consoleTab', btn);
       else openConsoleDrawer('consoleTab');
     }
+
+    // Initialize Journey HUD collapsed state (respect saved preference or default to collapsed on mobile)
+    try {
+      const savedCollapsed = localStorage.getItem('ep_quest_hud_collapsed');
+      if (savedCollapsed === '1' || (savedCollapsed === null && window.innerWidth <= 768)) {
+        const hud = document.getElementById('questHud');
+        const btn = document.getElementById('btnToggleQuestHud');
+        if (hud) {
+          hud.classList.add('collapsed');
+          hud.setAttribute('aria-expanded', 'false');
+        }
+        if (btn) {
+          btn.textContent = '+';
+          btn.setAttribute('title', 'Expand Journey HUD');
+          btn.setAttribute('aria-label', 'Expand Journey HUD');
+        }
+      }
+    } catch (_) {}
   </script>
 </body>
 </html>
