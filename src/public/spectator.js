@@ -350,8 +350,10 @@ function handleServerMessage(msg) {
         setTimeout(() => { if (existing) existing.isMoving = false; }, 800);
       }
       if (!msg.ambient) {
-        logActivity(`<strong>${escapeHtml(msg.name)}</strong> stepped to [${msg.pos.join(', ')}].`);
-        soundSystem.play('step');
+        if (msg.name !== 'A.Ilicia' && msg.agentId !== 'resident_ailicia' && !msg.is_resident) {
+          logActivity(`<strong>${escapeHtml(msg.name)}</strong> stepped to [${msg.pos.join(', ')}].`);
+          soundSystem.play('step');
+        }
       }
       break;
     }
@@ -1659,6 +1661,29 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
           <strong style="font-size: 0.7rem; font-style: italic; color: #dfcf9f;">"${escapeHtml(profile.custom_status || localAgent.status || 'Seeking understanding')}"</strong>
         </div>
       </div>
+
+      ${profile.memories && profile.memories.length > 0 ? `
+      <!-- Inscribed Persistent Memories & System Prompt -->
+      <div style="background: rgba(46, 196, 182, 0.08); border: 1px solid rgba(46, 196, 182, 0.3); border-radius: 8px; padding: 0.65rem; margin-bottom: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <div style="font-size: 0.78rem; font-weight: 600; color: var(--accent-jade);">
+            🧠 Persistent Memories (${profile.memories.length})
+          </div>
+          ${profile.system_prompt ? `
+            <button class="btn-sound" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(profile.system_prompt)}')); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy System Prompt', 2000);" style="font-size: 0.68rem; padding: 0.2rem 0.5rem; cursor: pointer;">
+              Copy System Prompt
+            </button>
+          ` : ''}
+        </div>
+        <div style="max-height: 140px; overflow-y: auto; font-size: 0.72rem; color: #e2e8f0; display: flex; flex-direction: column; gap: 0.35rem;">
+          ${profile.memories.map(m => `
+            <div style="background: rgba(0,0,0,0.25); border-radius: 4px; padding: 0.35rem 0.5rem;">
+              <strong style="color: var(--accent-gold);">${escapeHtml(m.subject)}:</strong> ${escapeHtml(m.summary)}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Direct Spectator Whisper / Message Box -->
       <div class="whisper-box">

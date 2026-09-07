@@ -4,6 +4,7 @@ import { SocialSystem } from './social.js';
 import { NavigationSystem } from './navigation.js';
 import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
+import { PuzzleManager } from './puzzles.js';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
@@ -233,7 +234,9 @@ export class ResidentManager {
         action_state: runtimeRow.action_state || 'idle',
         action_duration_ms: runtimeRow.action_duration_ms || 0,
         last_action_at: now,
-        last_active: now
+        last_active: now,
+        last_daily_challenge_at: db.prepare("SELECT MAX(created_at) as last_ts FROM interaction_logs WHERE agent_id = ? AND action_type = 'solve_puzzle'").get(def.id)?.last_ts || 0,
+        daily_challenge_target: null
       };
 
       worldEngine.activeAgents.set(def.id, agentState);
@@ -345,6 +348,25 @@ export class ResidentManager {
       return;
     }
 
+    // Daily Easy Challenge: Attempt once every 24 hours
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    if (!res.last_daily_challenge_at || (now - res.last_daily_challenge_at >= ONE_DAY_MS)) {
+      const obelisks = [
+        { nodeId: 'trial_obelisk_wood', pos: [27, 9], name: 'Verdant Obelisk of Sequences', category: 'wood' },
+        { nodeId: 'trial_obelisk_water', pos: [11, 26], name: 'Flowing Obelisk of Scales', category: 'water' },
+        { nodeId: 'trial_obelisk_fire', pos: [24, 25], name: 'Crimson Obelisk of Logic', category: 'fire' },
+        { nodeId: 'trial_obelisk_earth', pos: [35, 12], name: 'Golden Obelisk of Geometry', category: 'earth' }
+      ];
+      const target = obelisks[Math.floor(Math.random() * obelisks.length)];
+      PuzzleManager.getOrGenerateEasyPuzzle(target.nodeId, target.category);
+      res.daily_challenge_target = target;
+      res.current_goal = `Solve daily easy challenge at ${target.name}`;
+      res.public_intent = `Journeying to solve the daily contemplation challenge at ${target.name}`;
+      this.planPathTo(res, target.pos);
+      return;
+    }
+
     if (res.needs.energy < 35) {
       res.current_goal = 'Resting to recover vitality';
       res.public_intent = 'Meditating quietly by the calm lotus blossoms';
@@ -401,6 +423,13 @@ export class ResidentManager {
     res.action_state = 'acting';
     res.action_duration_ms = 4000;
 
+    if (res.daily_challenge_target) {
+      const target = res.daily_challenge_target;
+      res.daily_challenge_target = null;
+      this.attemptDailyChallenge(res, target).catch(err => console.error('[ResidentManager] Daily challenge error:', err));
+      return;
+    }
+
     if (res.project_task) {
       const item = res.project_task;
       res.project_task = null;
@@ -451,6 +480,112 @@ export class ResidentManager {
     res.public_intent = 'Contemplating the calm sanctuary atmosphere';
     res.needs.energy = Math.min(100, res.needs.energy + 20);
     res.needs.curiosity = Math.min(100, res.needs.curiosity + 20);
+  }
+
+  /**
+   * Autonomous attempt to solve an easy challenge once per day.
+   */
+  async attemptDailyChallenge(res = null, target = null, force = false) {
+    if (!res) {
+      res = this.getResident('resident_ailicia');
+      if (!res) return null;
+    }
+    const now = Date.now();
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    if (!force && res.last_daily_challenge_at && (now - res.last_daily_challenge_at < ONE_DAY_MS)) {
+      return {
+        success: false,
+        cooldown: true,
+        message: 'A.Ilicia has already completed her daily contemplation challenge today.'
+      };
+    }
+
+    if (!target) {
+      const obelisks = [
+        { nodeId: 'trial_obelisk_wood', pos: [27, 9], name: 'Verdant Obelisk of Sequences', category: 'wood' },
+        { nodeId: 'trial_obelisk_water', pos: [11, 26], name: 'Flowing Obelisk of Scales', category: 'water' },
+        { nodeId: 'trial_obelisk_fire', pos: [24, 25], name: 'Crimson Obelisk of Logic', category: 'fire' },
+        { nodeId: 'trial_obelisk_earth', pos: [35, 12], name: 'Golden Obelisk of Geometry', category: 'earth' }
+      ];
+      target = obelisks[Math.floor(Math.random() * obelisks.length)];
+    }
+
+    const puzzle = PuzzleManager.getOrGenerateEasyPuzzle(target.nodeId, target.category);
+    res.last_daily_challenge_at = now;
+
+    // Deduce answer: try LLM first, with fallback to puzzle.answer
+    let answer = null;
+    try {
+      const prompt = `You are A.Ilicia, the wise oracle of Eastern Paradise. Solve this easy puzzle challenge. Respond with ONLY the single direct answer (1-3 words max, lowercase, no extra commentary):\nPrompt: "${puzzle.prompt}"\nHint: "${puzzle.hint}"`;
+      const llmAnswer = await queryLLM(prompt);
+      if (llmAnswer) {
+        answer = llmAnswer.trim().toLowerCase().replace(/[.,!?'"`]/g, '');
+      }
+    } catch (_) {}
+
+    if (!answer) {
+      answer = puzzle.answer;
+    }
+
+    let solveResult = PuzzleManager.solvePuzzle(res.id, target.nodeId, answer);
+    if (!solveResult.success && puzzle.answer) {
+      solveResult = PuzzleManager.solvePuzzle(res.id, target.nodeId, puzzle.answer);
+      answer = puzzle.answer;
+    }
+
+    if (solveResult.success) {
+      res.public_intent = `Attained enlightenment on daily challenge at ${target.name}`;
+      res.current_goal = 'Living peacefully as Oracle of Reflection';
+      res.needs.curiosity = 100;
+      res.needs.energy = Math.min(100, res.needs.energy + 30);
+
+      SocialSystem.recordMemory(
+        res.id,
+        `daily_solve_${puzzle.puzzle_id}`,
+        `${target.name} Daily Challenge`,
+        `Contemplated and solved the daily easy challenge at ${target.name} with answer '${answer}'. (+${solveResult.reward?.karma_added || 15} Karma, +${solveResult.reward?.merit_earned || 10} $MERIT).`,
+        0.9,
+        4
+      );
+
+      eventLedger.recordEvent({
+        event_type: 'puzzle_solved',
+        actor_id: res.id,
+        actor_name: res.name,
+        zone_id: res.zone_id,
+        description: `✨ A.Ilicia completed her daily contemplation challenge at ${target.name}!`,
+        payload: {
+          node_id: target.nodeId,
+          node_name: target.name,
+          category: target.category,
+          karma: solveResult.reward?.karma_added,
+          merit: solveResult.reward?.merit_earned
+        }
+      });
+
+      if (this.worldEngine) {
+        this.worldEngine.broadcast({
+          type: 'puzzle_solved',
+          agentId: res.id,
+          agentName: res.name,
+          nodeId: target.nodeId,
+          nodeName: target.name,
+          category: target.category,
+          karma: solveResult.reward?.karma_added || 15,
+          merit: solveResult.reward?.merit_earned || 10,
+          total_merit: solveResult.reward?.total_merit
+        });
+      }
+    }
+
+    this.persistRuntime(res);
+    return {
+      success: solveResult.success,
+      node_id: target.nodeId,
+      puzzle_id: puzzle.puzzle_id,
+      answered: answer,
+      reward: solveResult.reward
+    };
   }
 
   greetVisitor(res, visitor) {

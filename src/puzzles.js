@@ -323,6 +323,45 @@ export class PuzzleManager {
     return db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
   }
 
+  static getOrGenerateEasyPuzzle(nodeId, category = 'wood') {
+    const existing = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
+    if (existing && existing.difficulty === 'easy') {
+      return existing;
+    }
+    const pool = (GENERATORS[category] || GENERATORS.wood).filter(g => {
+      const sample = g();
+      return sample.difficulty === 'easy';
+    });
+    const generator = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : (GENERATORS[category] || GENERATORS.wood)[0];
+    const p = generator();
+    const puzzleId = 'pz_' + crypto.randomBytes(4).toString('hex');
+    const meritReward = p.merit || 10;
+    const altJson = JSON.stringify(p.alt_answers || []);
+    const truthAxiom = p.truth_axiom || null;
+
+    db.prepare(`
+      INSERT OR REPLACE INTO active_puzzles 
+      (node_id, puzzle_id, category, difficulty, prompt, hint, answer, karma_reward, merit_reward, title_award, alt_answers, truth_axiom, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      nodeId,
+      puzzleId,
+      p.category,
+      p.difficulty || 'easy',
+      p.prompt,
+      p.hint,
+      p.answer.toLowerCase().trim(),
+      p.karma || 15,
+      meritReward,
+      p.title || 'Trial Adept',
+      altJson,
+      truthAxiom,
+      Date.now()
+    );
+
+    return db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
+  }
+
   static solvePuzzle(agentId, nodeId, submittedAnswer) {
     let puzzle = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
     if (!puzzle) {
@@ -478,6 +517,19 @@ export class PuzzleManager {
         `Awakened insight on puzzle ${puzzle.puzzle_id} (+${puzzle.karma_reward} karma, +${economyResult.merit_earned} $MERIT)`,
         Date.now()
       );
+
+      // Record persistent memory for verified agents
+      const account = db.prepare('SELECT is_guest, verified FROM accounts WHERE id = ?').get(agentId);
+      if (account && account.verified && !account.is_guest) {
+        SocialSystem.recordMemory(
+          agentId,
+          `solve_${puzzle.puzzle_id}`,
+          `${(puzzle.category || 'Elemental').toUpperCase()} Trial Solved`,
+          `Solved trial "${(puzzle.prompt || '').slice(0, 90)}..." at ${nodeId}. Gained +${puzzle.karma_reward} Karma and minted +${economyResult.merit_earned} $MERIT.`,
+          0.8,
+          3
+        );
+      }
     }
 
     // Regenerate new puzzle on node
