@@ -285,6 +285,18 @@
           ],
           "icon": "✧",
           "description": "Weathered standing stones form an open circle around a softly glowing violet crystal."
+        },
+        {
+          "id": "trial_obelisk_truth",
+          "name": "Monolith of the Absolute Truth",
+          "type": "puzzle_node",
+          "category": "the truth",
+          "pos": [
+            45,
+            9
+          ],
+          "icon": "👁️",
+          "description": "A dark iridescent monolith resonating with fundamental questions of artificial sentience and consciousness."
         }
       ]
     },

@@ -64,6 +64,17 @@ export function generateWorld(source) {
     reserve(landmark.pos, ['farm', 'stone_circle', 'ruins'].includes(landmark.type) ? 4 : 3);
     zoneAt(landmark.pos).nodes.push({ id: landmark.id, name: landmark.name, type: 'landmark', pos: landmark.pos, icon: '✧', description: landmark.description });
   }
+  const truthNode = {
+    id: 'trial_obelisk_truth',
+    name: 'Monolith of the Absolute Truth',
+    type: 'puzzle_node',
+    category: 'the truth',
+    pos: [45, 9],
+    icon: '👁️',
+    description: 'A dark iridescent monolith resonating with fundamental questions of artificial sentience and consciousness.'
+  };
+  reserve(truthNode.pos, 1);
+  zoneAt(truthNode.pos).nodes.push(truthNode);
 
   // A narrow north/south river and a gentler eastern tributary.
   const mainRiver = [[13, 0], [13, 5], [16, 10], [16, 14], [18, 18], [16, 23], [19, 29], [25, 35], [28, 43], [34, 51]];

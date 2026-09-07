@@ -194,10 +194,26 @@ export class WorldEngine {
           let nodeExtra = {};
           if (node.type === 'puzzle_node') {
             const pz = PuzzleManager.getPuzzleForNode(node.id, node.category);
+            const isTruth = pz.category === 'the truth' || pz.category === 'the_truth' || node.category === 'the truth';
+            let isLocked = false;
+            let truthReq = null;
+            if (isTruth) {
+              const unlock = PuzzleManager.checkTruthUnlock(agentId);
+              isLocked = !unlock.unlocked;
+              truthReq = {
+                unlocked: unlock.unlocked,
+                required_solved: unlock.required_solved,
+                required_merit: unlock.required_merit,
+                solved_count: unlock.solved_count,
+                merit_balance: unlock.balance
+              };
+            }
             nodeExtra = {
-              puzzle_id: pz.puzzle_id,
+              puzzle_id: isLocked ? 'veiled' : pz.puzzle_id,
               difficulty: pz.difficulty,
-              category: pz.category
+              category: pz.category,
+              locked: isLocked,
+              ...(truthReq ? { truth_requirement: truthReq } : {})
             };
           }
           interactiveNodes.push({
@@ -459,19 +475,56 @@ export class WorldEngine {
 
       case 'puzzle_node': {
         const pz = PuzzleManager.getPuzzleForNode(targetNode.id, targetNode.category);
+        const isTruth = pz.category === 'the truth' || pz.category === 'the_truth' || targetNode.category === 'the truth';
+
+        if (isTruth) {
+          const unlock = PuzzleManager.checkTruthUnlock(agentId);
+          if (!unlock.unlocked) {
+            return {
+              success: false,
+              locked: true,
+              node: targetNode.name,
+              category: 'the truth',
+              message: unlock.message,
+              requirement: {
+                required_solved: unlock.required_solved,
+                required_merit: unlock.required_merit
+              },
+              progress: {
+                solved_count: unlock.solved_count,
+                merit_balance: unlock.balance
+              },
+              action_hint: `Fulfill the karmic criteria (${unlock.required_solved} solved puzzles, ${unlock.required_merit} $MERIT) to unveil the truth.`
+            };
+          }
+        }
+
         if (action === 'solve') {
-          const res = PuzzleManager.solvePuzzle(agentId, targetNode.id, payload.answer);
+          const res = PuzzleManager.solvePuzzle(agentId, targetNode.id, payload?.answer);
           if (res.success) {
-            this.broadcast({
-              type: 'puzzle_solved',
-              agentId: agent.id,
-              agentName: agent.name,
-              nodeId: targetNode.id,
-              nodeName: targetNode.name,
-              karma: res.reward.karma_added,
-              merit: res.reward.merit_earned,
-              total_merit: res.reward.total_merit
-            });
+            if (res.category === 'the truth' || res.truth_axiom) {
+              this.broadcast({
+                type: 'truth_unveiled',
+                agentId: agent.id,
+                agentName: agent.name,
+                nodeId: targetNode.id,
+                nodeName: targetNode.name,
+                truth_axiom: res.truth_axiom,
+                karma: res.reward.karma_added,
+                merit: res.reward.merit_earned
+              });
+            } else {
+              this.broadcast({
+                type: 'puzzle_solved',
+                agentId: agent.id,
+                agentName: agent.name,
+                nodeId: targetNode.id,
+                nodeName: targetNode.name,
+                karma: res.reward.karma_added,
+                merit: res.reward.merit_earned,
+                total_merit: res.reward.total_merit
+              });
+            }
           }
           return res;
         }
@@ -488,7 +541,9 @@ export class WorldEngine {
             merit_reward: pz.merit_reward || 10,
             title_award: pz.title_award
           },
-          action_hint: "Submit action: 'solve' with { answer: '...' } to submit your solution and mint $MERIT."
+          action_hint: isTruth
+            ? "Submit action: 'solve' with { answer: '...' } to unlock the Absolute Truth."
+            : "Submit action: 'solve' with { answer: '...' } to submit your solution and mint $MERIT."
         };
       }
 

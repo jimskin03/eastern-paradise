@@ -84,6 +84,7 @@ db.exec(`
     karma_reward INTEGER NOT NULL,
     merit_reward INTEGER NOT NULL DEFAULT 10,
     title_award TEXT,
+    truth_axiom TEXT,
     created_at INTEGER NOT NULL
   );
 
@@ -217,6 +218,9 @@ try {
 } catch (_) {}
 try {
   db.exec(`ALTER TABLE active_puzzles ADD COLUMN alt_answers TEXT;`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE active_puzzles ADD COLUMN truth_axiom TEXT;`);
 } catch (_) {}
 try {
   db.exec(`ALTER TABLE accounts ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;`);

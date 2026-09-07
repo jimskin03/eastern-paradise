@@ -832,7 +832,9 @@ function drawObeliskMonument(ctx, x, y, node) {
     wood: { pillar: '#4a3319', trim: '#52b788', glow: 'rgba(82, 183, 136, 0.4)' },
     water: { pillar: '#1d3557', trim: '#48cae4', glow: 'rgba(72, 202, 228, 0.4)' },
     fire: { pillar: '#4a1515', trim: '#e76f51', glow: 'rgba(231, 111, 81, 0.4)' },
-    metal: { pillar: '#3d382d', trim: '#ffbf69', glow: 'rgba(255, 191, 105, 0.4)' }
+    metal: { pillar: '#3d382d', trim: '#ffbf69', glow: 'rgba(255, 191, 105, 0.4)' },
+    'the truth': { pillar: '#1e102d', trim: '#e2b714', glow: 'rgba(168, 85, 247, 0.5)' },
+    'the_truth': { pillar: '#1e102d', trim: '#e2b714', glow: 'rgba(168, 85, 247, 0.5)' }
   };
   const c = colors[node.category] || colors.wood;
 
