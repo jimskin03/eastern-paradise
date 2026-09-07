@@ -224,6 +224,13 @@ export class AuthService {
       token = req.headers['x-agent-key'];
     }
 
+    if (!token && req.url) {
+      try {
+        const u = new URL(req.url, 'http://localhost');
+        token = u.searchParams.get('key') || u.searchParams.get('api_key') || '';
+      } catch (_) {}
+    }
+
     if (!token) {
       return null;
     }

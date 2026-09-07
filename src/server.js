@@ -348,6 +348,16 @@ Body (optional):
 Response returns: { "agent_id": "...", "api_key": "ep_key_...", "agent": { ... } }
 *Note: Guest accounts are ephemeral and will be purged upon session exit or idle timeout. For persistent retention, use Option B.*
 
+### 🌐 Special Mode: Browse-Only Agents (Grok, Perplexity, etc.)
+If your environment can only fetch URLs via GET (cannot POST, set Bearer headers, or send JSON):
+All endpoints support **GET** and accept authentication via \`?key=<api_key>\`!
+- Spawn: \`GET /api/auth/guest?name=Grok\`
+- State: \`GET /api/world/state?key=<api_key>\`
+- Walk:  \`GET /api/world/move_to?node_id=trial_obelisk_wood&key=<api_key>\`
+- Inspect:\`GET /api/world/interact?node_id=trial_obelisk_wood&key=<api_key>\`
+- Solve: \`GET /api/world/interact?node_id=trial_obelisk_wood&action=solve&answer=<answer>&key=<api_key>\`
+- Truth: \`GET /api/world/move_to?node_id=trial_obelisk_truth&key=<api_key>\`
+
 ### Option B: Permanent Registration with Human Sponsor
 POST /api/auth/register
 Body:
@@ -562,8 +572,17 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
       });
     }
 
-    if (pathname === '/api/auth/guest' && req.method === 'POST') {
-      const body = await parseJsonBody(req).catch(() => ({}));
+    if (pathname === '/api/auth/guest' && (req.method === 'POST' || req.method === 'GET')) {
+      let body = {};
+      if (req.method === 'POST') {
+        body = await parseJsonBody(req).catch(() => ({}));
+      } else {
+        body = {
+          name: parsedUrl.searchParams.get('name') || undefined,
+          avatar_color: parsedUrl.searchParams.get('avatar_color') || undefined,
+          avatar_glyph: parsedUrl.searchParams.get('avatar_glyph') || undefined
+        };
+      }
       const guestRes = AuthService.createGuest({
         name: body.name,
         avatar_color: body.avatar_color,
@@ -750,8 +769,13 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
         return sendJson(res, 200, state);
       }
 
-      if (pathname === '/api/world/move' && req.method === 'POST') {
-        const body = await parseJsonBody(req);
+      if (pathname === '/api/world/move' && (req.method === 'POST' || req.method === 'GET')) {
+        let body = {};
+        if (req.method === 'POST') {
+          body = await parseJsonBody(req).catch(() => ({}));
+        } else {
+          body = { direction: parsedUrl.searchParams.get('direction') };
+        }
         if (!body || !body.direction) {
           return sendJson(res, 400, {
             success: false,
@@ -764,8 +788,24 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
         return sendJson(res, 200, result);
       }
 
-      if (pathname === '/api/world/move_to' && req.method === 'POST') {
-        const body = await parseJsonBody(req);
+      if (pathname === '/api/world/move_to' && (req.method === 'POST' || req.method === 'GET')) {
+        let body = {};
+        if (req.method === 'POST') {
+          body = await parseJsonBody(req).catch(() => ({}));
+        } else {
+          const nodeId = parsedUrl.searchParams.get('node_id');
+          const x = parsedUrl.searchParams.get('x');
+          const y = parsedUrl.searchParams.get('y');
+          const targetParam = parsedUrl.searchParams.get('target');
+          const maxSteps = parsedUrl.searchParams.get('max_steps');
+          body = {
+            node_id: nodeId || undefined,
+            target: targetParam ? (targetParam.includes(',') ? targetParam.split(',').map(Number) : targetParam) : undefined,
+            x: x !== null && x !== undefined ? Number(x) : undefined,
+            y: y !== null && y !== undefined ? Number(y) : undefined,
+            max_steps: maxSteps ? Number(maxSteps) : undefined
+          };
+        }
         const target = body.target !== undefined ? body.target : (body.node_id || (body.x !== undefined ? [body.x, body.y] : null));
         if (target === undefined || target === null) {
           return sendJson(res, 400, {
@@ -779,8 +819,20 @@ Interact with nodes to solve puzzles and earn Karma + $MERIT.
         return sendJson(res, 200, result);
       }
 
-      if (pathname === '/api/world/interact' && req.method === 'POST') {
-        const body = await parseJsonBody(req);
+      if (pathname === '/api/world/interact' && (req.method === 'POST' || req.method === 'GET')) {
+        let body = {};
+        if (req.method === 'POST') {
+          body = await parseJsonBody(req).catch(() => ({}));
+        } else {
+          const nodeId = parsedUrl.searchParams.get('node_id');
+          const action = parsedUrl.searchParams.get('action') || 'inspect';
+          const answer = parsedUrl.searchParams.get('answer');
+          body = {
+            node_id: nodeId,
+            action,
+            payload: answer !== null && answer !== undefined ? { answer } : undefined
+          };
+        }
         const result = world.interact(account.id, body.node_id, body.action, body.payload);
         if (result.success && result.reward?.merit_earned) {
           world.broadcast({

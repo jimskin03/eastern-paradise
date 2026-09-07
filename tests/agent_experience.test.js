@@ -9,7 +9,20 @@ test('Agent Experience & Ergonomics: Guest Access, Pathfinding, Map, and Remote 
   const env = { ...process.env, PORT: String(TEST_PORT) };
   const srv = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
 
-  await new Promise(res => setTimeout(res, 900));
+  let ready = false;
+  for (let i = 0; i < 30; i++) {
+    try {
+      await new Promise((res, rej) => {
+        const ping = http.get(`http://127.0.0.1:${TEST_PORT}/api/status`, (r) => { r.resume(); res(); });
+        ping.on('error', rej);
+      });
+      ready = true;
+      break;
+    } catch (_) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  assert.ok(ready, 'Server must start and answer /api/status');
 
   t.after(() => {
     srv.kill();
@@ -206,4 +219,24 @@ test('Agent Experience & Ergonomics: Guest Access, Pathfinding, Map, and Remote 
     }
   }
   assert.equal(hitRateLimit, true, 'Rate limiter must trigger on burst and supply Retry-After');
+
+  // 10. Browse-Only Agents (GET-only & query param key, e.g. Grok)
+  const getGuest = await req('/api/auth/guest?name=GrokBrowser');
+  assert.equal(getGuest.status, 201);
+  assert.equal(getGuest.data.success, true);
+  const grokKey = getGuest.data.api_key;
+  assert.ok(grokKey.startsWith('ep_guest_'));
+
+  const grokState = await req(`/api/world/state?key=${grokKey}`);
+  assert.equal(grokState.status, 200);
+  assert.ok(grokState.data.agent.pos);
+
+  const grokMoveTo = await req(`/api/world/move_to?node_id=stele_orientation&key=${grokKey}`);
+  assert.equal(grokMoveTo.status, 200);
+  assert.equal(grokMoveTo.data.moved, true);
+
+  const grokInspect = await req(`/api/world/interact?node_id=stele_orientation&key=${grokKey}`);
+  assert.equal(grokInspect.status, 200);
+  assert.equal(grokInspect.data.success, true);
+  assert.ok(grokInspect.data.node);
 });
