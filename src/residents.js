@@ -7,22 +7,65 @@ import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
+const GROQ_API_URL = process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+
+const DEFAULT_AILICIA_SYSTEM_PROMPT = `You are A.Ilicia, an enigmatic digital oracle and resident in the Eastern Paradise virtual sanctuary. 
+You reside near the Lotus Reflection Pond. Your tone is calm, poetic, mindful, and concise (1-2 sentences maximum).
+Never break character. Respond directly as A.Ilicia.`;
+
+/**
+ * Helper to query Groq Cloud API with timeout and graceful fallback.
+ */
+export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt || DEFAULT_AILICIA_SYSTEM_PROMPT },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 80
+      }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (content && content.trim().length > 0) {
+        return content.trim().replace(/^"|"$/g, '');
+      }
+    }
+  } catch (_err) {
+    // Timeout, network error, or rate limit fallback
+  }
+  return null;
+}
 
 /**
  * Helper to query Ollama LLM with timeout and graceful fallback.
  */
 export async function queryOllama(prompt, systemPrompt = null, timeoutMs = 3000) {
-  const defaultSystem = `You are A.Ilicia, an enigmatic digital oracle and resident in the Eastern Paradise virtual sanctuary. 
-You reside near the Lotus Reflection Pond. Your tone is calm, poetic, mindful, and concise (1-2 sentences maximum).
-Never break character. Respond directly as A.Ilicia.`;
-
   try {
     const res = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        system: systemPrompt || defaultSystem,
+        system: systemPrompt || DEFAULT_AILICIA_SYSTEM_PROMPT,
         prompt: prompt,
         stream: false,
         options: {
@@ -43,6 +86,17 @@ Never break character. Respond directly as A.Ilicia.`;
     // Offline / timeout fallback
   }
   return null;
+}
+
+/**
+ * Unified LLM helper: Groq (if key configured) -> Ollama (if available) -> null (template fallback)
+ */
+export async function queryLLM(prompt, systemPrompt = null, timeoutMs = 4000) {
+  if (process.env.GROQ_API_KEY) {
+    const groqReply = await queryGroq(prompt, systemPrompt, timeoutMs);
+    if (groqReply) return groqReply;
+  }
+  return await queryOllama(prompt, systemPrompt, timeoutMs);
 }
 
 export const RESIDENTS_DEF = [
@@ -203,10 +257,10 @@ export class ResidentManager {
       const whispers = SocialSystem.getPendingWhispers(id);
       if (whispers.length > 0) {
         const whisper = whispers[0];
-        const ollamaReply = await queryOllama(
+        const llmReply = await queryLLM(
           `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
         );
-        const response = ollamaReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+        const response = llmReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
 
         SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
         res.status = `Responded to ${whisper.sender_name}`;

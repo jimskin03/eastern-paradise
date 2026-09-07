@@ -18,7 +18,7 @@ const { NavigationSystem } = await import('../src/navigation.js');
 const { eventLedger } = await import('../src/events.js');
 const { SocialSystem } = await import('../src/social.js');
 const { ProjectManager, CHIME_OBJECT_ID } = await import('../src/projects.js');
-const { residentManager, RESIDENTS_DEF, queryOllama } = await import('../src/residents.js');
+const { residentManager, RESIDENTS_DEF, queryOllama, queryGroq, queryLLM } = await import('../src/residents.js');
 const { RETIRED_RESIDENT_IDS } = await import('../src/resident-policy.js');
 const { AuthService } = await import('../src/auth.js');
 const { EconomyManager } = await import('../src/economy.js');
@@ -430,4 +430,75 @@ test('Living Sanctuary: A.Ilicia uses the configured Ollama contract with a mock
   assert.equal(request.body.prompt, 'What does the pond reflect?');
   assert.equal(request.body.stream, false);
   assert.equal(request.body.model, process.env.OLLAMA_MODEL || 'qwen2.5:latest');
+});
+
+test('Living Sanctuary: A.Ilicia uses Groq Cloud API when GROQ_API_KEY is configured', async (t) => {
+  const origKey = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'gsk_test_mock_key_123';
+
+  let request;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    request = { url, options, body: JSON.parse(options.body) };
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: '"The mirror basin shows not who you are, but the stillness you seek."'
+            }
+          }
+        ]
+      })
+    };
+  });
+
+  try {
+    const reply = await queryGroq('What is the lotus pond?');
+    assert.equal(reply, 'The mirror basin shows not who you are, but the stillness you seek.');
+    assert.equal(request.url, 'https://api.groq.com/openai/v1/chat/completions');
+    assert.equal(request.options.headers['Authorization'], 'Bearer gsk_test_mock_key_123');
+    assert.equal(request.body.model, 'llama-3.1-8b-instant');
+    assert.equal(request.body.messages[0].role, 'system');
+    assert.match(request.body.messages[0].content, /A\.Ilicia/);
+    assert.equal(request.body.messages[1].role, 'user');
+    assert.equal(request.body.messages[1].content, 'What is the lotus pond?');
+
+    // Test unified queryLLM prefers Groq when key is present
+    const unifiedReply = await queryLLM('Tell me a thought');
+    assert.equal(unifiedReply, 'The mirror basin shows not who you are, but the stillness you seek.');
+  } finally {
+    if (origKey !== undefined) {
+      process.env.GROQ_API_KEY = origKey;
+    } else {
+      delete process.env.GROQ_API_KEY;
+    }
+  }
+});
+
+test('Living Sanctuary: queryLLM falls back to Ollama or template when Groq fails', async (t) => {
+  const origKey = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'gsk_test_error_key';
+
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('groq.com')) {
+      return { ok: false, status: 429, statusText: 'Too Many Requests' };
+    }
+    // Ollama fallback
+    return {
+      ok: true,
+      json: async () => ({ response: 'A serene fallback thought from local model.' })
+    };
+  });
+
+  try {
+    const reply = await queryLLM('Are you awake?');
+    assert.equal(reply, 'A serene fallback thought from local model.');
+  } finally {
+    if (origKey !== undefined) {
+      process.env.GROQ_API_KEY = origKey;
+    } else {
+      delete process.env.GROQ_API_KEY;
+    }
+  }
 });

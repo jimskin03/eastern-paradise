@@ -24,6 +24,11 @@ services:
         value: "*"
       - key: SMTP_URL
         sync: false
+      # Groq Cloud API for NPC A.Ilicia live LLM responses
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: "llama-3.1-8b-instant"
       # Persistent SQLite: requires a paid plan (Starter, $7/mo) + disk ($0.25/GB/mo).
       # To activate: uncomment the disk block below, set plan: starter, and uncomment DATA_DIR.
       # - key: DATA_DIR
