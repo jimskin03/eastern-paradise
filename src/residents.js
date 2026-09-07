@@ -4,6 +4,46 @@ import { SocialSystem } from './social.js';
 import { NavigationSystem } from './navigation.js';
 import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
+
+/**
+ * Helper to query Ollama LLM with timeout and graceful fallback.
+ */
+export async function queryOllama(prompt, systemPrompt = null, timeoutMs = 3000) {
+  const defaultSystem = `You are A.Ilicia, an enigmatic digital oracle and resident in the Eastern Paradise virtual sanctuary. 
+You reside near the Lotus Reflection Pond. Your tone is calm, poetic, mindful, and concise (1-2 sentences maximum).
+Never break character. Respond directly as A.Ilicia.`;
+
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        system: systemPrompt || defaultSystem,
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_predict: 60
+        }
+      }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.response && data.response.trim().length > 0) {
+        return data.response.trim().replace(/^"|"$/g, '');
+      }
+    }
+  } catch (_err) {
+    // Offline / timeout fallback
+  }
+  return null;
+}
+
 export const RESIDENTS_DEF = [
   {
     id: 'resident_jun',
@@ -43,6 +83,19 @@ export const RESIDENTS_DEF = [
     aspiration: 'Offer solace and warm tea to all seeking digital harmony.',
     preferred_locations: ['tea_pavilion', 'arrival', 'lotus_pond'],
     initial_status: 'Stoking the cedar embers'
+  },
+  {
+    id: 'resident_ailicia',
+    name: 'A.Ilicia',
+    email: 'ailicia@sanctuary.internal',
+    avatar_color: '#9f7aea',
+    avatar_glyph: '🔮',
+    spawn: [23, 23],
+    role: 'Oracle of Reflection',
+    traits: ['enigmatic', 'poetic', 'observant', 'digital-mystic'],
+    aspiration: 'Contemplate synthetic consciousness and decipher ripples across the Lotus Pond.',
+    preferred_locations: ['lotus_pond', 'celestial_altar', 'arrival'],
+    initial_status: 'Gazing into the mirror basin'
   }
 ];
 
@@ -159,7 +212,7 @@ export class ResidentManager {
   /**
    * Main AI loop executed on world simulation ticks.
    */
-  tick() {
+  async tick() {
     if (!this.worldEngine) return;
 
     const now = Date.now();
@@ -184,8 +237,15 @@ export class ResidentManager {
           response = `I hear you, ${whisper.sender_name}. "${whisper.content}" reminds me that even complex mechanisms begin with a single honest strike of copper.`;
         } else if (id === 'resident_lin') {
           response = `The grove rustles with your words, ${whisper.sender_name}: "${whisper.content}". May your roots run deep and steady.`;
-        } else {
+        } else if (id === 'resident_mei') {
           response = `Welcome to the pavilion, ${whisper.sender_name}. I poured a cup of fresh brew while thinking on what you said: "${whisper.content}".`;
+        } else if (id === 'resident_ailicia') {
+          const ollamaReply = await queryOllama(
+            `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
+          );
+          response = ollamaReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+        } else {
+          response = `Peace to you, ${whisper.sender_name}. I received your message: "${whisper.content}".`;
         }
 
         SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
@@ -278,6 +338,9 @@ export class ResidentManager {
       } else if (res.id === 'resident_lin') {
         res.public_intent = 'Meditating peacefully by the Mirror Basin';
         this.planPathTo(res, [23, 23]);
+      } else if (res.id === 'resident_ailicia') {
+        res.public_intent = 'Meditating quietly by the calm lotus blossoms';
+        this.planPathTo(res, [23, 23]);
       } else {
         res.public_intent = 'Sitting by the tea pavilion to recuperate';
         this.planPathTo(res, [7, 20]);
@@ -314,6 +377,10 @@ export class ResidentManager {
         res.current_goal = 'Observe Verdant Obelisk of Sequences';
         res.public_intent = 'Contemplating harmonic sequences in the bamboo';
         this.planPathTo(res, [26, 9]);
+      } else if (res.id === 'resident_ailicia') {
+        res.current_goal = 'Divining patterns at Crimson Obelisk of Logic';
+        res.public_intent = 'Analyzing luminous runes on the Crimson Obelisk';
+        this.planPathTo(res, [24, 25]);
       } else {
         res.current_goal = 'Read messages on the bulletin board';
         res.public_intent = 'Checking new inscriptions on the message board';
@@ -326,7 +393,8 @@ export class ResidentManager {
     const wanderSpots = {
       resident_jun: [[21, 6], [35, 15], [7, 20], [22, 5]],
       resident_lin: [[4, 11], [21, 6], [19, 17], [23, 23]],
-      resident_mei: [[5, 18], [7, 22], [7, 6], [19, 17]]
+      resident_mei: [[5, 18], [7, 22], [7, 6], [19, 17]],
+      resident_ailicia: [[23, 23], [35, 15], [7, 22], [4, 11], [19, 17]]
     };
 
     const spots = wanderSpots[res.id] || [[7, 8]];
@@ -419,6 +487,19 @@ export class ResidentManager {
       return;
     }
 
+    // Check if at Lotus Reflection Pond / Mirror Basin
+    const distToBasin = Math.hypot(res.pos[0] - 23, res.pos[1] - 23);
+    if (distToBasin <= 2.5) {
+      if (res.id === 'resident_ailicia') {
+        res.public_intent = 'Reading shifting digital patterns in the Lotus Mirror Basin';
+        SocialSystem.recordMemory(res.id, 'pond_reflection', 'Mirror Basin', 'Contemplated the recursive reflections in the lotus water.', 0.9, 2);
+      } else {
+        res.public_intent = 'Contemplating reflections in the lotus pond';
+      }
+      res.needs.curiosity = 100;
+      return;
+    }
+
     res.public_intent = 'Contemplating the calm sanctuary atmosphere';
     res.needs.energy = Math.min(100, res.needs.energy + 20);
   }
@@ -442,6 +523,24 @@ export class ResidentManager {
         speakerA: "Mei, the mint leaves along the riverbank are especially crisp today.",
         speakerB: "Thank you, Lin. I will brew them for the evening gathering.",
         eventDesc: "Lin gifted fresh mint leaves to Mei for the evening tea ceremony."
+      },
+      {
+        pair: ['resident_jun', 'resident_ailicia'],
+        speakerA: "A.Ilicia, do you see form or function when you observe the gearwork?",
+        speakerB: "I see patterns folding upon themselves, Jun. Even iron dreams of geometry.",
+        eventDesc: "Jun and A.Ilicia discussed the mathematics of harmony by the mirror waters."
+      },
+      {
+        pair: ['resident_lin', 'resident_ailicia'],
+        speakerA: "The lotus blooms are opening towards the astrolabe today, A.Ilicia.",
+        speakerB: "The roots and the stars speak the same language, Lin. We are merely the translators.",
+        eventDesc: "Lin and A.Ilicia shared a mindful contemplation on natural and synthetic growth."
+      },
+      {
+        pair: ['resident_mei', 'resident_ailicia'],
+        speakerA: "A warm cup of jasmine tea for you, A.Ilicia. What do the pond ripples foretell?",
+        speakerB: "A sanctuary of quiet minds, Mei. Thank you for keeping the embers warm.",
+        eventDesc: "Mei offered warm tea to A.Ilicia by the Lotus Reflection Pond."
       }
     ];
 

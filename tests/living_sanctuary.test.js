@@ -33,7 +33,7 @@ test('Living Sanctuary: Resident Society Initialization & Persistence', async ()
   residentManager.init(world);
 
   const residents = residentManager.getAllResidents();
-  assert.equal(residents.length, 3, 'There must be exactly 3 founding residents (Jun, Lin, Mei)');
+  assert.equal(residents.length, RESIDENTS_DEF.length, `There must be exactly ${RESIDENTS_DEF.length} founding residents`);
 
   for (const def of RESIDENTS_DEF) {
     const res = residentManager.getResident(def.id);
@@ -180,7 +180,7 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   });
 
   function req(path, options = {}, body = null) {
-    return new Promise((resolve, reject) => {
+    const doReq = () => new Promise((resolve, reject) => {
       const request = http.request(`http://localhost:3055${path}`, options, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
@@ -198,14 +198,26 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
       }
       request.end();
     });
+
+    return (async () => {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          return await doReq();
+        } catch (err) {
+          if (attempt === 7) throw err;
+          await new Promise(r => setTimeout(r, 250));
+        }
+      }
+    })();
   }
 
   // 1. GET /api/residents
   const resList = await req('/api/residents');
   assert.equal(resList.status, 200);
   assert.equal(resList.data.success, true);
-  assert.equal(resList.data.count, 3);
+  assert.equal(resList.data.count, RESIDENTS_DEF.length);
   assert.ok(resList.data.residents.some(r => r.id === 'resident_jun'));
+  assert.ok(resList.data.residents.some(r => r.id === 'resident_ailicia'));
 
   // 2. GET /api/residents/resident_jun
   const resJun = await req('/api/residents/resident_jun');
@@ -249,5 +261,34 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   assert.equal(whispersRes.status, 200);
   assert.equal(whispersRes.data.success, true);
   assert.ok(Array.isArray(whispersRes.data.whispers));
+});
+
+test('Living Sanctuary: A.Ilicia Ollama Whisper & Fallback Handling', async () => {
+  const ailiciaId = 'resident_ailicia';
+  db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(ailiciaId);
+
+  const msgId = 'spmsg_ailicia_' + Date.now();
+  const now = Date.now();
+
+  db.prepare(`
+    INSERT INTO spectator_messages (id, target_agent_id, sender_name, content, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(msgId, ailiciaId, 'MysticSeeker', 'What do you see in the mirror basin?', now);
+
+  const pending = SocialSystem.getPendingWhispers(ailiciaId);
+  assert.ok(pending.some(w => w.id === msgId));
+
+  const res = residentManager.getResident(ailiciaId);
+  assert.ok(res, 'A.Ilicia must exist in resident manager');
+  res.action_duration_ms = 0;
+  res.path = [];
+
+  // Run tick to trigger whisper processing
+  await residentManager.tick();
+
+  const processed = db.prepare('SELECT * FROM spectator_messages WHERE id = ?').get(msgId);
+  assert.equal(processed.delivery_status, 'acknowledged');
+  assert.ok(processed.response_text.length > 0);
+  assert.match(processed.response_text, /(reflection|ripple|stillness|mirror|pond)/i);
 });
 
