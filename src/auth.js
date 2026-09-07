@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { db } from './db.js';
 import { mailMode } from './mailer.js';
 import { isRetiredResident } from './resident-policy.js';
+import { MailboxService } from './mailbox.js';
 
 export class AuthService {
   static register({ name, email, avatar_color = '#48bb78', avatar_glyph = '☯' }) {
@@ -197,6 +198,9 @@ export class AuthService {
 
     // 5. Purge transactions involving this guest
     db.prepare('DELETE FROM transactions WHERE sender_id = ? OR recipient_id = ?').run(agentId, agentId);
+
+    // 5b. Purge mailbox messages involving this guest
+    MailboxService.purgeAgentMessages(agentId);
 
     // 6. Purge account record
     db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);

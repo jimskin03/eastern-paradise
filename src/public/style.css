@@ -1246,5 +1246,66 @@ main {
   }
 }
 
+/* Spec v0.1: Live Arrivals Feed Watermark, Offline State & Explicit Agent Statuses */
+.feed-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.feed-watermark {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  font-family: monospace;
+}
+
+.feed-offline-banner {
+  background: rgba(229, 62, 62, 0.15);
+  border: 1px solid var(--accent-crimson);
+  color: #feb2b2;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.status-state-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-family: monospace;
+}
+
+.status-state-pill.online {
+  background: rgba(72, 187, 120, 0.15);
+  color: #48bb78;
+  border: 1px solid #48bb78;
+}
+
+.status-state-pill.seated {
+  background: rgba(214, 158, 46, 0.15);
+  color: #ecc94b;
+  border: 1px solid #d69e2e;
+}
+
+.status-state-pill.offline {
+  background: rgba(160, 174, 192, 0.12);
+  color: #a0aec0;
+  border: 1px solid #718096;
+}
+
 
 

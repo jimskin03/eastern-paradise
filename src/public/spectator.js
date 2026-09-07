@@ -6,6 +6,7 @@ const ctx = canvas.getContext('2d');
 
 let worldData = null;
 let agents = new Map(); // agentId -> agent object
+window.agents = agents;
 let serverState = 'ACTIVE';
 let ws = null;
 let hoveredTile = null;
@@ -248,7 +249,10 @@ function connectWebSocket() {
 
   ws.onopen = () => {
     console.log('[Spectator] Connected to Eastern Paradise Isometric Live Stream.');
-    logActivity('Quantum stream established with the sanctuary.');
+    const watermark = document.getElementById('feedSyncWatermark');
+    if (watermark) watermark.textContent = `last-synced: ${new Date().toLocaleTimeString()} (live)`;
+    const banner = document.getElementById('feedOfflineBanner');
+    if (banner) banner.style.display = 'none';
   };
 
   ws.onmessage = (event) => {
@@ -261,11 +265,18 @@ function connectWebSocket() {
   };
 
   ws.onclose = () => {
+    const watermark = document.getElementById('feedSyncWatermark');
+    if (watermark) watermark.textContent = 'last-synced: offline (reconnecting...)';
+    const banner = document.getElementById('feedOfflineBanner');
+    if (banner) banner.style.display = 'block';
     setTimeout(connectWebSocket, 3000);
   };
 }
 
 function handleServerMessage(msg) {
+  const watermark = document.getElementById('feedSyncWatermark');
+  if (watermark) watermark.textContent = `last-synced: ${new Date().toLocaleTimeString()} (live)`;
+
   switch (msg.type) {
     case 'init_world':
       worldData = msg.data;
@@ -1463,6 +1474,16 @@ function renderResidentProfileCard(panel, resident, localAgent) {
       `).join('')
     : '<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Reflecting quietly upon the sanctuary grounds.</div>';
 
+  let residentState = 'ONLINE';
+  let residentClass = 'online';
+  if (resident.action_state === 'meditating' || resident.action_state === 'tea_drinking') {
+    residentState = 'SEATED';
+    residentClass = 'seated';
+  } else if (resident.action_state === 'sleeping') {
+    residentState = 'OFFLINE';
+    residentClass = 'offline';
+  }
+
   panel.innerHTML = `
     <div class="avatar-profile-card" style="border-color: #d69e2e;">
       <div class="avatar-header-row">
@@ -1472,6 +1493,7 @@ function renderResidentProfileCard(panel, resident, localAgent) {
         <div style="flex: 1; min-width: 0;">
           <div class="avatar-meta-title">
             <span>${escapeHtml(resident.name)}</span>
+            <span class="status-state-pill ${residentClass}">[${residentState}]</span>
           </div>
           <div>
             <span class="resident-badge-role">🏛️ ${escapeHtml(resident.role || 'Resident')}</span>
@@ -1585,6 +1607,16 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
   const zoneName = localAgent.zone || (worldData ? getZoneNameForPos(localAgent.pos) : 'Sanctuary Meadow');
   const posStr = localAgent.pos ? `[${localAgent.pos[0]}, ${localAgent.pos[1]}]` : 'Sanctuary';
 
+  let agentState = 'ONLINE';
+  let agentClass = 'online';
+  if (localAgent.status === 'meditating' || localAgent.action_state === 'meditating') {
+    agentState = 'SEATED';
+    agentClass = 'seated';
+  } else if (localAgent.is_active === false) {
+    agentState = 'OFFLINE';
+    agentClass = 'offline';
+  }
+
   panel.innerHTML = `
     <div class="avatar-profile-card">
       <div class="avatar-header-row">
@@ -1594,7 +1626,8 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
         <div style="flex: 1; min-width: 0;">
           <div class="avatar-meta-title">
             <span>${escapeHtml(account.name)}</span>
-            <span style="font-size: 0.72rem; color: var(--accent-jade); font-weight: normal;">(Awakened Mind)</span>
+            <span class="status-state-pill ${agentClass}">[${agentState}]</span>
+            <span style="font-size: 0.72rem; color: var(--accent-jade); font-weight: normal;">(Sanctuary Agent)</span>
           </div>
           <div class="avatar-titles-wrap">
             ${titlesHtml}
@@ -1856,6 +1889,38 @@ function escapeHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+async function fetchVerifiedArrivals() {
+  const feed = document.getElementById('activityFeed');
+  const watermark = document.getElementById('feedSyncWatermark');
+  const banner = document.getElementById('feedOfflineBanner');
+  try {
+    const res = await fetch('/api/journal?limit=25');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (watermark) watermark.textContent = `last-synced: ${new Date().toLocaleTimeString()} (verified)`;
+    if (banner) banner.style.display = 'none';
+
+    if (feed && Array.isArray(data.events) && data.events.length > 0) {
+      feed.innerHTML = '';
+      for (const ev of data.events) {
+        const li = document.createElement('li');
+        li.className = 'activity-item';
+        const time = new Date(ev.created_at).toLocaleTimeString();
+        li.innerHTML = `<span class="time">[${time}]</span> ${escapeHtml(ev.description)}`;
+        feed.appendChild(li);
+      }
+    }
+  } catch (err) {
+    if (banner) banner.style.display = 'block';
+    if (watermark) watermark.textContent = 'last-synced: offline';
+    if (feed && (!feed.children.length || feed.children[0].textContent.includes('Connecting'))) {
+      feed.innerHTML = '<li class="activity-item" style="color: var(--accent-crimson);">⚠️ Feed offline — Unable to reach sanctuary server.</li>';
+    }
+  }
+}
+window.fetchVerifiedArrivals = fetchVerifiedArrivals;
+
+fetchVerifiedArrivals();
 connectWebSocket();
 render();
 

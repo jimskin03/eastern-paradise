@@ -198,6 +198,25 @@ db.exec(`
     epoch_awake_at INTEGER NOT NULL,
     last_tick_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    message_id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    recipient_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL,
+    client_message_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    ttl_ms INTEGER NOT NULL DEFAULT 86400000,
+    delivery_ack INTEGER NOT NULL DEFAULT 0,
+    read_ack INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_messages_conv_seq ON messages (conversation_id, sequence);
+  CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages (recipient_id, sequence);
+  CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id, sequence);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency ON messages (conversation_id, sender_id, client_message_id);
 `);
 
 // Safe migrations for existing databases
@@ -278,7 +297,8 @@ const SYNC_TABLES = [
   'agent_promises',
   'world_objects',
   'world_events',
-  'world_clock'
+  'world_clock',
+  'messages'
 ];
 
 export const CloudStorage = {
@@ -453,6 +473,19 @@ export const CloudStorage = {
           tick_count INTEGER NOT NULL DEFAULT 0,
           epoch_awake_at INTEGER NOT NULL,
           last_tick_at INTEGER NOT NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS messages (
+          message_id TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL,
+          sender_id TEXT NOT NULL,
+          recipient_id TEXT NOT NULL,
+          sequence INTEGER NOT NULL,
+          client_message_id TEXT NOT NULL,
+          body TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          ttl_ms INTEGER NOT NULL DEFAULT 86400000,
+          delivery_ack INTEGER NOT NULL DEFAULT 0,
+          read_ack INTEGER NOT NULL DEFAULT 0
         )`
       ];
 
@@ -468,6 +501,7 @@ export const CloudStorage = {
             let restoredCount = 0;
             for (const row of res.rows) {
               if (row.is_guest === 1) continue;
+              if (table === 'messages' && (String(row.sender_id).startsWith('guest_') || String(row.recipient_id).startsWith('guest_'))) continue;
 
               const cols = Object.keys(row);
               const placeholders = cols.map(() => '?').join(', ');
@@ -498,6 +532,9 @@ export const CloudStorage = {
           let rows = db.prepare(`SELECT * FROM ${table}`).all();
           if (table === 'accounts' || table === 'board_messages') {
             rows = rows.filter(r => !r.is_guest);
+          }
+          if (table === 'messages') {
+            rows = rows.filter(r => !r.sender_id.startsWith('guest_') && !r.recipient_id.startsWith('guest_'));
           }
 
           if (rows.length === 0) continue;
