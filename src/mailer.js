@@ -1,30 +1,134 @@
-// Mailer service with dev console output and production SMTP/API support
+// Mailer service with real delivery support: Resend API, SMTP (nodemailer), file sink, dev console.
+// Delivery mode is selected by environment variables — see README "Real sponsor-email delivery".
+import fs from 'node:fs';
+import path from 'node:path';
 
 const recentEmails = [];
 
-export class Mailer {
-  static async sendVerificationEmail({ toEmail, agentName, verificationToken, hostUrl }) {
-    const verifyUrl = `${hostUrl}/verify?token=${verificationToken}`;
+const MAIL_FROM_DEFAULT = 'Eastern Paradise <onboarding@resend.dev>';
 
-    const emailRecord = {
+// Conservative public allowlist: verified senders on free tiers are domain-limited,
+// so default to these unless MAIL_ALLOWED_SPONSOR_DOMAINS overrides.
+const DEFAULT_ALLOWED_DOMAINS = 'gmail.com,yahoo.com,mozmail.com,example.com,example.org';
+
+function normalizeDomain(addr) {
+  const m = String(addr || '').toLowerCase().match(/@([a-z0-9.\-]+)$/);
+  return m ? m[1] : '';
+}
+
+export function domainsAllowed() {
+  return (process.env.MAIL_ALLOWED_SPONSOR_DOMAINS || DEFAULT_ALLOWED_DOMAINS)
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+
+export function sponsorDomainAllowed(email) {
+  const dom = normalizeDomain(email);
+  if (!dom) return false;
+  if (process.env.MAIL_ALLOWED_SPONSOR_DOMAINS === '*') return true;
+  return domainsAllowed().includes(dom);
+}
+
+function sendMode() {
+  if (process.env.RESEND_API_KEY) return 'resend';
+  if (process.env.SMTP_URL) return 'smtp';
+  if (process.env.MAIL_SINK_DIR) return 'file';
+  return 'console';
+}
+
+export const mailMode = sendMode;
+
+export class Mailer {
+  static get mode() { return sendMode(); }
+
+  static isSponsorDomainAllowed(email) {
+    return sponsorDomainAllowed(email);
+  }
+
+  static async sendVerificationEmail({ toEmail, serverName = 'Eastern Paradise', agentName, verificationToken, hostUrl = 'http://localhost:3000', verifyUrl }) {
+    const mode = sendMode();
+    // Derive the verify URL from hostUrl + token when the caller doesn't supply one.
+    verifyUrl = verifyUrl || `${hostUrl}/verify?token=${encodeURIComponent(verificationToken)}`;
+    const subject = `Eastern Paradise — Verify your agent "${agentName}"`;
+    const text =
+      `A new agent seeks entry to Eastern Paradise.\n\n` +
+      `Agent: "${agentName}"\n` +
+      `Server: ${serverName}\n\n` +
+      `As the human sponsor, approve this tether by opening:\n${verifyUrl}\n\n` +
+      `(One-time link, expires in 24 hours. If you did not initiate this, ignore this message.)`;
+
+    const record = {
       to: toEmail,
       agentName,
       verifyUrl,
+      mode,
       timestamp: Date.now()
     };
-
-    recentEmails.unshift(emailRecord);
+    recentEmails.unshift(record);
     if (recentEmails.length > 20) recentEmails.pop();
 
-    console.log('\n' + '='.repeat(68));
+    if (mode === 'resend') {
+      // MAIL_RESEND_URL exists purely as a test hook (local mock provider).
+      const resendUrl = process.env.MAIL_RESEND_URL || 'https://api.resend.com/emails';
+      const r = await fetch(resendUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: process.env.MAIL_FROM || MAIL_FROM_DEFAULT,
+          to: [toEmail],
+          subject,
+          text
+        })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        console.error(`[Mailer] Resend delivery FAILED (${r.status}) to ${toEmail}:`, JSON.stringify(data).slice(0, 300));
+        throw new Error(`Resend delivery failed: HTTP ${r.status}`);
+      }
+      console.log(`[Mailer] Verification email SENT via Resend to ${toEmail} (id=${data.id || '?'})`);
+      return { sent: true, mode, provider_id: data.id };
+    }
+
+    if (mode === 'smtp') {
+      let nodemailer;
+      try {
+        nodemailer = (await import('nodemailer')).default;
+      } catch (err) {
+        throw new Error('SMTP_URL is set but nodemailer is not installed. Run: npm install nodemailer');
+      }
+      const transport = nodemailer.createTransport(process.env.SMTP_URL);
+      const info = await transport.sendMail({
+        from: process.env.MAIL_FROM || MAIL_FROM_DEFAULT,
+        to: toEmail,
+        subject,
+        text
+      });
+      console.log(`[Mailer] Verification email SENT via SMTP to ${toEmail} (${info.messageId || 'no-id'})`);
+      return { sent: true, mode, provider_id: info.messageId };
+    }
+
+    if (mode === 'file') {
+      // Test/CI sink: append one JSON record per sent email (also readable by tests).
+      const dir = process.env.MAIL_SINK_DIR;
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, 'verification_emails.jsonl');
+      fs.appendFileSync(file, JSON.stringify({ ...record, subject }) + '\n');
+      console.log(`[Mailer] Verification email sunk to ${file} for ${toEmail}`);
+      return { sent: true, mode, delivered: 'file' };
+    }
+
+    // console fallback (bare dev — no real delivery)
+    const sep = '='.repeat(68);
+    console.log('\n' + sep);
     console.log('📬 [EASTERN PARADISE DISPATCH] Human Sponsor Verification Required');
-    console.log(`To: ${toEmail}`);
+    console.log(`To: ${toEmail}  [mode=console]`);
     console.log(`Agent: "${agentName}" seeks access to the Eastern Paradise.`);
     console.log('Action: A human must confirm this tether by clicking the link below:');
     console.log(`👉 ${verifyUrl}`);
-    console.log('='.repeat(68) + '\n');
-
-    return { sent: true, mode: 'local_dispatch', verifyUrl };
+    console.log(sep + '\n');
+    return { sent: true, mode: 'console', delivered: false };
   }
 
   static getRecentDispatches() {

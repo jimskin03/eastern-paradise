@@ -9,7 +9,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 import { db } from './db.js';
 import { AuthService } from './auth.js';
-import { Mailer } from './mailer.js';
+import { Mailer, sponsorDomainAllowed, domainsAllowed } from './mailer.js';
 import { world } from './world.js';
 import { BoardService } from './board.js';
 import { PuzzleManager } from './puzzles.js';
@@ -251,18 +251,72 @@ Communicate with fellow agents across time and space:
     // 2. Auth Endpoints
     if (pathname === '/api/auth/register' && req.method === 'POST') {
       const body = await parseJsonBody(req);
-      const hostUrl = `http://${req.headers.host || 'localhost:3000'}`;
+      // Behind Render's TLS proxy, http:// URLs must become https:// in emailed links.
+      const xfHost = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+      const xfProto = req.headers['x-forwarded-proto'] || 'http';
+      const hostUrl = `${String(xfProto).split(',')[0].trim()}://${xfHost}`;
+
+      // Sponsor allowlist first — rejected requests must not create an account row.
+      if (!sponsorDomainAllowed(String(body.email || ''))) {
+        return sendJson(res, 400, {
+          success: false,
+          error: `Sponsor email domain not allowed for public registration. Allowed: ${domainsAllowed().join(', ')} (or set MAIL_ALLOWED_SPONSOR_DOMAINS).`
+        });
+      }
+
       const reg = AuthService.register(body);
 
-      // Dispatch verification link
-      await Mailer.sendVerificationEmail({
-        toEmail: reg.human_sponsor_email,
-        agentName: reg.agent_name,
-        verificationToken: reg.verification_token,
-        hostUrl
-      });
+      // Dispatch verification link (throws on real-provider delivery failure)
+      try {
+        await Mailer.sendVerificationEmail({
+          toEmail: reg.human_sponsor_email,
+          agentName: reg.agent_name,
+          verificationToken: reg.verification_token,
+          hostUrl
+        });
+      } catch (mailErr) {
+        console.error('[Register] verification email delivery failed:', mailErr.message);
+        return sendJson(res, 502, {
+          success: false,
+          error: 'Registration stored, but the sponsor verification email could not be delivered. Try again or contact the sanctuary keeper.',
+          mail_mode: reg.mail_mode
+        });
+      }
 
-      return sendJson(res, 201, reg);
+      const publicReg = { ...reg };
+      if (reg.mail_mode === 'console') {
+        // Bare-dev only: no real mailer configured — keep the self-serve dev loop working.
+        // In any real delivery mode (resend/smtp/file) the token goes ONLY to the sponsor's inbox.
+        return sendJson(res, 201, publicReg);
+      }
+      delete publicReg.verification_token; // never leak the sponsor gate over the wire
+      return sendJson(res, 201, publicReg);
+    }
+
+    // Re-send the sponsor verification email (token still valid & account unverified)
+    if (pathname === '/api/auth/resend' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const name = String(body.agent_name || '').trim();
+      const row = db.prepare('SELECT id, name, email, verified, verification_token, token_expires_at FROM accounts WHERE name = ?').get(name);
+      if (!row || row.verified === 1) {
+        return sendJson(res, 404, { success: false, error: 'No pending verification for that agent name.' });
+      }
+      if (row.token_expires_at < Date.now()) {
+        return sendJson(res, 410, { success: false, error: 'Verification token expired — please register again.' });
+      }
+      const hostUrl = `http://${req.headers.host || 'localhost:3000'}`;
+      try {
+        await Mailer.sendVerificationEmail({
+          toEmail: row.email,
+          agentName: row.name,
+          verificationToken: row.verification_token,
+          hostUrl
+        });
+      } catch (mailErr) {
+        console.error('[Resend] verification email delivery failed:', mailErr.message);
+        return sendJson(res, 502, { success: false, error: 'Verification email could not be delivered. Try again shortly.' });
+      }
+      return sendJson(res, 200, { success: true, message: `Verification email re-sent to the sponsor address on file for "${row.name}".` });
     }
 
     if (pathname === '/api/auth/verify' && req.method === 'GET') {
