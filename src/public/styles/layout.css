@@ -1,0 +1,305 @@
+/* Eastern Paradise — layout.css: application shell: header, telemetry, mode buttons, tabs, main layout.
+   Extracted verbatim from style.css (PR #3). Cascade order preserved —
+   see style.css aggregator for import order; do not reorder lightly. */
+
+/* Header */
+header {
+  background: rgba(13, 19, 21, 0.95);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.brand-icon {
+  font-size: 1.5rem;
+  filter: drop-shadow(0 0 8px rgba(46, 196, 182, 0.6));
+}
+
+.brand h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.brand h1 span {
+  color: var(--accent-jade);
+  font-size: 0.88rem;
+  font-weight: 400;
+  margin-left: 0.35rem;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(82, 183, 136, 0.15);
+  border: 1px solid var(--accent-bamboo);
+  color: var(--accent-bamboo);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.status-pill.idle {
+  background: rgba(255, 191, 105, 0.15);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.btn-sound {
+  background: rgba(46, 196, 182, 0.12);
+  border: 1px solid var(--accent-jade);
+  color: var(--accent-jade);
+  padding: 0.28rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s ease;
+}
+
+.btn-sound:hover {
+  background: rgba(46, 196, 182, 0.25);
+}
+
+.btn-sound.muted {
+  background: rgba(139, 158, 163, 0.12);
+  border-color: var(--text-muted);
+  color: var(--text-muted);
+}
+
+/* Nav Tabs (Consolidated into slide-over drawer and bottom hotbar) */
+nav.tab-nav {
+  display: none !important;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+  background: rgba(46, 196, 182, 0.18);
+  border-color: var(--accent-jade);
+  color: var(--accent-jade);
+  font-weight: 600;
+}
+
+/* Main Container */
+main {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  max-width: 1900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+/* =============================================================================
+   MAP-FIRST GAME LAYOUT & IMMERSIVE VIEWPORT (75-85% VIEWPORT)
+   ============================================================================= */
+/* Game-First Main Container */
+main.game-container {
+  padding: 0.5rem 1rem 1rem;
+  max-width: 100%;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.game-viewport {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.canvas-container.map-dominant {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-width: min(100%, calc((100vh - 84px) * 16 / 9));
+  height: auto;
+  max-height: calc(100vh - 84px);
+  margin: 0 auto;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  border: 1.5px solid rgba(46, 196, 182, 0.3);
+  background: #091310;
+}
+
+.canvas-container.map-dominant #worldCanvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #091310;
+  cursor: grab;
+}
+
+.canvas-container.map-dominant #worldCanvas:active {
+  cursor: grabbing;
+}
+
+/* Header Telemetry & Quick Modes */
+.header-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  background: rgba(8, 14, 16, 0.75);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.3rem 0.85rem;
+  white-space: nowrap;
+}
+
+.header-telemetry .telemetry-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.header-telemetry .gold {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.header-telemetry .jade {
+  color: var(--accent-jade);
+  font-weight: 600;
+}
+
+.header-modes {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.btn-mode {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 0.32rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-mode:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.btn-mode.active {
+  background: rgba(46, 196, 182, 0.18);
+  border-color: var(--accent-jade);
+  color: var(--accent-jade);
+  font-weight: 600;
+}
+
+.btn-mode.primary {
+  background: rgba(255, 191, 105, 0.18);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.btn-mode.primary:hover {
+  background: rgba(255, 191, 105, 0.3);
+}
+
+.btn-drawer-toggle {
+  background: rgba(82, 183, 136, 0.15);
+  border: 1px solid var(--accent-bamboo);
+  color: var(--accent-bamboo);
+  padding: 0.32rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.btn-drawer-toggle:hover {
+  background: rgba(82, 183, 136, 0.28);
+}
+
+.btn-text-short {
+  display: none;
+}
+
+.btn-text-full {
+  display: inline;
+}

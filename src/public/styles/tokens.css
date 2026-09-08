@@ -1,0 +1,17 @@
+/* Eastern Paradise — tokens.css: design tokens (CSS custom properties).
+   Extracted verbatim from style.css (PR #3). Cascade order preserved —
+   see style.css aggregator for import order; do not reorder lightly. */
+
+:root {
+  --bg-primary: #0f1416;
+  --bg-secondary: #172124;
+  --bg-card: rgba(26, 37, 40, 0.85);
+  --border-color: #273e44;
+  --accent-jade: #2ec4b6;
+  --accent-gold: #ffbf69;
+  --accent-crimson: #e76f51;
+  --accent-bamboo: #52b788;
+  --text-primary: #e8f1f2;
+  --text-muted: #8b9ea3;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
