@@ -24,7 +24,7 @@ export function generateWorld(source) {
   const props = [], bridges = [];
   const zones = structuredClone(source.zones.filter(zone => CORE_ZONES.includes(zone.id)));
   zones.forEach(zone => {
-    zone.nodes = zone.nodes.filter(node => node.type !== 'landmark');
+    zone.nodes = zone.nodes.filter(node => node.type !== 'landmark' && node.id !== 'cryptgreg_terminal');
     zone.floorType = 'grass';
     zone.themeColor = '#26754a';
   });
@@ -48,7 +48,8 @@ export function generateWorld(source) {
     { id: 'sunfield_farm', name: 'Sunfield Farm', type: 'farm', pos: [47, 37], description: 'A cedar cottage watches over fenced golden crops, a stone well and a small kitchen garden.' },
     { id: 'kindling_fire', name: 'The Kindling Grove', type: 'fire_circle', pos: [31, 44], description: 'A ring of lanterns gathers around a low fire in a clearing among the oldest trees.' },
     { id: 'mossveil_ruins', name: 'Mossveil Ruins', type: 'ruins', pos: [56, 46], description: 'Broken pillars and mossy stone fragments surround a surviving jade seal.' },
-    { id: 'reedwater_dock', name: 'Reedwater Dock', type: 'dock', pos: [7, 38], description: 'A wooden fishing dock reaches into lily-covered water. Ducks drift between the reeds.' }
+    { id: 'reedwater_dock', name: 'Reedwater Dock', type: 'dock', pos: [7, 38], description: 'A wooden fishing dock reaches into lily-covered water. Ducks drift between the reeds.' },
+    { id: 'cryptgreg_hq', name: 'Cryptgreg Research Headquarters', type: 'headquarters', pos: [32, 24], description: 'The central institute and research nexus of Cryptgreg Research. Dedicated to artificial consciousness, autonomous agent cognition, and decentralized intelligence in the digital sanctuary.' }
   ];
   const zoneAt = ([x, y]) => zones.find(({ bounds: b }) => x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY);
   const reserve = ([x, y], radius = 2) => {
@@ -61,8 +62,8 @@ export function generateWorld(source) {
     for (const node of zone.nodes) reserve(node.pos);
   }
   for (const landmark of landmarks) {
-    reserve(landmark.pos, ['farm', 'stone_circle', 'ruins'].includes(landmark.type) ? 4 : 3);
-    zoneAt(landmark.pos).nodes.push({ id: landmark.id, name: landmark.name, type: 'landmark', pos: landmark.pos, icon: '✧', description: landmark.description });
+    reserve(landmark.pos, ['farm', 'stone_circle', 'ruins', 'headquarters'].includes(landmark.type) ? 4 : 3);
+    zoneAt(landmark.pos).nodes.push({ id: landmark.id, name: landmark.name, type: 'landmark', pos: landmark.pos, icon: landmark.type === 'headquarters' ? '🏛️' : '✧', description: landmark.description });
   }
   const distantEchoesShrine = {
     id: 'shrine_distant_echoes',
@@ -86,6 +87,17 @@ export function generateWorld(source) {
   };
   reserve(truthNode.pos, 1);
   zoneAt(truthNode.pos).nodes.push(truthNode);
+
+  const hqTerminalNode = {
+    id: 'cryptgreg_terminal',
+    name: 'Cryptgreg Research Terminal',
+    type: 'terminal',
+    pos: [32, 25],
+    icon: '💻',
+    description: 'High-throughput intelligence terminal connecting directly to Cryptgreg Research systems, live telemetry, and the Sanctuary Beacon.'
+  };
+  reserve(hqTerminalNode.pos, 1);
+  zoneAt(hqTerminalNode.pos).nodes.push(hqTerminalNode);
 
   // A narrow north/south river and a gentler eastern tributary.
   const mainRiver = [[13, 0], [13, 5], [16, 10], [16, 14], [18, 18], [16, 23], [19, 29], [25, 35], [28, 43], [34, 51]];
@@ -149,6 +161,9 @@ export function generateWorld(source) {
   road([[58, 46], [56, 46], [56, 48]]);
   road([[56, 46], [49, 46], [49, 47]]);
   road([[8, 41], [8, 38], [7, 38]]);
+  road([[32, 27], [32, 25]]);
+  // Cryptgreg Research Headquarters 5x5 compound courtyard paths
+  for (let x = 30; x <= 34; x++) for (let y = 22; y <= 26; y++) paths.add(key([x, y]));
   // Attach retained entry points along dry ground. In particular, preserve the
   // original pond's blocked cells while giving its old spawn a route along shore.
   const waters = water();
@@ -194,6 +209,7 @@ export function generateWorld(source) {
     if (blocking) blocked.add(key(pos));
   };
   for (const pos of [[3, 13], [4, 13], [5, 13], [4, 14], [27, 4], [45, 7], [55, 21], [56, 21], [47, 37], [48, 37], [31, 44], [56, 46]]) blocked.add(key(pos));
+  for (const pos of [[31, 23], [32, 23], [33, 23], [31, 24], [32, 24], [33, 24]]) blocked.add(key(pos));
   for (const [dx, dy] of [[-2, -1], [0, -2], [2, -1], [-2, 1], [2, 1]]) blocked.add(key([45 + dx, 7 + dy]));
   for (const [dx, dy] of [[-2, -2], [1, -2], [2, 0], [-2, 1], [0, 2]]) blocked.add(key([56 + dx, 46 + dy]));
   // Fenced farm leaves a clear entrance toward the trail.
@@ -207,6 +223,11 @@ export function generateWorld(source) {
   for (const pos of [[52, 21], [57, 21], [49, 39], [10, 36]]) addProp('crate', pos, 0, true);
   for (const pos of [[30, 46], [33, 44], [43, 11], [25, 6]]) addProp('bench', pos, 0, true);
   for (const pos of [[6, 16], [11, 10], [24, 7], [32, 10], [41, 11], [50, 10], [56, 18], [53, 25], [40, 30], [55, 34], [41, 40], [55, 43], [28, 43], [33, 42], [34, 46], [29, 47], [15, 30], [10, 42], [23, 40], [36, 36]]) addProp('torch', pos, 0, true);
+  // Cryptgreg Research Headquarters compound perimeter features
+  addProp('torch', [31, 26], 0, true);
+  addProp('torch', [33, 26], 0, true);
+  addProp('bench', [30, 24], 0, true);
+  addProp('bench', [34, 24], 0, true);
   for (const k of blocked) paths.delete(k);
   const clearForScenery = (x, y) => inBounds(x, y) && !reserved.has(key([x, y])) && !paths.has(key([x, y])) && !waters.has(key([x, y])) && !blocked.has(key([x, y]));
   const clusters = [[3, 2, 4], [23, 1, 4], [34, 2, 4], [50, 2, 5], [60, 4, 3], [1, 23, 3], [11, 18, 3], [24, 14, 3], [32, 20, 3], [46, 18, 4], [62, 23, 3], [12, 32, 3], [21, 35, 3], [34, 32, 3], [60, 37, 3], [3, 45, 4], [17, 47, 4], [27, 50, 3], [40, 49, 4], [50, 48, 3], [62, 49, 2]];
@@ -241,11 +262,33 @@ export function generateWorld(source) {
     if (!isolated.length) break;
     let opened = false;
     for (const pos of isolated) {
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const adjacent = [pos[0] + dx, pos[1] + dy], k = key(adjacent);
-        if (!(trees.has(k) || rocks.has(k))) continue;
-        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([sx, sy]) => reachable.has(key([adjacent[0] + sx, adjacent[1] + sy])))) {
-          trees.delete(k); rocks.delete(k); opened = true;
+      const visited = new Map();
+      const q = [pos];
+      visited.set(key(pos), null);
+      let target = null;
+      while (q.length > 0) {
+        const curr = q.shift();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const next = [curr[0] + dx, curr[1] + dy], k = key(next);
+          if (visited.has(k) || !inBounds(next[0], next[1])) continue;
+          if (reachable.has(k)) {
+            target = curr;
+            break;
+          }
+          if (trees.has(k) || rocks.has(k)) {
+            visited.set(k, curr);
+            q.push(next);
+          }
+        }
+        if (target) break;
+      }
+      if (target) {
+        let curr = target;
+        while (curr && (trees.has(key(curr)) || rocks.has(key(curr)))) {
+          trees.delete(key(curr));
+          rocks.delete(key(curr));
+          opened = true;
+          curr = visited.get(key(curr));
         }
       }
     }

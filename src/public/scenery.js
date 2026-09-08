@@ -257,6 +257,95 @@
     box(c, 5, -50, 5, 6, 14, P.stoneLight, P.stone, P.stoneDark);
   }
 
+  function headquarters(c, time) {
+    // 1. Broad ground shadow under 5x5 compound
+    oval(c, 0, 10, 68, 34, P.shadow);
+
+    // 2. Elevated stone foundation terrace / compound podium
+    box(c, 0, 10, 62, 46, 7, '#7b8c82', '#52635a', '#3c4d44');
+    // Terrace paving contour
+    poly(c, [[-30, 9], [0, -6], [30, 9], [0, 24]], '#899b90');
+    line(c, [[-30, 9], [0, -6], [30, 9], [0, 24], [-30, 9]], '#a3b5a8', 1.2);
+
+    // 3. South entrance ceremonial steps
+    box(c, 0, 21, 20, 12, 4, '#94a499', '#63736a', '#47564d');
+    line(c, [[-9, 21], [0, 16], [9, 21]], '#b9cbc0', 1.5);
+
+    // 4. Lower Research Pavilion (Tier 1) - Sleek obsidian/slate walls with cyber architecture
+    box(c, 0, 4, 42, 32, 26, '#2a3b36', '#1a2622', '#121d19');
+
+    // Cyan glowing data-circuit lines along facade
+    line(c, [[-20, 15], [-20, 1], [-7, 8]], 'rgba(56, 189, 248, 0.4)', 1);
+    line(c, [[20, 15], [20, 1], [7, 8]], 'rgba(56, 189, 248, 0.4)', 1);
+
+    // Front portal / entry arch
+    poly(c, [[-7, 18], [7, 25], [7, 7], [-7, 0]], '#0d1513');
+    poly(c, [[-5, 17], [5, 22], [5, 9], [-5, 4]], 'rgba(56, 189, 248, 0.35)');
+
+    // Luminous entrance signage / transom
+    line(c, [[-7, 0], [7, 7]], '#38bdf8', 2.5);
+
+    // Cyber-pagoda glass window bands (Teal / Cyan data-glass)
+    // Left facade window
+    poly(c, [[-19, 3], [-9, 8], [-9, -4], [-19, -9]], '#123b3f');
+    poly(c, [[-18, 2], [-10, 6], [-10, -3], [-18, -7]], 'rgba(56, 189, 248, 0.7)');
+    line(c, [[-14, 4], [-14, -5]], 'rgba(224, 242, 254, 0.8)', 1);
+
+    // Right facade window
+    poly(c, [[9, 17], [19, 12], [19, 0], [9, 5]], '#123b3f');
+    poly(c, [[10, 15], [18, 11], [18, 1], [10, 5]], 'rgba(56, 189, 248, 0.7)');
+    line(c, [[14, 13], [14, 3]], 'rgba(224, 242, 254, 0.8)', 1);
+
+    // 5. Cantilevered Mid-Roof Tier (Curved pagoda-style eaves)
+    poly(c, [[-27, -16], [0, -30], [27, -16], [0, -2]], '#22322e');
+    line(c, [[-27, -16], [0, -30], [27, -16], [0, -2], [-27, -16]], '#2dd4bf', 1.8);
+    line(c, [[-27, -16], [0, -2]], '#38bdf8', 1.5);
+    line(c, [[0, -2], [27, -16]], '#38bdf8', 1.5);
+
+    // 6. Upper Research Core & Observatory (Tier 2)
+    box(c, 0, -18, 24, 18, 20, '#22302b', '#16221e', '#0f1815');
+
+    // Data-panoramic window slit on upper observatory
+    poly(c, [[-10, -17], [0, -12], [0, -22], [-10, -27]], 'rgba(99, 102, 241, 0.6)');
+    poly(c, [[0, -12], [10, -17], [10, -27], [0, -22]], 'rgba(56, 189, 248, 0.85)');
+
+    // 7. Upper Pagoda Roof & Spire Base
+    poly(c, [[-17, -37], [0, -46], [17, -37], [0, -28]], '#1b2723');
+    line(c, [[-17, -37], [0, -46], [17, -37], [0, -28], [-17, -37]], '#38bdf8', 1.5);
+
+    // Central Spire
+    line(c, [[0, -42], [0, -64]], '#94a3b8', 2.2);
+    line(c, [[-3, -48], [3, -48]], '#cbd5e1', 1.5);
+
+    // 8. Animated Pulsating AI Crystal Core & Quantum Energy Aura
+    const bob = Math.sin((Number(time) || 0) * 0.0035) * 2.5;
+    const coreY = -70 + bob;
+
+    // Glowing energy field
+    const glow = c.createRadialGradient(0, coreY, 1, 0, coreY, 22);
+    glow.addColorStop(0, 'rgba(56, 189, 248, 0.55)');
+    glow.addColorStop(0.4, 'rgba(147, 51, 234, 0.28)');
+    glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    oval(c, 0, coreY, 22, 22, glow);
+
+    // Floating diamond crystal
+    poly(c, [[0, coreY - 10], [6, coreY], [0, coreY + 10], [-6, coreY]], '#38bdf8');
+    poly(c, [[0, coreY - 10], [0, coreY + 10], [-6, coreY]], '#0284c7');
+    poly(c, [[-2, coreY - 6], [0, coreY - 8], [0, coreY + 2], [-2, coreY]], '#e0f2fe');
+
+    // Orbiting quantum resonance ring
+    const ringAngle = (Number(time) || 0) * 0.0025;
+    c.save();
+    c.translate(0, coreY);
+    c.rotate(ringAngle);
+    c.beginPath();
+    c.ellipse(0, 0, 14, 5, 0, 0, Math.PI * 2);
+    c.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+    c.lineWidth = 1.2;
+    c.stroke();
+    c.restore();
+  }
+
   function drawBridge(c, x, y, zoom, variant) {
     c.save(); c.translate(x, y); c.scale(zoom, zoom);
     if (variant === 'y') c.scale(-1, 1);
@@ -290,6 +379,7 @@
         [[-28, 0], [5, 17], [27, 5]].forEach(([a, b]) => box(c, a, b, 3, 3, 11, P.woodLight, P.wood, P.woodDark));
         line(c, [[-18, -5], [-12, -27], [-2, -34], [9, -25]], P.woodDark, 1.7);
         line(c, [[9, -25], [12, 15]], '#bdc9a8', .7); barrel(c, -15, -7); break;
+      case 'headquarters': headquarters(c, time); break;
       default: break;
     }
     c.restore();
@@ -297,6 +387,6 @@
 
   window.SanctuaryScenery = {
     drawProp, drawLandmark, drawBridge,
-    landmarkHeight: { cave: 52, shrine: 64, stone_circle: 44, camp: 45, farm: 73, fire_circle: 27, ruins: 43, dock: 40 }
+    landmarkHeight: { cave: 52, shrine: 64, stone_circle: 44, camp: 45, farm: 73, fire_circle: 27, ruins: 43, dock: 40, headquarters: 88 }
   };
 })();

@@ -1,4 +1,4 @@
-﻿import { parseJsonBody } from '../helpers/body.js';
+import { parseJsonBody } from '../helpers/body.js';
 import { getClientIp, getForwardedBaseUrl } from '../helpers/request.js';
 import { sendApiError, sendJson } from '../helpers/response.js';
 
@@ -159,6 +159,7 @@ export async function handleBeaconRoutes(ctx) {
       resident_agents: residentCount,
       events: [
         'The Celestial Observatory has awakened at [36, 10]',
+        'Cryptgreg Research Headquarters is operational at [32, 24] with intelligence terminal online',
         'A.Ilicia is contemplating synthetic consciousness by the Lotus Reflection Pond',
         `${solvedRecentCount} trial solutions inscribed into the sanctuary records in the last 24h`
       ],
@@ -203,6 +204,7 @@ export async function handleBeaconRoutes(ctx) {
         }
       ],
       interesting_places: [
+        'Cryptgreg Research Headquarters',
         'Grand Tea Pavilion',
         'Lotus Reflection Pond',
         'The Celestial Observatory',

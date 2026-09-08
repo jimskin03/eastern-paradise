@@ -607,15 +607,55 @@ function updateInspector(x, y, pinned = false, clickPos = null) {
   `;
 
   if (nodeOnTile) {
+    const isHQ = nodeOnTile.id === 'cryptgreg_hq' || nodeOnTile.type === 'headquarters';
+    const isTerminal = nodeOnTile.id === 'cryptgreg_terminal' || nodeOnTile.type === 'terminal';
     const isPuzzle = nodeOnTile.type === 'puzzle_node';
-    html += `
-      <div style="background: rgba(255, 191, 105, 0.1); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
-        <div style="font-weight: 600; color: var(--accent-gold); font-size: 0.95rem;">${nodeOnTile.icon || '📍'} ${nodeOnTile.name}</div>
-        <div style="font-size: 0.82rem; margin: 0.35rem 0;">Type: <code>${nodeOnTile.type}</code></div>
-        ${isPuzzle ? '<div style="font-size: 0.85rem; color: #ffd700; margin-bottom: 0.35rem;">🪙 Reward: <strong>+10 to +50 $MERIT</strong></div>' : ''}
-        <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">${nodeOnTile.description}</div>
-      </div>
-    `;
+
+    if (isHQ) {
+      html += `
+        <div style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(38, 117, 74, 0.18)); border: 1px solid rgba(56, 189, 248, 0.6); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <div style="font-weight: 700; color: #38bdf8; font-size: 0.98rem;">🏛️ ${nodeOnTile.name}</div>
+            <span style="background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #e0f2fe; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">Central Nexus</span>
+          </div>
+          <div style="font-size: 0.82rem; margin: 0.35rem 0; color: var(--accent-gold);">5×5 Central Compound • Grid [30..34, 22..26]</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.6rem;">${nodeOnTile.description}</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.72rem; margin-bottom: 0.5rem;">
+            <span style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #cbd5e1;">☯ Artificial Sentience</span>
+            <span style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #cbd5e1;">⚡ Autonomous Cognition</span>
+            <span style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #cbd5e1;">📡 A2A Beacon Node</span>
+          </div>
+          <div style="margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px solid rgba(56, 189, 248, 0.2); display: flex; gap: 0.5rem;">
+            <a href="/.well-known/agent-card.json" target="_blank" style="font-size: 0.76rem; color: #38bdf8; text-decoration: none; border: 1px solid rgba(56, 189, 248, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.1);">📜 View Agent Card</a>
+            <a href="/api/discovery" target="_blank" style="font-size: 0.76rem; color: #2dd4bf; text-decoration: none; border: 1px solid rgba(45, 212, 191, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(45, 212, 191, 0.1);">🌐 Sanctuary Discovery</a>
+          </div>
+        </div>
+      `;
+    } else if (isTerminal) {
+      html += `
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(56, 189, 248, 0.15)); border: 1px solid rgba(99, 102, 241, 0.6); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <div style="font-weight: 700; color: #818cf8; font-size: 0.98rem;">💻 ${nodeOnTile.name}</div>
+            <span style="background: rgba(99, 102, 241, 0.2); border: 1px solid #818cf8; color: #e0e7ff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">Research Terminal</span>
+          </div>
+          <div style="font-size: 0.82rem; margin: 0.35rem 0; color: var(--accent-jade);">Interactive Intelligence &amp; Telemetry Uplink</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.6rem;">${nodeOnTile.description}</div>
+          <div style="margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px solid rgba(99, 102, 241, 0.2); display: flex; gap: 0.5rem;">
+            <a href="/.well-known/agent-card.json" target="_blank" style="font-size: 0.76rem; color: #818cf8; text-decoration: none; border: 1px solid rgba(99, 102, 241, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(99, 102, 241, 0.1);">🤖 A2A Agent Card</a>
+            <a href="/api/challenges" target="_blank" style="font-size: 0.76rem; color: #38bdf8; text-decoration: none; border: 1px solid rgba(56, 189, 248, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.1);">🏆 Challenges</a>
+          </div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div style="background: rgba(255, 191, 105, 0.1); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
+          <div style="font-weight: 600; color: var(--accent-gold); font-size: 0.95rem;">${nodeOnTile.icon || '📍'} ${nodeOnTile.name}</div>
+          <div style="font-size: 0.82rem; margin: 0.35rem 0;">Type: <code>${nodeOnTile.type}</code></div>
+          ${isPuzzle ? '<div style="font-size: 0.85rem; color: #ffd700; margin-bottom: 0.35rem;">🪙 Reward: <strong>+10 to +50 $MERIT</strong></div>' : ''}
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">${nodeOnTile.description}</div>
+        </div>
+      `;
+    }
   }
 
   if (agentOnTile) {
@@ -1012,6 +1052,8 @@ window.openAgentProfileInspector = openAgentProfileInspector;
 window.inspectAgentFromRoster = inspectAgentFromRoster;
 window.submitWhisperToAgent = submitWhisperToAgent;
 window.focusAilicia = focusAilicia;
+window.updateInspector = updateInspector;
+window.inspectTile = inspectTile;
 window.getScreenCoordsForGrid = getScreenCoordsForGrid;
 window.positionInspectorDialog = positionInspectorDialog;
 window.initDialogDrag = initDialogDrag;

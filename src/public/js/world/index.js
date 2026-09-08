@@ -19,6 +19,7 @@ import { QuestManager } from './quests.js';
 
 // ---- legacy window.* compatibility surface ----
 window.agents = state.agents;
+window.camera = state.camera;
 window.soundSystem = soundSystem;
 window.zoomSanctuary = zoomSanctuary;
 window.setSanctuaryCamera = setSanctuaryCamera;

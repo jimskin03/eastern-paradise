@@ -89,7 +89,7 @@ test('Visible water, bridge decks and solid scenery agree with collision', () =>
 test('World generation is reproducible and includes the requested landscape', () => {
   assert.deepEqual(generateWorld(config), config);
   assert.ok(config.landscape.trees.length >= 300);
-  assert.deepEqual(new Set(config.landscape.landmarks.map(l => l.type)), new Set(['cave', 'shrine', 'stone_circle', 'camp', 'farm', 'fire_circle', 'ruins', 'dock']));
+  assert.deepEqual(new Set(config.landscape.landmarks.map(l => l.type)), new Set(['cave', 'shrine', 'stone_circle', 'camp', 'farm', 'fire_circle', 'ruins', 'dock', 'headquarters']));
   for (const field of ['river', 'ponds', 'river_crossings', 'trees', 'rocks', 'paths', 'blocked_tiles']) {
     const positions = config.landscape[field];
     assert.equal(new Set(positions.map(key)).size, positions.length, `${field} must not repeat tiles`);

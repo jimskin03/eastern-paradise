@@ -92,7 +92,8 @@ canvas.addEventListener('pointerdown', (e) => {
   for (const landmark of [...(worldData?.landscape?.landmarks || [])].reverse()) {
     const anchor = gridToIso(...landmark.pos);
     const height = (window.SanctuaryScenery?.landmarkHeight?.[landmark.type] || 40) * camera.zoom;
-    if (Math.abs(cx - anchor.x) < 40 * camera.zoom && cy < anchor.y + 12 * camera.zoom && cy > anchor.y - height - 16) {
+    const width = (landmark.type === 'headquarters' ? 70 : 40) * camera.zoom;
+    if (Math.abs(cx - anchor.x) < width && cy < anchor.y + 12 * camera.zoom && cy > anchor.y - height - 16) {
       setSelectedAgentId(null);
       updateInspector(...landmark.pos, true, { clientX: e.clientX, clientY: e.clientY });
       return;
