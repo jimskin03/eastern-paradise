@@ -41,9 +41,10 @@ window.submitWhisperToAgent = inspector.submitWhisperToAgent;
 window.checkPlayerProximity = inspector.checkPlayerProximity;
 window.triggerAmbientThoughts = inspector.triggerAmbientThoughts;
 window.handleHudAction = handleHudAction;
-window.QuestManager = QuestManager;
+// spectator.js L2477 assigned a QuestManager INSTANCE (not the class):
+window.QuestManager = new QuestManager();
 
 // ---- boot (original ordering from spectator.js) ----
 initWebSocket();
 initRenderer();
-QuestManager.updateHud();
+window.QuestManager.updateHud();
