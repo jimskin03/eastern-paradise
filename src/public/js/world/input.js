@@ -83,7 +83,7 @@ canvas.addEventListener('pointerdown', (e) => {
 
   if (clickedAgent) {
     setSelectedAgentId(clickedAgent.id);
-    openAgentProfileInspector(clickedAgent.id);
+    openAgentProfileInspector(clickedAgent.id, { clientX: e.clientX, clientY: e.clientY });
     addBubble(clickedAgent.id, 'Awakened Mind', clickedAgent.pos[0], clickedAgent.pos[1], '#ffd700');
     soundSystem.play('chime');
     return;
@@ -94,7 +94,7 @@ canvas.addEventListener('pointerdown', (e) => {
     const height = (window.SanctuaryScenery?.landmarkHeight?.[landmark.type] || 40) * camera.zoom;
     if (Math.abs(cx - anchor.x) < 40 * camera.zoom && cy < anchor.y + 12 * camera.zoom && cy > anchor.y - height - 16) {
       setSelectedAgentId(null);
-      updateInspector(...landmark.pos, true);
+      updateInspector(...landmark.pos, true, { clientX: e.clientX, clientY: e.clientY });
       return;
     }
   }
@@ -106,6 +106,8 @@ canvas.addEventListener('pointerdown', (e) => {
   camera.hasDragged = false;
   camera.clickGx = gx;
   camera.clickGy = gy;
+  camera.clickClientX = e.clientX;
+  camera.clickClientY = e.clientY;
 });
 
 window.addEventListener('pointermove', (e) => {
@@ -191,12 +193,14 @@ window.addEventListener('pointermove', (e) => {
   }
 });
 
-window.addEventListener('pointerup', () => {
+window.addEventListener('pointerup', (e) => {
   if (camera.isDragging && !camera.hasDragged) {
     const gx = camera.clickGx;
     const gy = camera.clickGy;
+    const clientX = (e && typeof e.clientX === 'number') ? e.clientX : camera.clickClientX;
+    const clientY = (e && typeof e.clientY === 'number') ? e.clientY : camera.clickClientY;
     if (worldData && gx !== undefined && gy !== undefined && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
-      inspectTile(gx, gy);
+      inspectTile(gx, gy, { clientX, clientY });
     }
   }
   camera.isDragging = false;

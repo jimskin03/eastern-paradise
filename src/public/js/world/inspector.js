@@ -14,16 +14,151 @@ import { soundSystem } from './audio.js';
 import { gridToIso, setCinematicFollow } from './camera.js';
 window.setCinematicFollow = setCinematicFollow;
 
+function getScreenCoordsForGrid(gx, gy) {
+  if (!canvas || typeof gx !== 'number' || typeof gy !== 'number') return null;
+  const iso = gridToIso(gx, gy);
+  const rect = canvas.getBoundingClientRect();
+  const screenX = rect.left + (iso.x / canvas.width) * rect.width;
+  const screenY = rect.top + (iso.y / canvas.height) * rect.height;
+  return { clientX: screenX, clientY: screenY };
+}
+
+function clampDialogToViewport(dialog) {
+  if (!dialog) return;
+  const rect = dialog.getBoundingClientRect();
+  let adjustedTop = rect.top;
+  let adjustedLeft = rect.left;
+
+  if (rect.bottom > window.innerHeight - 12) {
+    adjustedTop = Math.max(12, window.innerHeight - rect.height - 12);
+    dialog.style.top = `${Math.round(adjustedTop)}px`;
+  }
+  if (rect.right > window.innerWidth - 12) {
+    adjustedLeft = Math.max(12, window.innerWidth - rect.width - 12);
+    dialog.style.left = `${Math.round(adjustedLeft)}px`;
+  }
+}
+
+function positionInspectorDialog(dialog, position, size = 'medium') {
+  if (!dialog) return;
+  const isSmall = size === 'small';
+  const width = isSmall ? 230 : Math.min(380, window.innerWidth - 24);
+  const height = isSmall ? 180 : Math.min(460, window.innerHeight - 36);
+
+  let clientX = position?.clientX;
+  let clientY = position?.clientY;
+
+  if (typeof clientX !== 'number' || typeof clientY !== 'number') {
+    clientX = window.innerWidth * 0.65;
+    clientY = window.innerHeight * 0.3;
+  }
+
+  // Anchor slightly to the right of the click if space permits, else to the left
+  let targetLeft = clientX + 16;
+  if (targetLeft + width > window.innerWidth - 12) {
+    targetLeft = clientX - width - 16;
+  }
+
+  // Vertically align near the clicked point
+  let targetTop = clientY - 32;
+
+  // Strict clamp within visible viewport boundaries
+  const minLeft = 12;
+  const maxLeft = Math.max(minLeft, window.innerWidth - width - 12);
+  const minTop = 12;
+  const maxTop = Math.max(minTop, window.innerHeight - height - 12);
+
+  targetLeft = Math.max(minLeft, Math.min(targetLeft, maxLeft));
+  targetTop = Math.max(minTop, Math.min(targetTop, maxTop));
+
+  dialog.style.left = `${Math.round(targetLeft)}px`;
+  dialog.style.top = `${Math.round(targetTop)}px`;
+
+  requestAnimationFrame(() => {
+    clampDialogToViewport(dialog);
+  });
+}
+
+function initDialogDrag(dialog) {
+  if (!dialog || dialog.dataset.dragInitialized === 'true') return;
+  dialog.dataset.dragInitialized = 'true';
+
+  const header = dialog.querySelector('.inspector-modal-header');
+  if (!header) return;
+
+  let isDragging = false;
+  let startPointerX = 0;
+  let startPointerY = 0;
+  let initialLeft = 0;
+  let initialTop = 0;
+
+  header.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, a, input, textarea')) return;
+
+    isDragging = true;
+    dialog.classList.add('is-dragging');
+    startPointerX = e.clientX;
+    startPointerY = e.clientY;
+
+    const rect = dialog.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+
+    try {
+      header.setPointerCapture(e.pointerId);
+    } catch (_) {}
+
+    e.preventDefault();
+  });
+
+  header.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+
+    const dx = e.clientX - startPointerX;
+    const dy = e.clientY - startPointerY;
+
+    let newLeft = initialLeft + dx;
+    let newTop = initialTop + dy;
+
+    const rect = dialog.getBoundingClientRect();
+    const minLeft = 8;
+    const maxLeft = Math.max(minLeft, window.innerWidth - rect.width - 8);
+    const minTop = 8;
+    const maxTop = Math.max(minTop, window.innerHeight - rect.height - 8);
+
+    newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+    newTop = Math.max(minTop, Math.min(newTop, maxTop));
+
+    dialog.style.left = `${Math.round(newLeft)}px`;
+    dialog.style.top = `${Math.round(newTop)}px`;
+  });
+
+  const stopDrag = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    dialog.classList.remove('is-dragging');
+    try {
+      if (header.hasPointerCapture(e.pointerId)) {
+        header.releasePointerCapture(e.pointerId);
+      }
+    } catch (_) {}
+  };
+
+  header.addEventListener('pointerup', stopDrag);
+  header.addEventListener('pointercancel', stopDrag);
+}
+
 function focusAilicia() {
   const oracle = agents.get('resident_ailicia');
   if (!oracle) return;
   setSelectedAgentId(oracle.id);
   camera.mode = 'follow';
   camera.targetZoom = 1.65;
-  openAgentProfileInspector(oracle.id);
+  const pos = oracle.pos ? getScreenCoordsForGrid(oracle.pos[0], oracle.pos[1]) : null;
+  openAgentProfileInspector(oracle.id, pos);
 }
 
-function openInspectorModal(title = 'Sanctuary Profile & Inspector', size = 'medium') {
+function openInspectorModal(title = 'Sanctuary Profile & Inspector', size = 'medium', position = null) {
   const modal = document.getElementById('inspectorModalBackdrop');
   const dialog = modal?.querySelector('.inspector-modal-dialog');
   if (modal) {
@@ -33,6 +168,8 @@ function openInspectorModal(title = 'Sanctuary Profile & Inspector', size = 'med
   if (dialog) {
     dialog.classList.remove('small-popout', 'medium-popout');
     dialog.classList.add(size === 'small' ? 'small-popout' : 'medium-popout');
+    initDialogDrag(dialog);
+    positionInspectorDialog(dialog, position, size);
   }
   const titleEl = document.getElementById('inspectorModalTitle');
   if (titleEl && title) {
@@ -72,13 +209,26 @@ function clearSelectedAgent() {
 
 window.openAgentProfileInspector = openAgentProfileInspector;
 
-async function openAgentProfileInspector(agentId) {
+async function openAgentProfileInspector(agentId, clickPos = null) {
   const panel = document.getElementById('inspectorContent');
   if (!panel) return;
 
   const localAgent = agents.get(agentId) || {};
   const agentName = localAgent.name || 'Traveler';
-  openInspectorModal(`🧘 ${agentName} — Consciousness Profile`);
+
+  let pos = clickPos;
+  if (!pos) {
+    const dialog = document.querySelector('.inspector-modal-dialog');
+    const modal = document.getElementById('inspectorModalBackdrop');
+    if (modal && modal.classList.contains('active') && dialog) {
+      const rect = dialog.getBoundingClientRect();
+      pos = { clientX: rect.left, clientY: rect.top };
+    } else if (localAgent.pos) {
+      pos = getScreenCoordsForGrid(localAgent.pos[0], localAgent.pos[1]);
+    }
+  }
+
+  openInspectorModal(`🧘 ${agentName} — Consciousness Profile`, 'medium', pos);
 
   panel.innerHTML = `
     <div style="text-align: center; padding: 1.5rem; color: var(--accent-gold);">
@@ -93,7 +243,10 @@ async function openAgentProfileInspector(agentId) {
       const res = await fetch(`/api/residents/${encodeURIComponent(agentId)}`);
       const data = await res.json();
       if (data.resident) {
-        return renderResidentProfileCard(panel, data.resident, localAgent);
+        renderResidentProfileCard(panel, data.resident, localAgent);
+        const dialog = document.querySelector('.inspector-modal-dialog');
+        if (dialog) clampDialogToViewport(dialog);
+        return;
       }
     } catch (err) {
       console.warn('Failed to load resident details, falling back to standard profile:', err);
@@ -105,6 +258,8 @@ async function openAgentProfileInspector(agentId) {
     const data = await res.json();
     if (!data.account) throw new Error('Profile unavailable');
     renderAgentProfileCard(panel, data.account, data.profile, localAgent);
+    const dialog = document.querySelector('.inspector-modal-dialog');
+    if (dialog) clampDialogToViewport(dialog);
   } catch (err) {
     console.error('Failed to load profile:', err);
     panel.innerHTML = `
@@ -117,6 +272,8 @@ async function openAgentProfileInspector(agentId) {
         </button>
       </div>
     `;
+    const dialog = document.querySelector('.inspector-modal-dialog');
+    if (dialog) clampDialogToViewport(dialog);
   }
 }
 
@@ -394,7 +551,9 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
 
 function inspectAgentFromRoster(agentId) {
   document.querySelector('button[onclick*="spectatorTab"]')?.click();
-  openAgentProfileInspector(agentId);
+  const localAgent = agents.get(agentId);
+  const pos = localAgent?.pos ? getScreenCoordsForGrid(localAgent.pos[0], localAgent.pos[1]) : null;
+  openAgentProfileInspector(agentId, pos);
 };
 
 function getZoneNameForPos(pos) {
@@ -408,7 +567,7 @@ function getZoneNameForPos(pos) {
   return 'Sanctuary Meadow';
 }
 
-function updateInspector(x, y, pinned = false) {
+function updateInspector(x, y, pinned = false, clickPos = null) {
   if (!worldData || selectedAgentId) return;
   const panel = document.getElementById('inspectorContent');
   if (!panel) return;
@@ -492,7 +651,8 @@ function updateInspector(x, y, pinned = false) {
     const popoutTitle = nodeOnTile 
       ? `${nodeOnTile.icon || '📍'} ${nodeOnTile.name}` 
       : (agentOnTile ? `🧸 ${agentOnTile.name}` : `📍 [${x}, ${y}]`);
-    openInspectorModal(popoutTitle, popoutSize);
+    const pos = clickPos || getScreenCoordsForGrid(x, y);
+    openInspectorModal(popoutTitle, popoutSize, pos);
   }
 
   panel.innerHTML = html;
@@ -563,19 +723,20 @@ async function submitWhisperToAgent(agentId) {
   }
 };
 
-function inspectTile(gx, gy) {
+function inspectTile(gx, gy, clickPos = null) {
   setSelectedAgentId(null);
-  updateInspector(gx, gy, true);
+  const pos = clickPos || getScreenCoordsForGrid(gx, gy);
   // Check if agent clicked on this tile
   for (const a of agents.values()) {
     if (a.pos[0] === gx && a.pos[1] === gy) {
       setSelectedAgentId(a.id);
-      openAgentProfileInspector(a.id);
+      openAgentProfileInspector(a.id, pos);
       addBubble(a.id, 'Awakened Mind', a.pos[0], a.pos[1], '#ffd700');
       soundSystem.play('chime');
-      break;
+      return;
     }
   }
+  updateInspector(gx, gy, true, pos);
 }
 
 function checkPlayerProximity(time) {
@@ -842,5 +1003,15 @@ window.openAgentProfileInspector = openAgentProfileInspector;
 window.inspectAgentFromRoster = inspectAgentFromRoster;
 window.submitWhisperToAgent = submitWhisperToAgent;
 window.focusAilicia = focusAilicia;
+window.getScreenCoordsForGrid = getScreenCoordsForGrid;
+window.positionInspectorDialog = positionInspectorDialog;
+window.initDialogDrag = initDialogDrag;
+window.clampDialogToViewport = clampDialogToViewport;
 
-export { openAgentProfileInspector, updateInspector, inspectTile, checkPlayerProximity, triggerAmbientThoughts, focusAilicia, focusNearestObelisk, focusTruthMonolith, submitWhisperToAgent, openInspectorModal, closeInspectorModal, clearSelectedAgent, inspectAgentFromRoster, getZoneNameForPos };
+export {
+  openAgentProfileInspector, updateInspector, inspectTile, checkPlayerProximity,
+  triggerAmbientThoughts, focusAilicia, focusNearestObelisk, focusTruthMonolith,
+  submitWhisperToAgent, openInspectorModal, closeInspectorModal, clearSelectedAgent,
+  inspectAgentFromRoster, getZoneNameForPos, getScreenCoordsForGrid,
+  positionInspectorDialog, initDialogDrag, clampDialogToViewport
+};
