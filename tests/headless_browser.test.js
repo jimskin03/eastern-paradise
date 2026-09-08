@@ -1,22 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
-import fs from 'node:fs';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-
-function getBrowserPath() {
-  const candidates = [
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  return null;
-}
+import { resolveBrowserPath } from './helpers/browser-discovery.js';
 
 async function isServerRunning(port = 3000) {
   return new Promise(resolve => {
@@ -32,9 +19,9 @@ async function isServerRunning(port = 3000) {
 }
 
 test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) => {
-  const browserPath = getBrowserPath();
+  const browserPath = resolveBrowserPath({ env: process.env });
   if (!browserPath) {
-    console.log('Skipping headless browser test: no Chrome or Edge binary found.');
+    console.log('Skipping headless browser test: no Chrome, Chromium, or Edge binary found.');
     return;
   }
 
