@@ -96,6 +96,17 @@ async function resolvePublicAddresses(hostname, resolver = dns) {
   return publicAddresses;
 }
 
+export function createPinnedLookup(address) {
+  const family = net.isIP(address);
+  return (_hostname, options, callback) => {
+    if (options?.all) {
+      callback(null, [{ address, family }]);
+      return;
+    }
+    callback(null, address, family);
+  };
+}
+
 function requestPinnedText(url, approvedHostname, { resolver = dns } = {}, redirectCount = 0) {
   const parsed = ensureExternalUrl(url, approvedHostname);
   return resolvePublicAddresses(parsed.hostname, resolver).then(addresses => new Promise((resolve, reject) => {
@@ -107,7 +118,7 @@ function requestPinnedText(url, approvedHostname, { resolver = dns } = {}, redir
       path: `${parsed.pathname}${parsed.search}`,
       headers: { 'User-Agent': 'Eastern-Paradise-Quest-Verifier/1.0', Accept: 'text/html,text/plain;q=0.9' },
       servername: parsed.hostname,
-      lookup: (_hostname, _options, callback) => callback(null, address, net.isIP(address))
+      lookup: createPinnedLookup(address)
     }, response => {
       const statusCode = response.statusCode || 0;
       if (statusCode >= 300 && statusCode < 400 && response.headers.location) {
