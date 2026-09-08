@@ -16,8 +16,10 @@ import { handleEconomyRoutes } from './routes/economy.routes.js';
 import { handleStatusRoutes } from './routes/status.routes.js';
 import { handleAdminRoutes } from './routes/admin.routes.js';
 import { handlePuzzleRoutes } from './routes/puzzles.routes.js';
+import { handleBeaconRoutes } from './routes/beacon.routes.js';
 
 const routeHandlers = [
+  handleBeaconRoutes,
   handleProtocolRoutes,
   handleAuthRoutes,
   handleAgentRoutes,
