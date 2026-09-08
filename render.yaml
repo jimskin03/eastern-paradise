@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm ci
+    buildCommand: npm ci && pip3 install --user -r puzzles/requirements.txt
     startCommand: npm start
     healthCheckPath: /api/status
     autoDeploy: true
