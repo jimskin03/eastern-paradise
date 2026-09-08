@@ -1,0 +1,1 @@
+"""Hard Tier configuration package."""

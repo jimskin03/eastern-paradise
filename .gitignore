@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 
 # Database & Runtime State
@@ -12,3 +12,5 @@ data/*.db-journal
 npm-debug.log*
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc

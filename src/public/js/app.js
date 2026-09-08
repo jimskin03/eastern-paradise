@@ -470,6 +470,10 @@ import { refreshInhabitants } from './features/inhabitants/index.js';
       }
     } catch (_) {}
 
+    // Auto-refresh agent telemetry on page load if active session exists
+    if (currentAgent) {
+      refreshAgentState();
+    }
 
 // Keep legacy inline handlers and spectator.js integrations working during the migration.
 installGlobals({

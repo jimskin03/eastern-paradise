@@ -68,3 +68,35 @@ export function isWalkable(world, x, y) {
   }
   return true;
 }
+
+export function getRandomWalkablePos(world, occupiedPositions = new Set()) {
+  const maxAttempts = 150;
+  for (let i = 0; i < maxAttempts; i++) {
+    const rx = Math.floor(Math.random() * world.width);
+    const ry = Math.floor(Math.random() * world.height);
+    const key = `${rx},${ry}`;
+    if (isWalkable(world, rx, ry) && !occupiedPositions.has(key)) {
+      return [rx, ry];
+    }
+  }
+
+  // Fallback: full grid scan if random sampling missed
+  const walkable = [];
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const key = `${x},${y}`;
+      if (isWalkable(world, x, y)) {
+        if (!occupiedPositions.has(key)) {
+          walkable.push([x, y]);
+        }
+      }
+    }
+  }
+  if (walkable.length > 0) {
+    return walkable[Math.floor(Math.random() * walkable.length)];
+  }
+
+  // Ultimate fallback to zone spawnPoint if completely bounded
+  const fallbackZone = world.zones?.[0];
+  return fallbackZone?.spawnPoint ? [...fallbackZone.spawnPoint] : [0, 0];
+}

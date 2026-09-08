@@ -11,7 +11,8 @@ import {
   AMBIENT_ORACLE_THOUGHTS
 } from './state.js';
 import { soundSystem } from './audio.js';
-import { gridToIso } from './camera.js';
+import { gridToIso, setCinematicFollow } from './camera.js';
+window.setCinematicFollow = setCinematicFollow;
 
 function focusAilicia() {
   const oracle = agents.get('resident_ailicia');
@@ -22,11 +23,16 @@ function focusAilicia() {
   openAgentProfileInspector(oracle.id);
 }
 
-function openInspectorModal(title = 'Sanctuary Profile & Inspector') {
+function openInspectorModal(title = 'Sanctuary Profile & Inspector', size = 'medium') {
   const modal = document.getElementById('inspectorModalBackdrop');
+  const dialog = modal?.querySelector('.inspector-modal-dialog');
   if (modal) {
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
+  }
+  if (dialog) {
+    dialog.classList.remove('small-popout', 'medium-popout');
+    dialog.classList.add(size === 'small' ? 'small-popout' : 'medium-popout');
   }
   const titleEl = document.getElementById('inspectorModalTitle');
   if (titleEl && title) {
@@ -259,7 +265,10 @@ function renderResidentProfileCard(panel, resident, localAgent) {
         </div>
       </div>
 
-      <div style="text-align: right; margin-top: 0.8rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.8rem;">
+        <button class="btn-primary" onclick="setCinematicFollow('${escapeHtml(resident.id)}'); closeInspectorModal();" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
+          🎬 Cinematic Lock
+        </button>
         <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
           ✕ Close Profile
         </button>
@@ -371,7 +380,10 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
         </div>
       </div>
 
-      <div style="text-align: right; margin-top: 0.8rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.8rem;">
+        <button class="btn-primary" onclick="setCinematicFollow('${escapeHtml(account.id)}'); closeInspectorModal();" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
+          🎬 Cinematic Lock
+        </button>
         <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
           ✕ Close Profile
         </button>
@@ -468,14 +480,19 @@ function updateInspector(x, y, pinned = false) {
   }
 
   if (pinned) {
+    const isSpecial = Boolean(nodeOnTile || agentOnTile);
+    const popoutSize = isSpecial ? 'medium' : 'small';
     html += `
-      <div style="text-align: right; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
-        <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
-          ✕ Close Inspector
+      <div style="text-align: right; margin-top: ${isSpecial ? '0.85rem' : '0.4rem'}; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+        <button class="btn-sound" onclick="closeInspectorModal()" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; cursor: pointer;">
+          ✕ Close
         </button>
       </div>
     `;
-    openInspectorModal(nodeOnTile ? `📍 ${nodeOnTile.name}` : `📍 Tile [${x}, ${y}] — Inspection`);
+    const popoutTitle = nodeOnTile 
+      ? `${nodeOnTile.icon || '📍'} ${nodeOnTile.name}` 
+      : (agentOnTile ? `🧸 ${agentOnTile.name}` : `📍 [${x}, ${y}]`);
+    openInspectorModal(popoutTitle, popoutSize);
   }
 
   panel.innerHTML = html;

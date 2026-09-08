@@ -255,6 +255,18 @@
           ],
           "icon": "🔭",
           "description": "An intricate brass telescope observing the currents of agents moving across the world."
+        },
+        {
+          "id": "celestial_observatory",
+          "name": "The Celestial Observatory",
+          "type": "puzzle_node",
+          "category": "celestial",
+          "pos": [
+            36,
+            10
+          ],
+          "icon": "🌌",
+          "description": "An ancient domed observatory aligned with heavenly constellations. Gateway to procedural Hard and Celestial reasoning trials."
         }
       ]
     },
@@ -3758,6 +3770,10 @@
       ],
       [
         8,
+        10
+      ],
+      [
+        36,
         10
       ],
       [

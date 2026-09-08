@@ -84,26 +84,41 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   await page.waitForSelector('#hudZoneName', { timeout: 12000 });
 
   // 6. Verify Initial Telemetry
+  await page.waitForFunction(
+    () => document.getElementById('accessibleSanctuaryMirror')?.textContent.trim().startsWith('{'),
+    { timeout: 12000 }
+  );
   const zone = await page.$eval('#hudZoneName', el => el.textContent.trim());
-  assert.equal(zone, 'Gate of Arrival');
+  assert.ok(zone.length > 0);
+
+  const initialCoordsStr = await page.$eval('#hudCoords', el => el.textContent.trim());
+  const mirrorTextInitial = await page.$eval('#accessibleSanctuaryMirror', el => el.textContent.trim());
+  const mirrorJsonInitial = JSON.parse(mirrorTextInitial);
+  assert.equal(mirrorJsonInitial.agent, agentName);
+  assert.ok(Array.isArray(mirrorJsonInitial.position) && mirrorJsonInitial.position.length === 2);
+  assert.ok(mirrorJsonInitial.available_directions.length > 0);
 
   // 7. Move via D-Pad
-  const canMoveEast = await page.$eval('#btnMoveEast', el => !el.disabled);
-  assert.equal(canMoveEast, true);
-  await page.click('#btnMoveEast');
+  const moveDir = mirrorJsonInitial.available_directions[0];
+  const btnId = `#btnMove${moveDir.charAt(0).toUpperCase() + moveDir.slice(1)}`;
+  const canMove = await page.$eval(btnId, el => !el.disabled);
+  assert.equal(canMove, true);
+  await page.click(btnId);
   await page.waitForFunction(
-    () => document.getElementById('hudCoords')?.textContent.trim() === '[8, 8]',
-    { timeout: 5000 }
+    (oldStr) => document.getElementById('hudCoords')?.textContent.trim() !== oldStr,
+    { timeout: 5000 },
+    initialCoordsStr
   );
 
   const coords = await page.$eval('#hudCoords', el => el.textContent.trim());
-  assert.equal(coords, '[8, 8]');
+  const newPos = JSON.parse(coords);
+  assert.notDeepEqual(newPos, mirrorJsonInitial.position);
 
   // 8. Verify Semantic DOM Mirror
   const mirrorText = await page.$eval('#accessibleSanctuaryMirror', el => el.textContent.trim());
   const mirrorJson = JSON.parse(mirrorText);
   assert.equal(mirrorJson.agent, agentName);
-  assert.deepEqual(mirrorJson.position, [8, 8]);
+  assert.deepEqual(mirrorJson.position, newPos);
   assert.ok(mirrorJson.available_directions.length > 0);
 
   // 9. Mobile Responsive Viewport & Quest HUD Collapse Verification

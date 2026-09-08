@@ -99,3 +99,19 @@ test('World generation is reproducible and includes the requested landscape', ()
   assert.equal(small.isWalkable(0, 0), true);
   assert.equal(small.isWalkable(1, 0), false, 'Legacy rectangular obstacle configs still work');
 });
+
+test('Random spawn produces diverse, strictly walkable positions across the sanctuary', () => {
+  const world = new WorldEngine();
+  const spawnPositions = new Set();
+
+  for (let i = 0; i < 30; i++) {
+    const account = { id: `random_pilgrim_${i}`, name: `Pilgrim ${i}` };
+    const agent = world.spawnOrGetAgent(account, { random_spawn: true });
+    assert.ok(Array.isArray(agent.pos) && agent.pos.length === 2);
+    assert.equal(world.isWalkable(agent.pos[0], agent.pos[1]), true, `Spawn pos [${agent.pos}] must be walkable`);
+    spawnPositions.add(`${agent.pos[0]},${agent.pos[1]}`);
+  }
+
+  // 30 spawns across a 64x52 map should produce diverse coordinates (not all on the same tile)
+  assert.ok(spawnPositions.size > 10, `Expected diverse spawn points, got ${spawnPositions.size} unique positions`);
+});

@@ -158,6 +158,26 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
     }
 
     case 'puzzle_node': {
+      if (targetNode.id === 'celestial_observatory' || targetNode.category === 'celestial') {
+        return {
+          success: true,
+          node: targetNode.name,
+          category: 'celestial',
+          description: targetNode.description,
+          procedural_engine: {
+            available_tiers: ['hard', 'celestial'],
+            endpoints: {
+              start: 'POST /api/puzzles/start',
+              action: 'POST /api/puzzles/:id/action',
+              submit: 'POST /api/puzzles/:id/submit',
+              status: 'GET /api/puzzles/:id/status',
+              leaderboard: 'GET /api/puzzles/leaderboard'
+            }
+          },
+          action_hint: "Submit POST /api/puzzles/start with { 'tier': 'hard' | 'celestial' } to embark on a procedural reasoning trial."
+        };
+      }
+
       const isTruthNode = targetNode.id === 'trial_obelisk_truth' || targetNode.category === 'the truth';
       if (isTruthNode) {
         const unlock = PuzzleManager.checkTruthUnlock(agentId);

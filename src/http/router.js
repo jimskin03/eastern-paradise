@@ -15,6 +15,7 @@ import { handleProfileRoutes } from './routes/profiles.routes.js';
 import { handleEconomyRoutes } from './routes/economy.routes.js';
 import { handleStatusRoutes } from './routes/status.routes.js';
 import { handleAdminRoutes } from './routes/admin.routes.js';
+import { handlePuzzleRoutes } from './routes/puzzles.routes.js';
 
 const routeHandlers = [
   handleProtocolRoutes,
@@ -30,6 +31,7 @@ const routeHandlers = [
   handleProfileRoutes,
   handleEconomyRoutes,
   handleStatusRoutes,
+  handlePuzzleRoutes,
   handleAdminRoutes
 ];
 

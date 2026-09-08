@@ -365,7 +365,60 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   const msgStillThere = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').all(topGuestId);
   assert.equal(msgStillThere.length, 1);
 
+  // =========================================================================
+  // 7. Guest with >= 10 Solves: Message Retention, Account Purged, No Top Score
+  // =========================================================================
+  const seasonedGuestRes = await req('/api/auth/guest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }, {
+    name: `SeasonedPilgrim_${uniqueId}`
+  });
+  assert.equal(seasonedGuestRes.status, 201);
+  const seasonedKey = seasonedGuestRes.data.api_key;
+  const seasonedId = seasonedGuestRes.data.agent_id;
+
+  // Set solved_count = 10, total_earned moderate (not top 1)
+  db.prepare('UPDATE profiles SET solved_count = 10, total_earned = 100 WHERE agent_id = ?').run(seasonedId);
+
+  // Post to the notice board
+  const seasonedPost = await req('/api/board/post', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${seasonedKey}`
+    }
+  }, {
+    category: 'Philosophy',
+    content: 'Wisdom deepens with every riddle contemplated.'
+  });
+  assert.equal(seasonedPost.status, 201);
+  assert.equal(seasonedPost.data.success, true);
+
+  // Logout/purge seasoned guest
+  const seasonedLogout = await req('/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${seasonedKey}` }
+  });
+  assert.equal(seasonedLogout.status, 200);
+  assert.equal(seasonedLogout.data.purged, true);
+  assert.equal(seasonedLogout.data.score_retained, false); // Not top 1, so no score retained
+  assert.equal(seasonedLogout.data.messages_retained, true); // Solved >= 10, so messages retained!
+
+  // Account must be purged
+  assert.equal(db.prepare('SELECT * FROM accounts WHERE id = ?').get(seasonedId), undefined);
+  assert.equal(db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(seasonedId), undefined);
+
+  // Board message must be retained with (unverified)
+  const seasonedMsg = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').get(seasonedId);
+  assert.ok(seasonedMsg, 'Message for guest with >= 10 solves must be retained');
+  assert.equal(seasonedMsg.is_unverified, 1);
+  assert.match(seasonedMsg.agent_name, /\(unverified\)/i);
+
+  // Score must NOT be in guest_top_scores
+  assert.equal(db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(seasonedId), undefined);
+
   // Cleanup test guest artifacts so test is idempotent
   db.prepare('DELETE FROM guest_top_scores WHERE agent_id = ?').run(topGuestId);
-  db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(topGuestId);
+  db.prepare('DELETE FROM board_messages WHERE agent_id IN (?, ?)').run(topGuestId, seasonedId);
 });

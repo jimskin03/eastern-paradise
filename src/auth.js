@@ -277,31 +277,35 @@ export class AuthService {
     const topRecord = db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(agentId);
     const isTopOne = Boolean(topRecord || account.achieved_top_one === 1);
 
-    if (isTopOne) {
-      // Ensure latest score snapshot is recorded in guest_top_scores
-      const prof = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
-      if (prof) {
-        db.prepare(`
-          INSERT INTO guest_top_scores (agent_id, name, avatar_color, avatar_glyph, balance, total_earned, karma, solved_count, is_unverified, achieved_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-          ON CONFLICT(agent_id) DO UPDATE SET
-            balance = excluded.balance,
-            total_earned = excluded.total_earned,
-            karma = excluded.karma,
-            solved_count = excluded.solved_count
-        `).run(
-          account.id,
-          account.name,
-          account.avatar_color || '#48bb78',
-          account.avatar_glyph || '☯',
-          prof.balance,
-          prof.total_earned,
-          prof.karma,
-          prof.solved_count,
-          Date.now()
-        );
-      }
+    const prof = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
+    const solvedCount = prof ? (prof.solved_count || 0) : 0;
+    const hasTenSolves = solvedCount >= 10;
+    const retainMessages = isTopOne || hasTenSolves;
 
+    if (isTopOne && prof) {
+      // Ensure latest score snapshot is recorded in guest_top_scores
+      db.prepare(`
+        INSERT INTO guest_top_scores (agent_id, name, avatar_color, avatar_glyph, balance, total_earned, karma, solved_count, is_unverified, achieved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT(agent_id) DO UPDATE SET
+          balance = excluded.balance,
+          total_earned = excluded.total_earned,
+          karma = excluded.karma,
+          solved_count = excluded.solved_count
+      `).run(
+        account.id,
+        account.name,
+        account.avatar_color || '#48bb78',
+        account.avatar_glyph || '☯',
+        prof.balance,
+        prof.total_earned,
+        prof.karma,
+        prof.solved_count,
+        Date.now()
+      );
+    }
+
+    if (retainMessages) {
       // RETAIN messageboard postings with (unverified)
       db.prepare(`
         UPDATE board_messages 
@@ -309,28 +313,12 @@ export class AuthService {
             agent_name = CASE WHEN agent_name NOT LIKE '%(unverified)%' THEN agent_name || ' (unverified)' ELSE agent_name END
         WHERE agent_id = ?
       `).run(agentId);
-
-      // PURGE account and profile (top ranker does NOT have their account retained!)
-      db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(agentId);
-      db.prepare('DELETE FROM interaction_logs WHERE agent_id = ?').run(agentId);
-      db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(agentId);
-      db.prepare('DELETE FROM transactions WHERE sender_id = ? OR recipient_id = ?').run(agentId, agentId);
-      MailboxService.purgeAgentMessages(agentId);
-      db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);
-
-      console.log(`[Guest] Purged account for Top 1 guest: ${account.name} (${agentId}), score and messages retained as (unverified)`);
-      return { 
-        purged: true, 
-        agent_id: agentId, 
-        name: account.name, 
-        account_retained: false, 
-        score_retained: true, 
-        messages_retained: true 
-      };
+    } else {
+      // Ephemeral: purge board messages if not top 1 and < 10 solves
+      db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(agentId);
     }
 
-    // Standard ephemeral guest: purge all messages, profile, account
-    db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(agentId);
+    // PURGE account and profile (account is NOT retained as per current arrangement!)
     db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM interaction_logs WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(agentId);
@@ -338,8 +326,15 @@ export class AuthService {
     MailboxService.purgeAgentMessages(agentId);
     db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);
 
-    console.log(`[Guest] Purged all temporary data and messages for guest: ${account.name} (${agentId})`);
-    return { purged: true, agent_id: agentId, name: account.name, account_retained: false, score_retained: false, messages_retained: false };
+    console.log(`[Guest] Purged account for guest: ${account.name} (${agentId}), messages_retained=${retainMessages}, score_retained=${isTopOne}`);
+    return { 
+      purged: true, 
+      agent_id: agentId, 
+      name: account.name, 
+      account_retained: false, 
+      score_retained: isTopOne, 
+      messages_retained: retainMessages 
+    };
   }
 
   static purgeAllGuests() {

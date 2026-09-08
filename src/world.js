@@ -13,7 +13,8 @@ import {
   getAllNodes,
   getZone,
   getZoneForPos,
-  isWalkable
+  isWalkable,
+  getRandomWalkablePos
 } from './domain/world/geometry.js';
 
 export class WorldEngine {
@@ -58,8 +59,8 @@ export class WorldEngine {
     return isWalkable(this, x, y);
   }
 
-  spawnOrGetAgent(account) {
-    return spawnOrGetAgent(this, account);
+  spawnOrGetAgent(account, options = {}) {
+    return spawnOrGetAgent(this, account, options);
   }
 
   removeAgent(agentId, purgeIfGuest = true) {

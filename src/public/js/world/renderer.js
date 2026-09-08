@@ -350,13 +350,26 @@ function render() {
   camera.offsetX += (camera.targetOffsetX - camera.offsetX) * 0.15;
   camera.offsetY += (camera.targetOffsetY - camera.offsetY) * 0.15;
 
-  // Follow camera mode target
-  if (camera.mode === 'follow' && agents.size > 0) {
-    const targetAgent = agents.get(selectedAgentId) || agents.values().next().value;
+  // Follow and Cinematic camera mode target
+  if ((camera.mode === 'follow' || camera.mode === 'cinematic') && agents.size > 0) {
+    const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+    const targetAgent = agents.get(selectedAgentId) || 
+      (session && (agents.get(session.id) || Array.from(agents.values()).find(a => a.name === session.name))) ||
+      agents.values().next().value;
     if (targetAgent) {
-      const { x, y } = gridToIso(targetAgent.renderGx, targetAgent.renderGy);
-      camera.targetOffsetX = canvas.width / 2 - (x - camera.offsetX);
-      camera.targetOffsetY = canvas.height / 2 - (y - camera.offsetY);
+      const rx = typeof targetAgent.renderGx === 'number' ? targetAgent.renderGx : targetAgent.pos[0];
+      const ry = typeof targetAgent.renderGy === 'number' ? targetAgent.renderGy : targetAgent.pos[1];
+      const { x, y } = gridToIso(rx, ry);
+
+      if (camera.mode === 'cinematic') {
+        const driftX = Math.sin(time * 0.0008) * 3;
+        const driftY = Math.cos(time * 0.0006) * 2;
+        camera.targetOffsetX = (canvas.width / 2 - (x - camera.offsetX)) + driftX;
+        camera.targetOffsetY = (canvas.height / 2 - (y - camera.offsetY)) + driftY;
+      } else {
+        camera.targetOffsetX = canvas.width / 2 - (x - camera.offsetX);
+        camera.targetOffsetY = canvas.height / 2 - (y - camera.offsetY);
+      }
     }
   }
 
@@ -450,6 +463,32 @@ function render() {
 
   // 4. Draw 1994 Retro Parchment HUD Overlay
   drawParchmentHUD(ctx, time);
+
+  // 5. Cinematic Mode Indicator
+  if (camera.mode === 'cinematic') {
+    ctx.save();
+    const pillW = 240;
+    const pillH = 26;
+    const pillX = canvas.width / 2 - pillW / 2;
+    const pillY = 16;
+    ctx.fillStyle = 'rgba(8, 16, 18, 0.85)';
+    ctx.strokeStyle = 'rgba(46, 196, 182, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(pillX, pillY, pillW, pillH, 13);
+    } else {
+      ctx.rect(pillX, pillY, pillW, pillH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#52b788';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎬 Cinematic Camera Lock Active', canvas.width / 2, pillY + 17);
+    ctx.restore();
+  }
 }
 
 export function initRenderer() { render(); }

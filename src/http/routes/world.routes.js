@@ -14,7 +14,7 @@ export async function handleWorldRoutes(ctx) {
     });
   }
 
-  world.spawnOrGetAgent(account);
+  world.spawnOrGetAgent(account, { random_spawn: true });
 
   if (pathname === '/api/world/state' && req.method === 'GET') {
     return sendJson(res, 200, world.getState(account.id));

@@ -37,6 +37,18 @@ function setSanctuaryCamera(mode) {
   camera.isDragging = false;
   if (mode === 'overview') fitTerrariumCamera();
   if (mode === 'free') canvas.style.cursor = 'grab';
+  if (mode === 'cinematic') {
+    camera.targetZoom = 1.48;
+  }
+}
+
+function setCinematicFollow(agentId) {
+  if (agentId) {
+    window.selectedAgentId = agentId;
+  }
+  camera.mode = 'cinematic';
+  camera.targetZoom = 1.48;
+  logActivity('Camera locked in <strong>Cinematic Follow Mode</strong>.');
 }
 
 function zoomSanctuary(factor) {
@@ -63,6 +75,10 @@ function toggleCameraMode() {
     zoomSanctuary(1.4);
     logActivity('Camera set to <strong>Free Pan & Zoom</strong> (Drag to pan, wheel to zoom).');
   } else if (camera.mode === 'free') {
+    camera.mode = 'cinematic';
+    camera.targetZoom = 1.48;
+    logActivity('Camera locked in <strong>Cinematic Follow</strong>.');
+  } else if (camera.mode === 'cinematic') {
     camera.mode = 'follow';
     logActivity('Camera set to <strong>Follow Active Thronglet</strong>.');
   } else {
@@ -100,4 +116,4 @@ window.addEventListener('resize', updateCanvasDimensions);
 
 window.addEventListener('resize', updateCanvasDimensions);
 
-export { gridToIso, isoToGrid, fitTerrariumCamera, setSanctuaryCamera, zoomSanctuary, toggleSanctuaryExpanded, toggleCameraMode, updateCanvasDimensions };
+export { gridToIso, isoToGrid, fitTerrariumCamera, setSanctuaryCamera, zoomSanctuary, toggleSanctuaryExpanded, toggleCameraMode, updateCanvasDimensions, setCinematicFollow };

@@ -34,7 +34,7 @@ export async function handleBoardRoutes(ctx) {
           avatar_glyph: body.avatar_glyph || '🕊️'
         });
         account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(autoGuest.agent_id);
-        world.spawnOrGetAgent(account);
+        world.spawnOrGetAgent(account, { random_spawn: true, respawn: true });
       } else {
         return sendApiError(
           res, 401, 'UNAUTHORIZED',

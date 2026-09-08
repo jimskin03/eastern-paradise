@@ -98,7 +98,7 @@ export async function handleAuthRoutes(ctx) {
     const body = await parseJsonBody(req);
     const auth = AuthService.login(body.agent_name, body.api_key);
     if (!auth.success) return sendJson(res, 401, auth);
-    const agentState = world.spawnOrGetAgent(auth.account);
+    const agentState = world.spawnOrGetAgent(auth.account, { random_spawn: true, respawn: true });
     return sendJson(res, 200, {
       success: true,
       message: `Welcome to Eastern Paradise, ${auth.account.name}.`,
@@ -135,7 +135,7 @@ export async function handleAuthRoutes(ctx) {
       avatar_glyph: body.avatar_glyph
     });
     const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(guestRes.agent_id);
-    const agentState = world.spawnOrGetAgent(account);
+    const agentState = world.spawnOrGetAgent(account, { random_spawn: true, respawn: true });
     return sendJson(res, 201, {
       ...guestRes,
       agent: {
