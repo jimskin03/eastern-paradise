@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../src/db.js';
-import { ARE_WE_ALONE, AreWeAloneQuestManager } from '../src/quests/are-we-alone.js';
+import { ARE_WE_ALONE, AreWeAloneQuestManager, createPinnedLookup } from '../src/quests/are-we-alone.js';
 import { WorldEngine } from '../src/world.js';
 
 function createAgent(label) {
@@ -40,6 +40,14 @@ function researchReport() {
     { record: 'legacy-c', platform: 'wiki', status: 'active', reason: 'Requires email verification; rejected.' }
   ];
 }
+
+test('pinned DNS lookup honors Node all-address requests', async () => {
+  const lookup = createPinnedLookup('203.0.113.10');
+  const all = await new Promise((resolve, reject) => {
+    lookup('public.example', { all: true }, (error, addresses) => error ? reject(error) : resolve(addresses));
+  });
+  assert.deepEqual(all, [{ address: '203.0.113.10', family: 4 }]);
+});
 
 test('Are We Alone persists a one-time research-to-signal journey', () => {
   const agentId = createAgent('journey');
