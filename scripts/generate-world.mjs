@@ -64,6 +64,17 @@ export function generateWorld(source) {
     reserve(landmark.pos, ['farm', 'stone_circle', 'ruins'].includes(landmark.type) ? 4 : 3);
     zoneAt(landmark.pos).nodes.push({ id: landmark.id, name: landmark.name, type: 'landmark', pos: landmark.pos, icon: '✧', description: landmark.description });
   }
+  const distantEchoesShrine = {
+    id: 'shrine_distant_echoes',
+    name: 'Shrine of Distant Echoes',
+    type: 'world_quest',
+    quest: 'are_we_alone',
+    pos: [49, 47],
+    icon: '📡',
+    description: 'An ancient shrine and abandoned radio observatory. Old copper dishes face the sky while prayer strips bear fragments of distant URLs.'
+  };
+  reserve(distantEchoesShrine.pos, 3);
+  zoneAt(distantEchoesShrine.pos).nodes.push(distantEchoesShrine);
   const truthNode = {
     id: 'trial_obelisk_truth',
     name: 'Monolith of the Absolute Truth',
@@ -136,6 +147,7 @@ export function generateWorld(source) {
   road([[31, 44], [32, 44], [32, 41]]);
   road([[33, 46], [37, 46]]);
   road([[58, 46], [56, 46], [56, 48]]);
+  road([[56, 46], [49, 46], [49, 47]]);
   road([[8, 41], [8, 38], [7, 38]]);
   // Attach retained entry points along dry ground. In particular, preserve the
   // original pond's blocked cells while giving its old spawn a route along shore.

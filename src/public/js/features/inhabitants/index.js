@@ -36,6 +36,7 @@ export async function refreshInhabitants() {
         </td>
         <td>
           <strong>${i.name}</strong>
+          ${(i.badges || []).map(badge => `<span title="${window.escapeHtml(badge.description || badge.name || badge.id)}">${window.escapeHtml(badge.icon || '✦')}</span>`).join('')}
           <span class="status-state-pill ${stateClass}">[${stateLabel}]</span>
           <span style="font-size: 0.72rem; color: var(--accent-jade); margin-left: 4px;">💬</span>
         </td>

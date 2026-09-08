@@ -17,6 +17,20 @@ function drawSanctuaryNode(ctx, node, x, y, time) {
     drawObeliskMonument(ctx, x, y, node);
     return;
   }
+  if (node.id === 'shrine_distant_echoes') {
+    const pulse = 0.55 + Math.sin(time / 950) * 0.22;
+    ctx.fillStyle = '#3c4348';
+    ctx.fillRect(x - 17 * z, y - 10 * z, 34 * z, 9 * z);
+    ctx.fillStyle = '#77838c';
+    ctx.fillRect(x - 13 * z, y - 15 * z, 26 * z, 6 * z);
+    ctx.strokeStyle = `rgba(112, 214, 255, ${pulse})`;
+    ctx.lineWidth = 2 * z;
+    ctx.beginPath(); ctx.arc(x, y - 25 * z, 13 * z, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - 10 * z); ctx.lineTo(x, y - 39 * z); ctx.lineTo(x + 9 * z, y - 48 * z); ctx.stroke();
+    ctx.fillStyle = `rgba(177, 235, 255, ${pulse})`;
+    ctx.beginPath(); ctx.arc(x + 10 * z, y - 49 * z, 3 * z, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
   if (node.id === 'wishing_tree') {
     drawPixelTree(ctx, x, y, 1.15);
     for (let i = 0; i < 4; i++) {

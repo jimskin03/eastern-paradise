@@ -25,6 +25,8 @@ const EXPECTED_TABLES = [
   'transactions',
   'active_puzzles',
   'interaction_logs',
+  'agent_badges',
+  'agent_world_quests',
   'spectator_messages',
   'resident_traits',
   'agent_runtime',
@@ -42,6 +44,7 @@ const EXPECTED_INDEXES = [
   'idx_messages_recipient',
   'idx_messages_sender',
   'idx_messages_idempotency',
+  'idx_agent_world_quests_status',
   'idx_sync_changes_tbl_id'
 ];
 

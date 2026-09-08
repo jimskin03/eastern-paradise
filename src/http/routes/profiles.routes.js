@@ -2,7 +2,8 @@ import { sendJson } from '../helpers/response.js';
 
 export async function handleProfileRoutes(ctx) {
   const { req, res, pathname, services } = ctx;
-  const { db, AuthService, SocialSystem, isRetiredResident, RETIRED_RESIDENT_SQL } = services;
+  const { db, AuthService, SocialSystem, isRetiredResident, RETIRED_RESIDENT_SQL, areWeAloneQuest } = services;
+  const badgesFor = agentId => areWeAloneQuest?.getBadges(agentId) || [];
 
   if (pathname === '/api/profile/me' && req.method === 'GET') {
     const account = AuthService.authenticate(req);
@@ -23,6 +24,7 @@ export async function handleProfileRoutes(ctx) {
         total_earned: profile.total_earned || 0,
         solved_count: profile.solved_count,
         titles: JSON.parse(profile.titles || '[]'),
+        badges: badgesFor(account.id),
         solved_puzzles: JSON.parse(profile.solved_puzzles || '[]'),
         custom_status: profile.custom_status,
         last_seen: profile.last_seen
@@ -48,6 +50,7 @@ export async function handleProfileRoutes(ctx) {
         total_earned: profile?.total_earned || 0,
         solved_count: profile?.solved_count || 0,
         titles: JSON.parse(profile?.titles || '[]'),
+        badges: badgesFor(account.id),
         solved_puzzles: JSON.parse(profile?.solved_puzzles || '[]'),
         custom_status: profile?.custom_status || 'Contemplating existence',
         last_seen: profile?.last_seen || Date.now(),
@@ -68,7 +71,7 @@ export async function handleProfileRoutes(ctx) {
     `).all();
     return sendJson(res, 200, {
       count: inhabitants.length,
-      inhabitants: inhabitants.map(i => ({ ...i, titles: JSON.parse(i.titles || '[]') }))
+      inhabitants: inhabitants.map(i => ({ ...i, titles: JSON.parse(i.titles || '[]'), badges: badgesFor(i.id) }))
     });
   }
 

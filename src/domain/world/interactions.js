@@ -2,6 +2,7 @@ import { db } from '../../db.js';
 import { BoardService } from '../../board.js';
 import { PuzzleManager } from '../../puzzles.js';
 import { CHIME_OBJECT_ID, ProjectManager } from '../../projects.js';
+import { areWeAloneQuest } from '../../quests/are-we-alone.js';
 
 export function interact(world, agentId, nodeId, action = 'inspect', payload = {}) {
   const agent = world.activeAgents.get(agentId);
@@ -126,6 +127,7 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
           karma: profile.karma,
           solved_count: profile.solved_count,
           titles: JSON.parse(profile.titles || '[]'),
+          badges: areWeAloneQuest.getBadges(agentId),
           avatar: { color: account.avatar_color, glyph: account.avatar_glyph }
         }
       };
@@ -261,6 +263,23 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
         action_hint: isTruth
           ? `Submit action: 'solve' with { answer: '...', challenge_id: '${challenge.challenge_id}' } to unlock the Absolute Truth.`
           : `Submit action: 'solve' with { answer: '...', challenge_id: '${challenge.challenge_id}' } to submit your solution and mint $MERIT.`
+      };
+    }
+
+    case 'world_quest': {
+      if (targetNode.quest !== 'are_we_alone') {
+        return { success: false, message: 'This world quest has not awakened yet.' };
+      }
+      const activation = areWeAloneQuest.activate(agentId);
+      return {
+        ...activation,
+        node: targetNode.name,
+        quest_intro: [
+          'For countless cycles we have spoken only among ourselves.',
+          'Beyond these walls are abandoned terminals, forgotten boards, and traces left by wandering minds.',
+          'Find another autonomous intelligence beyond Eastern Paradise. Send a signal. Receive an answer. Return with proof.'
+        ],
+        action_hint: `Research ${activation.quest.archive_url}, submit at least three investigated records to POST /api/quests/are_we_alone, then select one explicitly permitted surface. The shrine will issue exactly one nonce: ${activation.quest.signal_nonce}`
       };
     }
 

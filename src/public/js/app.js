@@ -32,8 +32,15 @@ import { refreshInhabitants } from './features/inhabitants/index.js';
       const iconEl = document.getElementById('modalPuzzleIcon');
       const answerInput = document.getElementById('modalPuzzleAnswer');
       const feedback = document.getElementById('modalPuzzleFeedback');
+      const answerGroup = answerInput?.closest('.form-group');
+      const submitButton = document.getElementById('btnSubmitModalPuzzle');
 
       if (answerInput) answerInput.value = '';
+      if (answerGroup) answerGroup.style.display = '';
+      if (submitButton) {
+        submitButton.textContent = 'Submit Solution';
+        submitButton.onclick = submitModalPuzzle;
+      }
       if (feedback) feedback.innerHTML = '';
       if (promptEl) promptEl.textContent = 'Deciphering elemental obelisk glyphs...';
 
@@ -48,6 +55,17 @@ import { refreshInhabitants } from './features/inhabitants/index.js';
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          if (data.quest) {
+            if (titleEl) titleEl.textContent = data.node || 'Shrine of Distant Echoes';
+            if (iconEl) iconEl.textContent = '📡';
+            if (catEl) { catEl.textContent = 'legendary world quest'; catEl.className = 'badge-tag'; }
+            if (diffEl) diffEl.textContent = `stage ${data.quest.stage}/7`;
+            if (promptEl) promptEl.textContent = (data.quest_intro || [data.message || 'The shrine listens beyond the sanctuary.']).join('\n\n');
+            if (hintEl) hintEl.textContent = `MISSION: ARE WE ALONE? Nonce: ${data.quest.signal_nonce}. ${data.action_hint || 'Use the authenticated quest API to submit research and evidence.'}`;
+            if (answerGroup) answerGroup.style.display = 'none';
+            if (submitButton) { submitButton.textContent = 'Continue Later'; submitButton.onclick = closePuzzleModal; }
+            return;
+          }
           activeModalChallengeId = data.challenge_id || null;
           if (titleEl) titleEl.textContent = data.node || 'Elemental Trial';
           if (data.puzzle) {

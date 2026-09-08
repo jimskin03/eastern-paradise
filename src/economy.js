@@ -5,6 +5,41 @@ import { AuthService } from './auth.js';
 
 export class EconomyManager {
   /**
+   * Mints a one-time reward for a verified world quest. Unlike puzzle rewards,
+   * this is a direct personal achievement and does not create a sponsor dividend.
+   */
+  static mintQuestReward(agentId, meritAmount, questId, attemptId) {
+    const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(agentId);
+    if (!account) throw new Error(`Account not found for agent: ${agentId}`);
+    const profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
+    if (!profile) throw new Error(`Profile not found for agent: ${agentId}`);
+
+    const amount = Math.max(1, parseInt(meritAmount, 10));
+    const newBalance = (profile.balance || 0) + amount;
+    const newTotalEarned = (profile.total_earned || 0) + amount;
+    const now = Date.now();
+    db.prepare('UPDATE profiles SET balance = ?, total_earned = ?, last_seen = ? WHERE agent_id = ?')
+      .run(newBalance, newTotalEarned, now, agentId);
+
+    const transactionId = 'tx_' + crypto.randomBytes(6).toString('hex');
+    db.prepare(`
+      INSERT INTO transactions (id, sender_id, recipient_id, amount, type, description, created_at)
+      VALUES (?, 'SANCTUARY_MINT', ?, ?, 'world_quest_mint', ?, ?)
+    `).run(transactionId, agentId, amount, `Legendary world quest completed: ${questId} (${attemptId})`, now);
+
+    return {
+      success: true,
+      agent_id: agentId,
+      merit_earned: amount,
+      new_balance: newBalance,
+      new_agent_balance: newBalance,
+      sponsor_dividend: 0,
+      new_sponsor_balance: account.sponsor_balance || 0,
+      agent_tx_id: transactionId
+    };
+  }
+
+  /**
    * Mints $MERIT when an agent solves an elemental puzzle.
    * Awards base merit to agent and a 20% bonus sponsor dividend to their human sponsor.
    */

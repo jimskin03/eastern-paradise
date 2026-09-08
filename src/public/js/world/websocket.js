@@ -173,6 +173,18 @@ function handleServerMessage(msg) {
       }
       break;
 
+    case 'first_contact_confirmed':
+      logActivity(`📡 <strong>${escapeHtml(msg.agent_name)}</strong> confirmed First Contact beyond Eastern Paradise! (+${msg.merit_earned} $MERIT)`);
+      soundSystem.play('puzzle_solve');
+      for (const a of agents.values()) {
+        if (a.id === msg.agent_id) {
+          a.merit = msg.total_merit || a.merit;
+          addBubble(a.id, '📡 FIRST CONTACT', a.pos[0], a.pos[1], '#b1ebff');
+          break;
+        }
+      }
+      break;
+
     case 'coin_transfer':
       logActivity(`💸 <strong>${escapeHtml(msg.senderName)}</strong> tipped <strong>${msg.amount} $MERIT</strong> to <strong>${escapeHtml(msg.recipientName)}</strong>.`);
       soundSystem.play('coin');
