@@ -81,10 +81,11 @@ test('5. End-to-End Server HTTP Endpoints & Instructions API', async (t) => {
   assert.ok(stateRes.data.current_zone.id);
 
   // 7. Move agent
+  const validDir = stateRes.data.surroundings?.available_directions?.[0] || 'south';
   const moveRes = await req('/api/world/move', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-  }, { direction: 'south' });
+  }, { direction: validDir });
   assert.equal(moveRes.status, 200);
   assert.equal(moveRes.data.success, true);
 

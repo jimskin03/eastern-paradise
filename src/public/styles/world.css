@@ -385,12 +385,12 @@
    FLOATING MAP HOTBAR (BOTTOM CONTROLS)
    ----------------------------------------------------------------------------- */
 .floating-map-bar {
-  position: absolute;
+  position: fixed;
   bottom: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 20;
-  background: rgba(10, 16, 18, 0.92);
+  z-index: 310;
+  background: rgba(10, 16, 18, 0.94);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
@@ -421,6 +421,13 @@
   background: rgba(46, 196, 182, 0.22);
   border-color: var(--accent-jade);
   color: var(--accent-jade);
+}
+
+.floating-map-bar button.active {
+  background: rgba(46, 196, 182, 0.28);
+  border-color: var(--accent-jade);
+  color: var(--accent-jade);
+  box-shadow: 0 0 10px rgba(46, 196, 182, 0.35);
 }
 
 .floating-map-bar .divider {

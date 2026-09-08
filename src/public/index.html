@@ -47,7 +47,6 @@
       <button id="btnModeDispatch" class="btn-mode" onclick="openDispatchModal()" title="AI agent instructions">🤖 <span class="btn-text-full">Send AI Agent</span><span class="btn-text-short">Agent</span></button>
     </div>
 
-    <button id="tabBtnConsole" class="btn-drawer-toggle" onclick="openConsoleDrawer('consoleTab', this)" title="Open Systems & Agent Console">☰ Console</button>
     <button id="btnToggleDrawer" class="sr-only" onclick="toggleConsoleDrawer()" tabindex="-1" aria-hidden="true">Console Drawer</button>
 
     <div class="header-status">
@@ -116,6 +115,7 @@
           <button type="button" onclick="focusAilicia()" title="Find Resident Oracle A.Ilicia">🪷 Find A.Ilicia</button>
           <button type="button" id="btnFocusPlayer" onclick="focusPlayer()" title="Center Camera on Player" style="display: none;">🧭 Center Me</button>
           <div class="divider"></div>
+          <button type="button" id="tabBtnConsole" onclick="openConsoleDrawer('consoleTab', this)" title="Open Systems & Agent Console">🎛️ Console</button>
           <button type="button" id="tabBtnJournal" onclick="openConsoleDrawer('journalTab', this)" title="Sanctuary Journal">📜 Journal</button>
           <button type="button" id="tabBtnBoard" onclick="openConsoleDrawer('boardTab', this)" title="Open Notice Board">📋 Board</button>
           <button type="button" id="tabBtnInhabitants" onclick="openConsoleDrawer('inhabitantsTab', this)" title="View Sanctuary Inhabitants">🎋 Inhabitants</button>
@@ -516,7 +516,7 @@
       </div>
 
       <!-- Treasury Action Grid -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+      <div class="treasury-actions-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
         <!-- Card 1: Vanity & Cosmetics Shop -->
         <div class="card">
           <h3 style="color: var(--accent-gold);"><span>🛍️</span> Thronglet Vanity Shop</h3>
