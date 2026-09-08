@@ -1,0 +1,39 @@
+export const SYNC_TABLES = [
+  'accounts',
+  'profiles',
+  'board_messages',
+  'guest_top_scores',
+  'transactions',
+  'active_puzzles',
+  'interaction_logs',
+  'spectator_messages',
+  'resident_traits',
+  'agent_runtime',
+  'relationships',
+  'agent_memories',
+  'agent_promises',
+  'world_objects',
+  'world_events',
+  'world_clock',
+  'messages'
+];
+
+export const TABLE_PK = {
+  accounts: 'id',
+  profiles: 'agent_id',
+  board_messages: 'id',
+  guest_top_scores: 'agent_id',
+  transactions: 'id',
+  active_puzzles: 'node_id',
+  interaction_logs: 'id',
+  spectator_messages: 'id',
+  resident_traits: 'agent_id',
+  agent_runtime: 'agent_id',
+  relationships: ['agent_id', 'target_id'],
+  agent_memories: 'id',
+  agent_promises: 'id',
+  world_objects: 'id',
+  world_events: 'id',
+  world_clock: 'id',
+  messages: 'message_id'
+};
