@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci
-          pip3 install --user -r puzzles/requirements.txt
+          bash scripts/setup_puzzle_engine.sh
 
       - name: Locate Chrome or Chromium
         shell: bash

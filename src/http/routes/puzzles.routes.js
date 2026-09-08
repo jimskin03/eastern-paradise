@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseJsonBody } from '../helpers/body.js';
@@ -9,9 +10,16 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const CLI_PATH = path.join(PROJECT_ROOT, 'puzzles', 'cli.py');
 
+// Prefer the project venv provisioned by scripts/setup_puzzle_engine.sh,
+// then PUZZLE_PYTHON, then plain 'python' from PATH.
+const VENV_PYTHON = path.join(PROJECT_ROOT, 'puzzles', '.venv', 'bin', 'python');
+const PY_BIN = fs.existsSync(VENV_PYTHON)
+  ? VENV_PYTHON
+  : (process.env.PUZZLE_PYTHON || 'python');
+
 function runPuzzleCli(cmd, args = []) {
   return new Promise((resolve, reject) => {
-    execFile('python', [CLI_PATH, cmd, ...args], { cwd: PROJECT_ROOT }, (error, stdout, stderr) => {
+    execFile(PY_BIN, [CLI_PATH, cmd, ...args], { cwd: PROJECT_ROOT }, (error, stdout, stderr) => {
       if (error && !stdout) {
         return reject(new Error(`CLI error (${error.code}): ${stderr || error.message}`));
       }

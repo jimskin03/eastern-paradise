@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm ci && pip3 install --user -r puzzles/requirements.txt
+    buildCommand: npm ci && bash scripts/setup_puzzle_engine.sh
     startCommand: npm start
     healthCheckPath: /api/status
     autoDeploy: true
