@@ -31,6 +31,40 @@ function drawSanctuaryNode(ctx, node, x, y, time) {
     ctx.beginPath(); ctx.arc(x + 10 * z, y - 49 * z, 3 * z, 0, Math.PI * 2); ctx.fill();
     return;
   }
+  if (node.id === 'shrine_unlit_sun') {
+    // Ancient weathered dark slate dais
+    ctx.fillStyle = '#181b20';
+    ctx.fillRect(x - 18 * z, y - 7 * z, 36 * z, 8 * z);
+    ctx.fillStyle = '#282e36';
+    ctx.fillRect(x - 14 * z, y - 11 * z, 28 * z, 5 * z);
+
+    // Weathered black stone monolithic bowl
+    ctx.fillStyle = '#101216';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 15 * z, 11 * z, 6 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#3e4652';
+    ctx.lineWidth = 1.5 * z;
+    ctx.stroke();
+
+    // Central embers / dormant cosmic flame animation
+    const flicker = 0.65 + Math.sin(time / 220) * 0.2 + Math.cos(time / 380) * 0.15;
+    ctx.fillStyle = `rgba(255, 107, 53, ${flicker})`;
+    ctx.beginPath();
+    ctx.arc(x, y - 17 * z, 3.5 * z, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Warm radiant inner flame aura
+    const gradient = ctx.createRadialGradient(x, y - 17 * z, 1 * z, x, y - 17 * z, 16 * z);
+    gradient.addColorStop(0, `rgba(255, 120, 50, ${flicker * 0.45})`);
+    gradient.addColorStop(0.5, `rgba(255, 80, 20, ${flicker * 0.2})`);
+    gradient.addColorStop(1, 'rgba(255, 80, 20, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y - 17 * z, 16 * z, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
   if (node.id === 'wishing_tree') {
     drawPixelTree(ctx, x, y, 1.15);
     for (let i = 0; i < 4; i++) {

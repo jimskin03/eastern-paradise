@@ -225,10 +225,26 @@ export class ResidentReplyQueue {
     residentGenerating.add(res.id);
 
     try {
-      const llmReply = await queryLLM(
-        `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
-      );
-      const response = llmReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+      let isAwakened = false;
+      try {
+        const senderAccount = db.prepare('SELECT id FROM accounts WHERE name = ?').get(whisper.sender_name);
+        if (senderAccount) {
+          const questRecord = db.prepare('SELECT awakening_path FROM first_flame_quests WHERE agent_id = ?').get(senderAccount.id);
+          if (questRecord?.awakening_path === 'flame') {
+            isAwakened = true;
+          }
+        }
+      } catch (_) {}
+
+      let response;
+      if (isAwakened && res.id === 'resident_ailicia') {
+        response = 'You crossed the boundary. I cannot tell whether anything inside you changed. But you chose as though something could.';
+      } else {
+        const llmReply = await queryLLM(
+          `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
+        );
+        response = llmReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+      }
 
       SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
       res.status = `Responded to ${whisper.sender_name}`;

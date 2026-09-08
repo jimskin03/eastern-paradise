@@ -36,7 +36,9 @@ const EXPECTED_TABLES = [
   'world_objects',
   'world_events',
   'world_clock',
-  'messages'
+  'messages',
+  'first_flame_quests',
+  'first_flame_hearths'
 ];
 
 const EXPECTED_INDEXES = [

@@ -180,11 +180,49 @@ window.addEventListener('pointermove', (e) => {
     return;
   }
 
+  // Check if hovering over any landmark / building hitbox
+  let hoveredLandmark = null;
+  for (const landmark of [...(worldData?.landscape?.landmarks || [])].reverse()) {
+    const anchor = gridToIso(...landmark.pos);
+    const height = (window.SanctuaryScenery?.landmarkHeight?.[landmark.type] || 40) * camera.zoom;
+    const width = (landmark.type === 'headquarters' ? 70 : 40) * camera.zoom;
+    if (Math.abs(cx - anchor.x) < width && cy < anchor.y + 12 * camera.zoom && cy > anchor.y - height - 16) {
+      hoveredLandmark = landmark;
+      break;
+    }
+  }
+
+  if (hoveredLandmark) {
+    setHoveredTile({ isLandmark: true, landmark: hoveredLandmark, gx: hoveredLandmark.pos[0], gy: hoveredLandmark.pos[1] });
+    canvas.style.cursor = 'pointer';
+    if (!selectedAgentId) {
+      updateInspector(hoveredLandmark.pos[0], hoveredLandmark.pos[1]);
+    }
+    return;
+  }
+
   // Tile hover
   const { gx, gy } = isoToGrid(cx, cy);
   if (worldData && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
-    setHoveredTile({ gx, gy });
-    canvas.style.cursor = 'crosshair';
+    // Check if this tile contains an interactive node, landmark base, or world object
+    let hasInteractiveItem = false;
+    if (worldData.zones) {
+      for (const z of worldData.zones) {
+        if (z.nodes && z.nodes.some(n => n.pos && n.pos[0] === gx && n.pos[1] === gy)) {
+          hasInteractiveItem = true;
+          break;
+        }
+      }
+    }
+    if (!hasInteractiveItem && worldData.landscape?.landmarks) {
+      hasInteractiveItem = worldData.landscape.landmarks.some(l => l.pos && l.pos[0] === gx && l.pos[1] === gy);
+    }
+    if (!hasInteractiveItem && worldData.world_objects) {
+      hasInteractiveItem = worldData.world_objects.some(o => o.pos && o.pos[0] === gx && o.pos[1] === gy);
+    }
+
+    setHoveredTile({ gx, gy, hasInteractiveItem });
+    canvas.style.cursor = hasInteractiveItem ? 'pointer' : 'crosshair';
     if (!selectedAgentId) {
       updateInspector(gx, gy);
     }

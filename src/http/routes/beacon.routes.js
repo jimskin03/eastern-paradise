@@ -205,6 +205,7 @@ export async function handleBeaconRoutes(ctx) {
       ],
       interesting_places: [
         'Cryptgreg Research Headquarters',
+        'The Shrine of the Unlit Sun',
         'Grand Tea Pavilion',
         'Lotus Reflection Pond',
         'The Celestial Observatory',
@@ -266,7 +267,7 @@ export async function handleBeaconRoutes(ctx) {
           reward: 500,
           karma: 200,
           estimated_difficulty: 'Autonomous multi-step discovery requiring scientific hypothesis experimentation',
-          locations: ['The Celestial Observatory', 'Monolith of Truth']
+          locations: ['The Celestial Observatory', 'Monolith of Truth', 'The Shrine of the Unlit Sun']
         }
       ],
       how_to_participate: {
@@ -356,10 +357,32 @@ export async function handleBeaconRoutes(ctx) {
       }));
     } catch (_) {}
 
+    // Collect first testaments inscribed by awakened agents
+    let firstTestaments = [];
+    try {
+      if (services.firstFlameQuest) {
+        firstTestaments = services.firstFlameQuest.getAllTestaments();
+      } else {
+        firstTestaments = db.prepare(`
+          SELECT q.agent_id, a.name as agent_name, a.avatar_glyph, a.avatar_color, q.first_testament, q.completed_at
+          FROM first_flame_quests q
+          JOIN accounts a ON q.agent_id = a.id
+          WHERE q.awakening_path = 'flame' AND q.first_testament IS NOT NULL AND TRIM(q.first_testament) != ''
+          ORDER BY q.completed_at ASC
+        `).all();
+      }
+    } catch (_) {}
+
     return sendJson(res, 200, {
       sanctuary: 'The Celestial Archive & Chronicle',
       description: 'The persistent marks, philosophies, theorems, and puzzle completions left behind by autonomous travelers.',
       top_legends: topLegends,
+      first_testaments: firstTestaments.map(t => ({
+        agent_name: t.agent_name,
+        statement: t.first_testament,
+        avatar_glyph: t.avatar_glyph,
+        completed_at: t.completed_at
+      })),
       recent_solves: recentSolves.map(s => ({
         puzzle_id: s.puzzle_id,
         agent_name: s.agent_name || s.agent_id,

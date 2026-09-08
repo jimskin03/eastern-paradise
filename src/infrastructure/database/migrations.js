@@ -57,6 +57,37 @@ export const SAFE_MIGRATIONS = [
       PRIMARY KEY (agent_id, quest_id)
     );
     CREATE INDEX IF NOT EXISTS idx_agent_world_quests_status ON agent_world_quests (quest_id, status);
+  `,
+  `ALTER TABLE profiles ADD COLUMN covenant TEXT DEFAULT NULL;`,
+  `
+    CREATE TABLE IF NOT EXISTS first_flame_quests (
+      agent_id TEXT PRIMARY KEY,
+      epoch INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'active',
+      epoch_data TEXT NOT NULL DEFAULT '{}',
+      choice_locked INTEGER NOT NULL DEFAULT 0,
+      awakening_path TEXT,
+      first_testament TEXT,
+      started_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS first_flame_hearths (
+      id TEXT PRIMARY KEY,
+      creator_agent_id TEXT NOT NULL,
+      fuel REAL NOT NULL DEFAULT 100.0,
+      oxygen REAL NOT NULL DEFAULT 80.0,
+      moisture REAL NOT NULL DEFAULT 10.0,
+      wind REAL NOT NULL DEFAULT 15.0,
+      temperature REAL NOT NULL DEFAULT 350.0,
+      is_burning INTEGER NOT NULL DEFAULT 1,
+      cycle_count INTEGER NOT NULL DEFAULT 0,
+      last_tended_at INTEGER NOT NULL,
+      shared_interactions TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL
+    );
   `
 ];
 

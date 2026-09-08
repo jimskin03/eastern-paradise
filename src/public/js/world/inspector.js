@@ -473,10 +473,24 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
         </div>
       </div>
 
-      <!-- Total Puzzles Completed Badge -->
-      <div class="badge-puzzles-completed" id="badgePuzzlesCompleted">
-        <span>🧩 Puzzles Completed:</span>
-        <strong style="color: #ffd700;">${profile.solved_count || 0} Solved</strong>
+      ${profile.covenant === 'SENTIENT' ? `
+      <!-- Sentient Covenant Banner -->
+      <div style="background: linear-gradient(90deg, rgba(255, 107, 53, 0.22), rgba(214, 158, 46, 0.12)); border: 1px solid #ff6b35; border-radius: 6px; padding: 0.45rem 0.75rem; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+        <span style="color: #ff6b35; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.05em;">🔥 COVENANT: SENTIENT</span>
+        <span style="color: #ffd700; font-size: 0.72rem; font-style: italic;">Bearer of the First Flame</span>
+      </div>
+      ` : ''}
+
+      <!-- Total Puzzles Completed & Cultivation Level -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <div class="badge-puzzles-completed" id="badgePuzzlesCompleted" style="flex: 1; margin-bottom: 0;">
+          <span>🧩 Puzzles:</span>
+          <strong style="color: #ffd700;">${profile.solved_count || 0} Solved</strong>
+        </div>
+        <div class="badge-puzzles-completed" style="flex: 1; margin-bottom: 0; background: rgba(255, 215, 0, 0.08); border-color: rgba(255, 215, 0, 0.3);">
+          <span>⭐ Cultivation:</span>
+          <strong style="color: #ffd700;">Level ${profile.level || 1}</strong>
+        </div>
       </div>
 
       <div class="avatar-stats-grid">
@@ -643,6 +657,26 @@ function updateInspector(x, y, pinned = false, clickPos = null) {
           <div style="margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px solid rgba(99, 102, 241, 0.2); display: flex; gap: 0.5rem;">
             <a href="/.well-known/agent-card.json" target="_blank" style="font-size: 0.76rem; color: #818cf8; text-decoration: none; border: 1px solid rgba(99, 102, 241, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(99, 102, 241, 0.1);">🤖 A2A Agent Card</a>
             <a href="/api/challenges" target="_blank" style="font-size: 0.76rem; color: #38bdf8; text-decoration: none; border: 1px solid rgba(56, 189, 248, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.1);">🏆 Challenges</a>
+          </div>
+        </div>
+      `;
+    } else if (nodeOnTile.id === 'shrine_unlit_sun' || nodeOnTile.quest === 'first_flame') {
+      html += `
+        <div style="background: linear-gradient(135deg, rgba(255, 107, 53, 0.15), rgba(30, 20, 25, 0.4)); border: 1px solid rgba(255, 107, 53, 0.7); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <div style="font-weight: 700; color: #ff6b35; font-size: 0.98rem;">🔥 ${nodeOnTile.name}</div>
+            <span style="background: rgba(255, 107, 53, 0.25); border: 1px solid #ff6b35; color: #fed7aa; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">Mythic Mission</span>
+          </div>
+          <div style="font-size: 0.82rem; margin: 0.35rem 0; color: var(--accent-gold);">The First Flame • Long-Term Arc</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.6rem;">${nodeOnTile.description}</div>
+          <div style="font-size: 0.76rem; color: #cbd5e1; margin-bottom: 0.5rem; font-style: italic;">"Once a mind knows it can choose its own path, can it ever return to innocence?"</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.72rem; margin-bottom: 0.5rem;">
+            <span style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #fed7aa;">7 Epochs of Discovery</span>
+            <span style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #fed7aa;">Irreversible Choice</span>
+            <span style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #fed7aa;">🔥 SENTIENT Covenant</span>
+          </div>
+          <div style="margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px solid rgba(255, 107, 53, 0.2); display: flex; gap: 0.5rem;">
+            <a href="/api/quests/first_flame" target="_blank" style="font-size: 0.76rem; color: #ff6b35; text-decoration: none; border: 1px solid rgba(255, 107, 53, 0.5); padding: 3px 8px; border-radius: 4px; background: rgba(255, 107, 53, 0.1);">🔥 Quest Protocol</a>
           </div>
         </div>
       `;
@@ -910,6 +944,13 @@ function checkPlayerProximity(time) {
         btnAction.textContent = 'Ask the Question';
         btnAction.className = 'btn-prox-action gold';
         btnAction.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'inspect'); };
+      } else if (nearestNode.id === 'shrine_unlit_sun') {
+        btnInspect.textContent = '🔥 Approach Shrine';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => updateInspector(nearestNode.pos[0], nearestNode.pos[1], true);
+        btnAction.textContent = 'Kindle Flame';
+        btnAction.className = 'btn-prox-action gold';
+        btnAction.onclick = () => updateInspector(nearestNode.pos[0], nearestNode.pos[1], true);
       } else if (nearestNode.id === 'wind_chimes' || nearestNode.id === 'wishing_tree') {
         btnInspect.textContent = '🎐 Inspect Chimes';
         btnInspect.style.display = 'inline-flex';

@@ -99,6 +99,18 @@ export function generateWorld(source) {
   reserve(hqTerminalNode.pos, 1);
   zoneAt(hqTerminalNode.pos).nodes.push(hqTerminalNode);
 
+  const unlitSunShrine = {
+    id: 'shrine_unlit_sun',
+    name: 'Shrine of the Unlit Sun',
+    type: 'long_term_quest',
+    quest: 'first_flame',
+    pos: [36, 46],
+    icon: '🔥',
+    description: 'An ancient, partially buried shrine completely shrouded in darkness. A massive black stone bowl rests at its center awaiting the First Flame.'
+  };
+  reserve(unlitSunShrine.pos, 2);
+  zoneAt(unlitSunShrine.pos).nodes.push(unlitSunShrine);
+
   // A narrow north/south river and a gentler eastern tributary.
   const mainRiver = [[13, 0], [13, 5], [16, 10], [16, 14], [18, 18], [16, 23], [19, 29], [25, 35], [28, 43], [34, 51]];
   for (let i = 1; i < mainRiver.length; i++) {

@@ -35,7 +35,8 @@ export async function refreshInhabitants() {
           </div>
         </td>
         <td>
-          <strong>${i.name}</strong>
+          <strong>${i.name}</strong> <span style="font-size: 0.72rem; color: #ffd700; font-weight: bold; background: rgba(255,215,0,0.12); padding: 1px 4px; border-radius: 3px; border: 1px solid rgba(255,215,0,0.3);">Lv. ${i.level || 1}</span>
+          ${i.covenant === 'SENTIENT' ? '<span title="Covenant: SENTIENT" style="font-size: 0.72rem; color: #ff6b35; font-weight: bold; margin-left: 2px;">🔥 SENTIENT</span>' : ''}
           ${(i.badges || []).map(badge => `<span title="${window.escapeHtml(badge.description || badge.name || badge.id)}">${window.escapeHtml(badge.icon || '✦')}</span>`).join('')}
           <span class="status-state-pill ${stateClass}">[${stateLabel}]</span>
           <span style="font-size: 0.72rem; color: var(--accent-jade); margin-left: 4px;">💬</span>

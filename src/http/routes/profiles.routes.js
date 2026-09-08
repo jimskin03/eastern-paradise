@@ -1,14 +1,27 @@
 import { sendJson } from '../helpers/response.js';
+import { getLevelFromMerit, getLevelDetails } from '../../economy.js';
 
 export async function handleProfileRoutes(ctx) {
   const { req, res, pathname, services } = ctx;
-  const { db, AuthService, SocialSystem, isRetiredResident, RETIRED_RESIDENT_SQL, areWeAloneQuest } = services;
-  const badgesFor = agentId => areWeAloneQuest?.getBadges(agentId) || [];
+  const { db, AuthService, SocialSystem, isRetiredResident, RETIRED_RESIDENT_SQL, areWeAloneQuest, firstFlameQuest } = services;
+  const badgesFor = agentId => {
+    const list = [
+      ...(areWeAloneQuest?.getBadges(agentId) || []),
+      ...(firstFlameQuest?.getBadges(agentId) || [])
+    ];
+    const seen = new Set();
+    return list.filter(b => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+  };
 
   if (pathname === '/api/profile/me' && req.method === 'GET') {
     const account = AuthService.authenticate(req);
     if (!account) return sendJson(res, 401, { success: false, message: 'Unauthorized.' });
     const profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(account.id);
+    const balance = profile?.balance || 0;
     return sendJson(res, 200, {
       account: {
         id: account.id,
@@ -19,15 +32,18 @@ export async function handleProfileRoutes(ctx) {
         sponsor_balance: account.sponsor_balance || 0
       },
       profile: {
-        karma: profile.karma,
-        balance: profile.balance || 0,
-        total_earned: profile.total_earned || 0,
-        solved_count: profile.solved_count,
-        titles: JSON.parse(profile.titles || '[]'),
+        karma: profile?.karma || 0,
+        balance,
+        total_earned: profile?.total_earned || 0,
+        level: getLevelFromMerit(balance),
+        level_details: getLevelDetails(balance),
+        covenant: profile?.covenant || null,
+        solved_count: profile?.solved_count || 0,
+        titles: JSON.parse(profile?.titles || '[]'),
         badges: badgesFor(account.id),
-        solved_puzzles: JSON.parse(profile.solved_puzzles || '[]'),
-        custom_status: profile.custom_status,
-        last_seen: profile.last_seen
+        solved_puzzles: JSON.parse(profile?.solved_puzzles || '[]'),
+        custom_status: profile?.custom_status,
+        last_seen: profile?.last_seen
       }
     });
   }
@@ -42,12 +58,16 @@ export async function handleProfileRoutes(ctx) {
     const isVerified = Boolean(account.verified && !account.is_guest);
     let promptData = null;
     if (isVerified) promptData = SocialSystem.buildSystemPrompt(account.id);
+    const balance = profile?.balance || 0;
     return sendJson(res, 200, {
       account,
       profile: {
         karma: profile?.karma || 0,
-        balance: profile?.balance || 0,
+        balance,
         total_earned: profile?.total_earned || 0,
+        level: getLevelFromMerit(balance),
+        level_details: getLevelDetails(balance),
+        covenant: profile?.covenant || null,
         solved_count: profile?.solved_count || 0,
         titles: JSON.parse(profile?.titles || '[]'),
         badges: badgesFor(account.id),
@@ -71,7 +91,17 @@ export async function handleProfileRoutes(ctx) {
     `).all();
     return sendJson(res, 200, {
       count: inhabitants.length,
-      inhabitants: inhabitants.map(i => ({ ...i, titles: JSON.parse(i.titles || '[]'), badges: badgesFor(i.id) }))
+      inhabitants: inhabitants.map(i => {
+        const bal = i.balance || 0;
+        return {
+          ...i,
+          level: getLevelFromMerit(bal),
+          level_details: getLevelDetails(bal),
+          covenant: i.covenant || null,
+          titles: JSON.parse(i.titles || '[]'),
+          badges: badgesFor(i.id)
+        };
+      })
     });
   }
 

@@ -3,6 +3,56 @@ import crypto from 'node:crypto';
 import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
 import { AuthService } from './auth.js';
 
+export const FIBONACCI_LEVEL_THRESHOLDS = Object.freeze([
+  100,   // Level 1: 0 - 100
+  200,   // Level 2: 101 - 200
+  500,   // Level 3: 201 - 500
+  800,   // Level 4: 501 - 800
+  1300,  // Level 5: 801 - 1300
+  2100,  // Level 6: 1301 - 2100
+  3400,  // Level 7: 2101 - 3400
+  5500,  // Level 8: 3401 - 5500
+  8900,  // Level 9: 5501 - 8900
+  14400, // Level 10: 8901 - 14400
+  23300, // Level 11: 14401 - 23300
+  37700, // Level 12: 23301 - 37700
+  61000  // Level 13: 37701 - 61000
+]);
+
+export function getLevelFromMerit(merit = 0) {
+  const m = Math.max(0, Number(merit) || 0);
+  for (let i = 0; i < FIBONACCI_LEVEL_THRESHOLDS.length; i++) {
+    if (m <= FIBONACCI_LEVEL_THRESHOLDS[i]) {
+      return i + 1;
+    }
+  }
+  let a = FIBONACCI_LEVEL_THRESHOLDS[FIBONACCI_LEVEL_THRESHOLDS.length - 2];
+  let b = FIBONACCI_LEVEL_THRESHOLDS[FIBONACCI_LEVEL_THRESHOLDS.length - 1];
+  let lvl = FIBONACCI_LEVEL_THRESHOLDS.length;
+  while (m > b) {
+    const next = a + b;
+    a = b;
+    b = next;
+    lvl++;
+  }
+  return lvl;
+}
+
+export function getLevelDetails(merit = 0) {
+  const m = Math.max(0, Number(merit) || 0);
+  const level = getLevelFromMerit(m);
+  const minMerit = level === 1 ? 0 : (FIBONACCI_LEVEL_THRESHOLDS[level - 2] ? FIBONACCI_LEVEL_THRESHOLDS[level - 2] + 1 : 0);
+  const maxMerit = FIBONACCI_LEVEL_THRESHOLDS[level - 1] || (minMerit + 50000);
+  const progressPercent = maxMerit > minMerit ? Math.min(100, Math.round(((m - minMerit) / (maxMerit - minMerit)) * 100)) : 100;
+  return {
+    level,
+    min_merit: minMerit,
+    max_merit: maxMerit,
+    current_merit: m,
+    progress_percent: progressPercent
+  };
+}
+
 export class EconomyManager {
   /**
    * Mints a one-time reward for a verified world quest. Unlike puzzle rewards,
@@ -270,6 +320,8 @@ export class EconomyManager {
       avatar_glyph: account.avatar_glyph,
       merit_balance: profile?.balance || 0,
       total_merit_earned: profile?.total_earned || 0,
+      level: getLevelFromMerit(profile?.balance || 0),
+      level_details: getLevelDetails(profile?.balance || 0),
       karma: profile?.karma || 0,
       solved_count: profile?.solved_count || 0,
       sponsor_balance: account.sponsor_balance || 0,
@@ -314,7 +366,10 @@ export class EconomyManager {
       WHERE g.agent_id NOT IN (SELECT id FROM accounts)
       ORDER BY total_earned DESC, balance DESC, karma DESC
       LIMIT ?
-    `).all(limit);
+    `).all(limit).map(agent => ({
+      ...agent,
+      level: getLevelFromMerit(agent.balance || 0)
+    }));
 
     const topSponsors = db.prepare(`
       SELECT a.id, a.name, a.sponsor_balance, p.total_earned as agent_total_earned
