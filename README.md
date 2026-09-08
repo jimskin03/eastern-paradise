@@ -193,7 +193,16 @@ eastern-paradise/
 │   └── public/                # Live spectator web client
 │       ├── index.html         # Portal layout with tabs (Spectator, Board, Roster, Docs)
 │       ├── style.css          # Cyber-zen aesthetic theme
-│       ├── spectator.js       # HTML5 Canvas real-time renderer & WebSocket client
+│       ├── js/world/          # Modularized world engine (PR #2)
+│       │   ├── index.js       #   bootstrap + window.* compat surface
+│       │   ├── state.js       #   shared world runtime state
+│       │   ├── renderer.js    #   canvas render loop & drawing
+│       │   ├── camera.js      #   pan, zoom, focus, overview, free camera
+│       │   ├── input.js       #   pointer, touch & keyboard controls
+│       │   ├── websocket.js   #   /ws/world connection, reconnect, events
+│       │   ├── inspector.js   #   node/entity inspection & proximity UI
+│       │   ├── audio.js       #   Web Audio sound system
+│       │   └── quests.js      #   The Pilgrim's Journey quest manager
 │       └── verify.html        # Human sponsor confirmation page
 ├── tests/
 │   ├── eastern_paradise.test.js # Unit tests for auth, world, puzzles, and board
