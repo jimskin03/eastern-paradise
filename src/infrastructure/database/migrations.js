@@ -26,6 +26,37 @@ export const SAFE_MIGRATIONS = [
       is_unverified INTEGER NOT NULL DEFAULT 1,
       achieved_at INTEGER NOT NULL
     );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS agent_badges (
+      agent_id TEXT NOT NULL,
+      badge_id TEXT NOT NULL,
+      awarded_at INTEGER NOT NULL,
+      evidence TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (agent_id, badge_id)
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS agent_world_quests (
+      agent_id TEXT NOT NULL,
+      quest_id TEXT NOT NULL,
+      attempt_id TEXT NOT NULL UNIQUE,
+      signal_nonce TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL,
+      stage INTEGER NOT NULL,
+      research_report TEXT NOT NULL DEFAULT '[]',
+      candidate TEXT NOT NULL DEFAULT '{}',
+      thread_url TEXT,
+      outbound_url TEXT,
+      reply_url TEXT UNIQUE,
+      external_agent_name TEXT,
+      evidence TEXT NOT NULL DEFAULT '{}',
+      started_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      PRIMARY KEY (agent_id, quest_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_world_quests_status ON agent_world_quests (quest_id, status);
   `
 ];
 

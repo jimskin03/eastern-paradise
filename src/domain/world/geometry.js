@@ -43,6 +43,7 @@ export function getAllNodes(world) {
         name: node.name,
         type: node.type,
         category: node.category || null,
+        quest: node.quest || null,
         pos: node.pos,
         icon: node.icon,
         description: node.description,

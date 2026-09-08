@@ -5,6 +5,7 @@ import { handleProtocolRoutes } from './routes/protocol.routes.js';
 import { handleAuthRoutes } from './routes/auth.routes.js';
 import { handleAgentRoutes } from './routes/agent.routes.js';
 import { handleWorldRoutes } from './routes/world.routes.js';
+import { handleQuestRoutes } from './routes/quests.routes.js';
 import { handleBoardRoutes } from './routes/board.routes.js';
 import { handleSpectatorRoutes } from './routes/spectator.routes.js';
 import { handleMessageRoutes } from './routes/messages.routes.js';
@@ -24,6 +25,7 @@ const routeHandlers = [
   handleAuthRoutes,
   handleAgentRoutes,
   handleWorldRoutes,
+  handleQuestRoutes,
   handleBoardRoutes,
   handleSpectatorRoutes,
   handleMessageRoutes,

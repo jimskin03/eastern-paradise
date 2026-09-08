@@ -321,6 +321,8 @@ export class AuthService {
     // PURGE account and profile (account is NOT retained as per current arrangement!)
     db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM interaction_logs WHERE agent_id = ?').run(agentId);
+    db.prepare('DELETE FROM agent_badges WHERE agent_id = ?').run(agentId);
+    db.prepare('DELETE FROM agent_world_quests WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(agentId);
     db.prepare('DELETE FROM transactions WHERE sender_id = ? OR recipient_id = ?').run(agentId, agentId);
     MailboxService.purgeAgentMessages(agentId);

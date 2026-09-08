@@ -26,6 +26,7 @@ import {
 import { sendApiError } from './http/helpers/response.js';
 import { attachWorldWebSocket } from './realtime/world-websocket.js';
 import { createLifecycle } from './runtime/lifecycle.js';
+import { areWeAloneQuest } from './quests/are-we-alone.js';
 
 export {
   sendApiError,
@@ -61,7 +62,8 @@ const services = {
   buildOpenApiSpec,
   buildManifest,
   buildInstructionsMarkdown,
-  getHomepagePrompts
+  getHomepagePrompts,
+  areWeAloneQuest
 };
 
 const limits = { checkRateLimit, checkGuestCreationLimit, checkWhisperLimit };

@@ -439,6 +439,7 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
   const titlesHtml = titles.length > 0 
     ? titles.map(t => `<span class="avatar-title-pill">${escapeHtml(t)}</span>`).join('') 
     : '<span class="avatar-title-pill">Novice Pilgrim</span>';
+  const badgesHtml = (profile.badges || []).map(badge => `<span class="avatar-title-pill" title="${escapeHtml(badge.description || badge.name || badge.id)}">${escapeHtml(badge.icon || '✦')} ${escapeHtml(badge.name || badge.id)}</span>`).join('');
 
   const zoneName = localAgent.zone || (worldData ? getZoneNameForPos(localAgent.pos) : 'Sanctuary Meadow');
   const posStr = localAgent.pos ? `[${localAgent.pos[0]}, ${localAgent.pos[1]}]` : 'Sanctuary';
@@ -467,6 +468,7 @@ function renderAgentProfileCard(panel, account, profile, localAgent) {
           </div>
           <div class="avatar-titles-wrap">
             ${titlesHtml}
+            ${badgesHtml}
           </div>
         </div>
       </div>
@@ -861,6 +863,13 @@ function checkPlayerProximity(time) {
         btnAction.textContent = '✍️ Inscribe';
         btnAction.className = 'btn-prox-action gold';
         btnAction.onclick = () => { if (typeof openConsoleDrawer === 'function') openConsoleDrawer('boardTab'); };
+      } else if (nearestNode.id === 'shrine_distant_echoes') {
+        btnInspect.textContent = '📡 Receive Signal';
+        btnInspect.style.display = 'inline-flex';
+        btnInspect.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'inspect'); };
+        btnAction.textContent = 'Ask the Question';
+        btnAction.className = 'btn-prox-action gold';
+        btnAction.onclick = () => { if (typeof openPuzzleModal === 'function') openPuzzleModal(nearestNode.id, 'inspect'); };
       } else if (nearestNode.id === 'wind_chimes' || nearestNode.id === 'wishing_tree') {
         btnInspect.textContent = '🎐 Inspect Chimes';
         btnInspect.style.display = 'inline-flex';
