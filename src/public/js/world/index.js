@@ -35,6 +35,7 @@ window.focusTruthMonolith = inspector.focusTruthMonolith;
 window.openAgentProfileInspector = inspector.openAgentProfileInspector;
 window.openInspectorModal = inspector.openInspectorModal;
 window.closeInspectorModal = inspector.closeInspectorModal;
+window.isInspectorModalOpen = inspector.isInspectorModalOpen;
 window.handleInspectorBackdropClick = inspector.handleInspectorBackdropClick;
 window.clearSelectedAgent = inspector.clearSelectedAgent;
 window.inspectAgentFromRoster = inspector.inspectAgentFromRoster;

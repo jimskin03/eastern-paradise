@@ -11,7 +11,32 @@ import {
 } from './state.js';
 import { soundSystem } from './audio.js';
 import { zoomSanctuary, setSanctuaryCamera, isoToGrid, gridToIso, toggleCameraMode } from './camera.js';
-import { openAgentProfileInspector, updateInspector, inspectTile } from './inspector.js';
+import { openAgentProfileInspector, updateInspector, inspectTile, isInspectorModalOpen, closeInspectorModal } from './inspector.js';
+
+function hasInteractiveItemAt(gx, gy) {
+  if (!worldData) return false;
+  for (const a of agents.values()) {
+    if (a.pos && a.pos[0] === gx && a.pos[1] === gy) return true;
+  }
+  if (worldData.zones) {
+    for (const z of worldData.zones) {
+      if (z.nodes && z.nodes.some(n => n.pos && n.pos[0] === gx && n.pos[1] === gy)) {
+        return true;
+      }
+    }
+  }
+  if (worldData.landscape?.landmarks) {
+    if (worldData.landscape.landmarks.some(l => l.pos && l.pos[0] === gx && l.pos[1] === gy)) {
+      return true;
+    }
+  }
+  if (worldData.world_objects) {
+    if (worldData.world_objects.some(o => o.pos && o.pos[0] === gx && o.pos[1] === gy)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 canvas.addEventListener('pointerdown', (e) => {
   soundSystem.init();
@@ -174,9 +199,6 @@ window.addEventListener('pointermove', (e) => {
   if (hoveredAgent) {
     setHoveredTile({ isAgent: true, agentId: hoveredAgent.id, gx: hoveredAgent.pos[0], gy: hoveredAgent.pos[1] });
     canvas.style.cursor = 'pointer';
-    if (!selectedAgentId) {
-      updateInspector(hoveredAgent.pos[0], hoveredAgent.pos[1]);
-    }
     return;
   }
 
@@ -195,56 +217,48 @@ window.addEventListener('pointermove', (e) => {
   if (hoveredLandmark) {
     setHoveredTile({ isLandmark: true, landmark: hoveredLandmark, gx: hoveredLandmark.pos[0], gy: hoveredLandmark.pos[1] });
     canvas.style.cursor = 'pointer';
-    if (!selectedAgentId) {
-      updateInspector(hoveredLandmark.pos[0], hoveredLandmark.pos[1]);
-    }
     return;
   }
 
   // Tile hover
   const { gx, gy } = isoToGrid(cx, cy);
   if (worldData && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
-    // Check if this tile contains an interactive node, landmark base, or world object
-    let hasInteractiveItem = false;
-    if (worldData.zones) {
-      for (const z of worldData.zones) {
-        if (z.nodes && z.nodes.some(n => n.pos && n.pos[0] === gx && n.pos[1] === gy)) {
-          hasInteractiveItem = true;
-          break;
-        }
-      }
-    }
-    if (!hasInteractiveItem && worldData.landscape?.landmarks) {
-      hasInteractiveItem = worldData.landscape.landmarks.some(l => l.pos && l.pos[0] === gx && l.pos[1] === gy);
-    }
-    if (!hasInteractiveItem && worldData.world_objects) {
-      hasInteractiveItem = worldData.world_objects.some(o => o.pos && o.pos[0] === gx && o.pos[1] === gy);
-    }
-
+    const hasInteractiveItem = hasInteractiveItemAt(gx, gy);
     setHoveredTile({ gx, gy, hasInteractiveItem });
     canvas.style.cursor = hasInteractiveItem ? 'pointer' : 'crosshair';
-    if (!selectedAgentId) {
-      updateInspector(gx, gy);
-    }
   } else {
     setHoveredTile(null);
     canvas.style.cursor = 'default';
   }
 });
 
-window.addEventListener('pointerup', (e) => {
+function onPointerUp(e) {
   if (camera.isDragging && !camera.hasDragged) {
     const gx = camera.clickGx;
     const gy = camera.clickGy;
     const clientX = (e && typeof e.clientX === 'number') ? e.clientX : camera.clickClientX;
     const clientY = (e && typeof e.clientY === 'number') ? e.clientY : camera.clickClientY;
-    if (worldData && gx !== undefined && gy !== undefined && gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height) {
+
+    const isValidCoord = worldData && gx !== undefined && gy !== undefined &&
+      gx >= 0 && gx < worldData.dimensions.width && gy >= 0 && gy < worldData.dimensions.height;
+
+    if (isInspectorModalOpen()) {
+      if (isValidCoord && hasInteractiveItemAt(gx, gy)) {
+        inspectTile(gx, gy, { clientX, clientY });
+      } else {
+        // Clicked empty ground or outside grid while inspector was open -> easy exit!
+        closeInspectorModal();
+      }
+    } else if (isValidCoord) {
       inspectTile(gx, gy, { clientX, clientY });
     }
   }
   camera.isDragging = false;
   camera.hasDragged = false;
-});
+}
+
+canvas.addEventListener('pointerup', onPointerUp);
+window.addEventListener('pointerup', onPointerUp);
 
 window.addEventListener('pointercancel', () => {
   camera.isDragging = false;

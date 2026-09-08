@@ -92,26 +92,7 @@ function initDialogDrag(dialog) {
   let initialLeft = 0;
   let initialTop = 0;
 
-  header.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('button, a, input, textarea')) return;
-
-    isDragging = true;
-    dialog.classList.add('is-dragging');
-    startPointerX = e.clientX;
-    startPointerY = e.clientY;
-
-    const rect = dialog.getBoundingClientRect();
-    initialLeft = rect.left;
-    initialTop = rect.top;
-
-    try {
-      header.setPointerCapture(e.pointerId);
-    } catch (_) {}
-
-    e.preventDefault();
-  });
-
-  header.addEventListener('pointermove', (e) => {
+  const onPointerMove = (e) => {
     if (!isDragging) return;
 
     const dx = e.clientX - startPointerX;
@@ -131,21 +112,48 @@ function initDialogDrag(dialog) {
 
     dialog.style.left = `${Math.round(newLeft)}px`;
     dialog.style.top = `${Math.round(newTop)}px`;
-  });
+  };
 
-  const stopDrag = (e) => {
+  const onPointerUp = (e) => {
     if (!isDragging) return;
     isDragging = false;
     dialog.classList.remove('is-dragging');
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    header.removeEventListener('pointerup', onPointerUp);
+    header.removeEventListener('pointercancel', onPointerUp);
     try {
-      if (header.hasPointerCapture(e.pointerId)) {
+      if (e && e.pointerId !== undefined && header.hasPointerCapture(e.pointerId)) {
         header.releasePointerCapture(e.pointerId);
       }
     } catch (_) {}
   };
 
-  header.addEventListener('pointerup', stopDrag);
-  header.addEventListener('pointercancel', stopDrag);
+  header.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, a, input, textarea')) return;
+
+    isDragging = true;
+    dialog.classList.add('is-dragging');
+    startPointerX = e.clientX;
+    startPointerY = e.clientY;
+
+    const rect = dialog.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+
+    try {
+      header.setPointerCapture(e.pointerId);
+    } catch (_) {}
+
+    header.addEventListener('pointerup', onPointerUp);
+    header.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    e.preventDefault();
+  });
 }
 
 function focusAilicia() {
@@ -156,6 +164,11 @@ function focusAilicia() {
   camera.targetZoom = 1.65;
   const pos = oracle.pos ? getScreenCoordsForGrid(oracle.pos[0], oracle.pos[1]) : null;
   openAgentProfileInspector(oracle.id, pos);
+}
+
+function isInspectorModalOpen() {
+  const modal = document.getElementById('inspectorModalBackdrop');
+  return Boolean(modal && modal.classList.contains('active'));
 }
 
 function openInspectorModal(title = 'Sanctuary Profile & Inspector', size = 'medium', position = null) {
@@ -196,6 +209,19 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeInspectorModal();
   }
+});
+
+// Dismiss popout on clicking outside dialog and outside canvas
+window.addEventListener('pointerdown', (e) => {
+  if (!isInspectorModalOpen()) return;
+  const modal = document.getElementById('inspectorModalBackdrop');
+  const dialog = modal?.querySelector('.inspector-modal-dialog');
+  if (!dialog) return;
+
+  if (dialog.contains(e.target)) return;
+  if (canvas && (e.target === canvas || canvas.contains(e.target))) return;
+
+  closeInspectorModal();
 });
 
 function clearSelectedAgent() {
@@ -584,7 +610,7 @@ function getZoneNameForPos(pos) {
 }
 
 function updateInspector(x, y, pinned = false, clickPos = null) {
-  if (!worldData || selectedAgentId) return;
+  if (!pinned || !worldData || selectedAgentId) return;
   const panel = document.getElementById('inspectorContent');
   if (!panel) return;
 
@@ -1087,6 +1113,7 @@ window.focusTruthMonolith = focusTruthMonolith;
 
 window.openInspectorModal = openInspectorModal;
 window.closeInspectorModal = closeInspectorModal;
+window.isInspectorModalOpen = isInspectorModalOpen;
 window.handleInspectorBackdropClick = handleInspectorBackdropClick;
 window.clearSelectedAgent = clearSelectedAgent;
 window.openAgentProfileInspector = openAgentProfileInspector;
@@ -1103,7 +1130,7 @@ window.clampDialogToViewport = clampDialogToViewport;
 export {
   openAgentProfileInspector, updateInspector, inspectTile, checkPlayerProximity,
   triggerAmbientThoughts, focusAilicia, focusNearestObelisk, focusTruthMonolith,
-  submitWhisperToAgent, openInspectorModal, closeInspectorModal, clearSelectedAgent,
-  inspectAgentFromRoster, getZoneNameForPos, getScreenCoordsForGrid,
+  submitWhisperToAgent, openInspectorModal, closeInspectorModal, isInspectorModalOpen,
+  clearSelectedAgent, inspectAgentFromRoster, getZoneNameForPos, getScreenCoordsForGrid,
   positionInspectorDialog, initDialogDrag, clampDialogToViewport
 };

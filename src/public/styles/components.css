@@ -813,20 +813,32 @@
 }
 
 .inspector-modal-close {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-muted);
-  font-size: 1.35rem;
+  font-size: 1.15rem;
+  font-weight: 600;
   line-height: 1;
-  padding: 0.2rem 0.5rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .inspector-modal-close:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: scale(1.05);
+}
+
+.inspector-modal-close:active {
+  transform: scale(0.95);
 }
 
 .inspector-modal-body {
