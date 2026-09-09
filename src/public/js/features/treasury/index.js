@@ -41,11 +41,18 @@ export async function refreshTreasury(options = {}) {
   }
   try {
     const url = force ? '/api/economy/reserve?force=1' : '/api/economy/reserve';
-    const reserveRes = await apiFetch(url);
+    const [reserveRes, chainRes] = await Promise.all([
+      apiFetch(url),
+      apiFetch('/api/chain/config')
+    ]);
     const reserve = await reserveRes.json();
+    let chain = null;
+    if (chainRes.ok) {
+      try { chain = await chainRes.json(); } catch { chain = null; }
+    }
     const chainLabelEl = document.getElementById('reserveChainLabel');
     if (chainLabelEl) {
-      chainLabelEl.textContent = reserve.chain_label || (reserve.network === 'devnet' ? 'Solana devnet' : `Solana ${reserve.network || 'devnet'}`);
+      chainLabelEl.textContent = chain?.chain_label || 'Solana devnet';
     }
     const treasuryAddress = reserve.treasury_address;
     lastKnownTreasuryAddress = treasuryAddress || '';

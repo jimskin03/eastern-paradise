@@ -63,15 +63,22 @@ export const ENDPOINT_CATALOG = [
     response_schema: {
       type: 'object',
       properties: {
+        family: { type: 'string', example: 'solana' },
         network: { type: 'string', enum: ['devnet', 'mainnet-beta'] },
         chain: { type: 'string', example: 'solana' },
         chain_label: { type: 'string', example: 'Solana devnet' },
+        production_target: { type: 'string', example: 'mainnet-beta' },
         treasury_address: { type: ['string', 'null'] },
+        public_mint: { type: ['string', 'null'] },
         usdc_mint: { type: ['string', 'null'] },
         collection_address: { type: ['string', 'null'] },
         purchase_enabled: { type: 'boolean' },
+        nft_provider: { type: 'string', enum: ['mock', 'solana'] },
         policy_version: { type: 'string' },
         rpc_cluster: { type: 'string', enum: ['devnet', 'mainnet-beta', 'custom', 'unknown'] },
+        mainnet_opt_in: { type: 'boolean' },
+        live_cluster_proven: { type: 'boolean', example: false },
+        consistency: { type: 'object' },
         risk_disclaimer: { type: 'string' },
         endpoint: { type: 'string', example: '/api/chain/config' }
       }
@@ -527,9 +534,12 @@ export function buildManifest(world, obelisks = [], extras = {}) {
     puzzle_obelisks: obelisks,
     chain: {
       endpoint: '/api/chain/config',
+      family: chain.family || null,
       network: chain.network || null,
       chain_label: chain.chain_label || null,
-      policy_version: chain.policy_version || null
+      production_target: chain.production_target || null,
+      policy_version: chain.policy_version || null,
+      live_cluster_proven: chain.live_cluster_proven === true
     },
     endpoints,
     mailbox: {
