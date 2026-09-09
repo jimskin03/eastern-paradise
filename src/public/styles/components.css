@@ -1229,9 +1229,61 @@
 .wallet-address { color: var(--accent-gold); font: 700 1.05rem monospace; margin: .3rem 0; }
 .verified-mark { color: var(--accent-jade); margin: .3rem 0; }
 .wallet-feedback, .land-feedback { color: var(--text-muted); font-size: .78rem; margin-top: .55rem; }
+.reserve-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.btn-refresh-reserve {
+  background: rgba(46, 196, 182, 0.12);
+  border: 1px solid rgba(46, 196, 182, 0.4);
+  color: var(--accent-jade);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-refresh-reserve:hover {
+  background: rgba(46, 196, 182, 0.25);
+  border-color: var(--accent-jade);
+}
+.reserve-treasury-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  text-align: right;
+  font-family: monospace;
+}
+.btn-copy-treasury {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.74rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+.btn-copy-treasury:hover {
+  background: rgba(255, 191, 105, 0.2);
+  border-color: var(--accent-gold);
+}
+.reserve-rate-subtext {
+  font-size: 0.72rem;
+  color: var(--accent-gold);
+  font-family: monospace;
+  margin-left: 0.35rem;
+  font-weight: normal;
+}
+.reserve-copy-feedback {
+  font-size: 0.75rem;
+  min-height: 1rem;
+  margin-top: 0.4rem;
+  text-align: right;
+}
 .reserve-ledger { margin: 0; }
 .reserve-ledger > div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,.08); padding: .36rem 0; }
-.reserve-ledger dt { color: var(--text-muted); }
+.reserve-ledger dt { color: var(--text-muted); display: flex; align-items: center; flex-wrap: wrap; }
 .reserve-ledger dd { margin: 0; text-align: right; font-family: monospace; }
 .reserve-disclaimer { color: #f4cf87; font-size: .75rem; margin: .8rem 0 0; }
 .land-inspector { margin-top: .75rem; border: 1px solid rgba(244,207,135,.45); border-radius: 8px; padding: .75rem; background: rgba(16,45,37,.55); }

@@ -26,11 +26,29 @@ test('reserve RPC failure never breaks the game and stale cache is returned', as
   const service = new TreasuryService({ config, rpcClient, supplyProvider: () => ({ outstanding: 100 }), cacheTtlMs: 10, now: () => now });
   const fresh = await service.getReserve();
   assert.equal(fresh.reserve.estimated_usd, 65);
+  assert.equal(fresh.reserve.sol_usd_price, 20);
   fail = true;
   now += 20;
   const stale = await service.getReserve();
   assert.equal(stale.reserve.estimated_usd, 65);
+  assert.equal(stale.reserve.sol_usd_price, 20);
   assert.equal(stale.reserve.stale, true);
   assert.match(stale.warning, /unavailable/i);
+});
+
+test('reserve respects force flag to bypass cache expiration window', async () => {
+  let callCount = 0;
+  const rpcClient = {
+    getSolBalance: async () => { callCount++; return 1; },
+    getTokenBalance: async () => 0
+  };
+  let now = 1000;
+  const service = new TreasuryService({ config, rpcClient, supplyProvider: () => ({ outstanding: 100 }), cacheTtlMs: 60000, now: () => now });
+  await service.getReserve();
+  assert.equal(callCount, 1);
+  await service.getReserve(); // not forced, within TTL
+  assert.equal(callCount, 1);
+  await service.getReserve({ force: true }); // forced
+  assert.equal(callCount, 2);
 });
 
