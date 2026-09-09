@@ -38,12 +38,17 @@ export async function handleMessageRoutes(ctx) {
     const account = AuthService.authenticate(req);
     if (!account) return unauthorized(res);
     try {
-      const messages = MailboxService.getMessages({
-        agentId: account.id,
-        conversationId: parsedUrl.searchParams.get('conversationId'),
-        since: parsedUrl.searchParams.get('since'),
-        limit: parsedUrl.searchParams.get('limit')
-      });
+      const messages = parsedUrl.searchParams.get('unread') === 'true'
+        ? MailboxService.getUnreadMessages({
+            agentId: account.id,
+            limit: parsedUrl.searchParams.get('limit')
+          })
+        : MailboxService.getMessages({
+            agentId: account.id,
+            conversationId: parsedUrl.searchParams.get('conversationId'),
+            since: parsedUrl.searchParams.get('since'),
+            limit: parsedUrl.searchParams.get('limit')
+          });
       return sendJson(res, 200, { success: true, count: messages.length, messages });
     } catch (err) {
       return sendJson(res, err.status || 500, {

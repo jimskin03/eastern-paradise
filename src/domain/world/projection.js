@@ -1,5 +1,6 @@
 import { PuzzleManager } from '../../puzzles.js';
 import { ProjectManager } from '../../projects.js';
+import { MailboxService } from '../../mailbox.js';
 
 export function getState(world, agentId) {
   const agent = world.activeAgents.get(agentId);
@@ -108,7 +109,8 @@ export function getState(world, agentId) {
       visible_agents: visibleAgents,
       interactive_nodes: interactiveNodes,
       available_directions: Object.keys(directions).filter(direction => directions[direction])
-    }
+    },
+    inbox: MailboxService.getInboxSummary(agentId)
   };
 }
 

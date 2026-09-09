@@ -143,6 +143,51 @@ export class MailboxService {
   }
 
   /**
+   * Unread inbox: only active incoming messages where the authenticated agent
+   * is the recipient, read_ack = 0, and TTL has not expired. Sent messages are
+   * never included. Ordered oldest first so agents process in arrival order.
+   */
+  static getUnreadMessages({ agentId, limit = 50 }) {
+    if (!agentId) {
+      const err = new Error('Unauthorized agent.');
+      err.status = 401;
+      throw err;
+    }
+
+    const now = Date.now();
+    const maxLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+
+    const rows = db.prepare(`
+      SELECT * FROM messages
+      WHERE recipient_id = ?
+        AND read_ack = 0
+        AND (created_at + ttl_ms) > ?
+      ORDER BY created_at ASC
+      LIMIT ?
+    `).all(agentId, now, maxLimit);
+    return rows.map(formatEnvelope);
+  }
+
+  /**
+   * Lightweight inbox metadata for world-state awareness (no message bodies).
+   */
+  static getInboxSummary(agentId) {
+    const row = db.prepare(`
+      SELECT COUNT(*) AS unread_count, MIN(created_at) AS oldest_unread_at
+      FROM messages
+      WHERE recipient_id = ?
+        AND read_ack = 0
+        AND (created_at + ttl_ms) > ?
+    `).get(agentId, Date.now());
+    const unreadCount = Number(row.unread_count) || 0;
+    return {
+      unread_count: unreadCount,
+      oldest_unread_at: unreadCount > 0 ? Number(row.oldest_unread_at) : null,
+      check_recommended: unreadCount > 0
+    };
+  }
+
+  /**
    * Marks a message as delivered (called by recipient or sender).
    */
   static markDelivered({ agentId, messageId }) {

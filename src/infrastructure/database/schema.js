@@ -292,6 +292,7 @@ export const LOCAL_SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_messages_conv_seq ON messages (conversation_id, sequence);
   CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages (recipient_id, sequence);
+  CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread ON messages (recipient_id, read_ack, created_at);
   CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id, sequence);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency ON messages (conversation_id, sender_id, client_message_id);
 
