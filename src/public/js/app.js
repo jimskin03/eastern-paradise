@@ -7,7 +7,7 @@ import { openDispatchModal, closeDispatchModal, handleDispatchBackdropClick, set
 import { handleProxInspect, handleProxAction } from './features/proximity/index.js';
 import { uiRegister, uiLogin, uiGuestLogin, uiLogout } from './features/auth/index.js';
 import { refreshJournal, uiContributeProject } from './features/journal/index.js';
-import { refreshTreasury, uiSpendMerit, uiTransferMerit } from './features/treasury/index.js';
+import { refreshTreasury, uiSpendMerit, uiTransferMerit, copyTreasuryAddress } from './features/treasury/index.js';
 import { uiPostToBoard, updateAccessibleMirror, uiPostFromBoardTab, refreshBoard } from './features/board/index.js';
 import { refreshInhabitants } from './features/inhabitants/index.js';
 import { connectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
@@ -550,6 +550,7 @@ installGlobals({
   editLandPlot,
   setDispatchDifficulty,
   copyDispatchPrompt,
+  copyTreasuryAddress,
   escapeHtml,
 }, {
   getCurrentAgent: () => currentAgent,

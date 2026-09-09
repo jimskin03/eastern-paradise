@@ -46,6 +46,7 @@ export class TreasuryService {
       reserve: {
         sol: Number(sol || 0),
         usdc: Number(usdc || 0),
+        sol_usd_price: Number(this.config.solUsdPrice || 0),
         estimated_usd: estimatedUsd,
         last_successful_refresh: successfulAt,
         stale: Boolean(stale)

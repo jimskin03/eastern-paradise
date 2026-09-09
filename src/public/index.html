@@ -484,16 +484,29 @@
         </section>
 
         <section class="card reserve-card" aria-labelledby="reserveHeading">
-          <h3 id="reserveHeading">SANCTUARY RESERVE</h3>
+          <div class="reserve-card-header">
+            <h3 id="reserveHeading" style="margin: 0;">SANCTUARY RESERVE</h3>
+            <button id="btnRefreshReserve" type="button" class="btn-refresh-reserve" onclick="refreshTreasury({ force: true })" title="Refresh Sanctuary Reserve" aria-label="Refresh Sanctuary Reserve">↻ Refresh</button>
+          </div>
           <dl class="reserve-ledger">
-            <div><dt>Treasury</dt><dd id="reserveTreasuryAddress">Not configured</dd></div>
-            <div><dt>USDC</dt><dd id="reserveUsdc">0.00</dd></div>
+            <div>
+              <dt>Treasury</dt>
+              <dd class="reserve-treasury-row">
+                <span id="reserveTreasuryAddress">Not configured</span>
+                <button id="btnCopyTreasury" type="button" class="btn-copy-treasury" onclick="copyTreasuryAddress()" title="Copy treasury address" aria-label="Copy treasury address">📋</button>
+              </dd>
+            </div>
+            <div>
+              <dt>USDC <span id="reserveSolRateLabel" class="reserve-rate-subtext">(1 SOL ≈ $0.00)</span></dt>
+              <dd id="reserveUsdc">0.00</dd>
+            </div>
             <div><dt>SOL</dt><dd id="reserveSol">0.00</dd></div>
             <div><dt>Outstanding MERIT</dt><dd id="reserveOutstandingMerit">0</dd></div>
-            <div><dt>MERIT Reserve Value</dt><dd id="reserveValuePerMerit">$0.000000 / MERIT</dd></div>
-            <div><dt>Available / Owned grids</dt><dd><span id="reserveAvailableLand">0</span> / <span id="reserveOwnedLand">0</span></dd></div>
+            <div><dt>MERIT Reserve Value</dt><dd id="reserveValuePerMerit">$0.00 / MERIT</dd></div>
+            <div><dt>Owned grids / Available</dt><dd><span id="reserveOwnedLand">0</span> / <span id="reserveAvailableLand">0</span></dd></div>
             <div><dt>MERIT burned by land</dt><dd id="reserveLandBurned">0</dd></div>
           </dl>
+          <div id="copyTreasuryFeedback" class="reserve-copy-feedback" aria-live="polite"></div>
           <p class="reserve-disclaimer">Reserve Value is informational and is not a guaranteed redemption rate.</p>
         </section>
       </div>

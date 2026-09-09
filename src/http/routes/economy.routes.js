@@ -6,7 +6,8 @@ export async function handleEconomyRoutes(ctx) {
   const { AuthService, EconomyManager, Treasury, world } = services;
 
   if (pathname === '/api/economy/reserve' && req.method === 'GET') {
-    return sendJson(res, 200, await Treasury.getReserve());
+    const force = parsedUrl.searchParams.get('force') === 'true' || parsedUrl.searchParams.get('force') === '1';
+    return sendJson(res, 200, await Treasury.getReserve({ force }));
   }
 
   if (pathname === '/api/economy/balance' && req.method === 'GET') {

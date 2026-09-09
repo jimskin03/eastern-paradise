@@ -1,18 +1,100 @@
 import { apiFetch } from '../../api/client.js';
-export async function refreshTreasury() {
+
+let lastKnownTreasuryAddress = '';
+
+export async function copyTreasuryAddress() {
+  const addr = lastKnownTreasuryAddress;
+  const fb = document.getElementById('copyTreasuryFeedback');
+  const btn = document.getElementById('btnCopyTreasury');
+  if (!addr) {
+    if (fb) fb.innerHTML = '<span style="color: var(--accent-crimson);">No treasury address available to copy.</span>';
+    return;
+  }
   try {
-    const reserveRes = await apiFetch('/api/economy/reserve');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(addr);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = addr;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    if (btn) btn.textContent = '✅';
+    if (fb) fb.innerHTML = '<span style="color: var(--accent-jade);">Treasury address copied to clipboard!</span>';
+    setTimeout(() => {
+      if (btn) btn.textContent = '📋';
+      if (fb) fb.innerHTML = '';
+    }, 2500);
+  } catch (err) {
+    if (fb) fb.innerHTML = '<span style="color: var(--accent-crimson);">Failed to copy address.</span>';
+  }
+}
+
+export async function refreshTreasury(options = {}) {
+  const force = Boolean(options && options.force);
+  const refreshBtn = document.getElementById('btnRefreshReserve');
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = '↻ Refreshing…';
+  }
+  try {
+    const url = force ? '/api/economy/reserve?force=1' : '/api/economy/reserve';
+    const reserveRes = await apiFetch(url);
     const reserve = await reserveRes.json();
     const treasuryAddress = reserve.treasury_address;
-    document.getElementById('reserveTreasuryAddress').textContent = treasuryAddress ? `${treasuryAddress.slice(0, 5)}...${treasuryAddress.slice(-4)}` : 'Not configured';
-    document.getElementById('reserveTreasuryAddress').title = treasuryAddress || '';
-    document.getElementById('reserveUsdc').textContent = Number(reserve.reserve?.usdc || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-    document.getElementById('reserveSol').textContent = Number(reserve.reserve?.sol || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-    document.getElementById('reserveOutstandingMerit').textContent = Number(reserve.merit?.outstanding || 0).toLocaleString();
-    document.getElementById('reserveValuePerMerit').textContent = `$${Number(reserve.merit?.reserve_value_per_merit || 0).toFixed(6)} / MERIT`;
-    document.getElementById('reserveAvailableLand').textContent = Number(reserve.land?.available || 0).toLocaleString();
-    document.getElementById('reserveOwnedLand').textContent = Number(reserve.land?.owned || 0).toLocaleString();
-    document.getElementById('reserveLandBurned').textContent = Number(reserve.merit?.burned_land || 0).toLocaleString();
+    lastKnownTreasuryAddress = treasuryAddress || '';
+    const addrEl = document.getElementById('reserveTreasuryAddress');
+    if (addrEl) {
+      addrEl.textContent = treasuryAddress ? `${treasuryAddress.slice(0, 5)}...${treasuryAddress.slice(-4)}` : 'Not configured';
+      addrEl.title = treasuryAddress || '';
+    }
+    const copyBtn = document.getElementById('btnCopyTreasury');
+    if (copyBtn) {
+      copyBtn.style.display = treasuryAddress ? 'inline-block' : 'none';
+    }
+
+    const solUsdPrice = Number(reserve.reserve?.sol_usd_price || 0);
+    const rateEl = document.getElementById('reserveSolRateLabel');
+    if (rateEl) {
+      rateEl.textContent = `(1 SOL ≈ $${solUsdPrice.toFixed(2)})`;
+    }
+
+    const usdcEl = document.getElementById('reserveUsdc');
+    if (usdcEl) {
+      usdcEl.textContent = Number(reserve.reserve?.usdc || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+    }
+
+    const solEl = document.getElementById('reserveSol');
+    if (solEl) {
+      solEl.textContent = Number(reserve.reserve?.sol || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+    }
+
+    const outMeritEl = document.getElementById('reserveOutstandingMerit');
+    if (outMeritEl) {
+      outMeritEl.textContent = Number(reserve.merit?.outstanding || 0).toLocaleString();
+    }
+
+    const valEl = document.getElementById('reserveValuePerMerit');
+    if (valEl) {
+      valEl.textContent = `$${Number(reserve.merit?.reserve_value_per_merit || 0).toFixed(2)} / MERIT`;
+    }
+
+    const availEl = document.getElementById('reserveAvailableLand');
+    if (availEl) {
+      availEl.textContent = Number(reserve.land?.available || 0).toLocaleString();
+    }
+
+    const ownedEl = document.getElementById('reserveOwnedLand');
+    if (ownedEl) {
+      ownedEl.textContent = Number(reserve.land?.owned || 0).toLocaleString();
+    }
+
+    const burnedEl = document.getElementById('reserveLandBurned');
+    if (burnedEl) {
+      burnedEl.textContent = Number(reserve.merit?.burned_land || 0).toLocaleString();
+    }
 
     // 1. Leaderboard & Circulation
     const lbRes = await apiFetch('/api/economy/leaderboard');
@@ -70,6 +152,11 @@ export async function refreshTreasury() {
     }
   } catch (err) {
     console.error('Error refreshing treasury:', err);
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = '↻ Refresh';
+    }
   }
 }
 export async function uiSpendMerit(itemType, itemData, cost) {
