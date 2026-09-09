@@ -1,4 +1,5 @@
 import { decodeBase58, isSolanaAddress } from './solana-client.js';
+import { DEFAULT_PRICE_URL } from './sol-price-oracle.js';
 
 const DEFAULT_DEVNET_RPC = 'https://api.devnet.solana.com';
 
@@ -60,6 +61,17 @@ export function loadSolanaConfig(env = process.env) {
     throw new Error('SOLANA_SOL_USD_PRICE must be a non-negative number when provided.');
   }
 
+  const solPriceOracleUrl = String(env.SOLANA_SOL_PRICE_URL || DEFAULT_PRICE_URL).trim();
+  let parsedPriceUrl;
+  try {
+    parsedPriceUrl = new URL(solPriceOracleUrl);
+  } catch {
+    throw new Error('SOLANA_SOL_PRICE_URL must be a valid http(s) URL.');
+  }
+  if (!['http:', 'https:'].includes(parsedPriceUrl.protocol)) {
+    throw new Error('SOLANA_SOL_PRICE_URL must use http or https.');
+  }
+
   return Object.freeze({
     network,
     rpcUrl,
@@ -68,6 +80,7 @@ export function loadSolanaConfig(env = process.env) {
     collectionAddress,
     nftMode,
     solUsdPrice: configuredSolUsd,
+    solPriceOracleUrl,
     usdcMint: String(env.SOLANA_USDC_MINT || '').trim(),
     metadataBaseUrl: String(env.PUBLIC_BASE_URL || 'https://simulation.cryptgregresearch.org').replace(/\/$/, ''),
     treasuryConfigured: configured(treasuryAddress),
