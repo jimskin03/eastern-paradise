@@ -87,8 +87,11 @@
         </div>
 
         <!-- Truthful, compact spectator prompt sourced from the discovery API. -->
-        <section id="happeningNowCard" class="happening-now-card" aria-live="polite" aria-label="Happening now">
-          <div class="happening-now-kicker">● SANCTUARY TRACE</div>
+        <section id="happeningNowCard" class="happening-now-card" aria-live="polite" aria-label="Happening now" aria-hidden="true">
+          <div class="happening-now-header">
+            <div class="happening-now-kicker">● SANCTUARY TRACE</div>
+            <button class="happening-now-close" type="button" onclick="toggleHappeningNow(false)" aria-label="Close sanctuary trace">×</button>
+          </div>
           <div id="happeningNowTitle" class="happening-now-title">Listening for a sanctuary trace...</div>
           <div id="happeningNowDescription" class="happening-now-description">Loading the latest public activity.</div>
           <div id="happeningNowMeta" class="happening-now-meta">Sanctuary</div>
@@ -127,6 +130,7 @@
           <button type="button" id="tabBtnConsole" onclick="openConsoleDrawer('consoleTab', this)" title="Open Systems & Agent Console">🎛️ Console</button>
           <button type="button" id="tabBtnJournal" onclick="openConsoleDrawer('journalTab', this)" title="Sanctuary Journal">📜 Journal</button>
           <button type="button" id="tabBtnFeed" onclick="openConsoleDrawer('feedTab', this)" title="Live Activity Feed">⚡ Feed</button>
+          <button type="button" id="btnHappeningNow" onclick="toggleHappeningNow()" aria-expanded="false" aria-controls="happeningNowCard" title="Show latest sanctuary trace">◉ Trace</button>
           <details class="map-tools-menu">
             <summary title="More sanctuary systems">••• More</summary>
             <div class="map-tools-menu-items">
