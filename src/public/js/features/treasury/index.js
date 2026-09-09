@@ -78,7 +78,7 @@ export async function refreshTreasury(options = {}) {
 
     const valEl = document.getElementById('reserveValuePerMerit');
     if (valEl) {
-      valEl.textContent = `$${Number(reserve.merit?.reserve_value_per_merit || 0).toFixed(2)} / MERIT`;
+      valEl.textContent = `$${Number(reserve.merit?.reserve_value_per_merit || 0).toFixed(5)} / MERIT`;
     }
 
     const availEl = document.getElementById('reserveAvailableLand');
