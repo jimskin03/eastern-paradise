@@ -123,6 +123,7 @@ export function switchTab(tabId, btn) {
   openConsoleDrawer(tabId, btn);
 }
 export function setPlayerMode(mode) {
+  if (document.body) document.body.dataset.playerMode = mode;
   document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
   const btnMap = {
     spectate: document.getElementById('btnModeSpectate'),
@@ -158,7 +159,7 @@ export function focusPlayer() {
   if (targetAgent && typeof window.gridToIso === 'function') {
     if (window.camera) {
       window.camera.mode = 'follow';
-      window.selectedAgentId = targetAgent.id;
+      if (typeof window.setSelectedAgentId === 'function') window.setSelectedAgentId(targetAgent.id);
       window.camera.targetZoom = 1.4;
     }
   }

@@ -4,7 +4,7 @@ import { sendApiError, sendJson } from '../helpers/response.js';
 
 export async function handleBeaconRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services, limits } = ctx;
-  const { db, AuthService, world, EconomyManager } = services;
+  const { db, AuthService, world, EconomyManager, eventLedger } = services;
 
   const baseUrl = getForwardedBaseUrl(req);
 
@@ -151,12 +151,48 @@ export async function handleBeaconRoutes(ctx) {
       solvedRecentCount = row?.count || 0;
     } catch (_) {}
 
+    const latestEvent = eventLedger?.getRecentEvents?.(1)?.[0] || null;
+    const activeAgent = Array.from(world.activeAgents.values())
+      .filter(agent => !agent.is_dummy && !agent.id.startsWith('resident_'))
+      .sort((a, b) => (b.last_active || 0) - (a.last_active || 0))[0] || null;
+    const recentActiveAgent = activeAgent && (Date.now() - (activeAgent.last_active || 0) < 2 * 60 * 1000)
+      ? activeAgent
+      : null;
+    const happeningNow = recentActiveAgent
+      ? {
+          kind: 'agent',
+          title: `${recentActiveAgent.name} is moving through the sanctuary`,
+          description: recentActiveAgent.public_intent || recentActiveAgent.status || 'Exploring the sanctuary',
+          actor_name: recentActiveAgent.name,
+          agent_id: recentActiveAgent.id,
+          zone_id: recentActiveAgent.zone_id || null,
+          created_at: recentActiveAgent.last_active || Date.now()
+        }
+      : latestEvent
+      ? {
+          kind: 'event',
+          title: Date.now() - latestEvent.created_at < 5 * 60 * 1000 ? 'A new trace is recorded' : 'Latest sanctuary trace',
+          description: latestEvent.description,
+          actor_name: latestEvent.actor_name || 'Sanctuary',
+          zone_id: latestEvent.zone_id || null,
+          event_id: latestEvent.id,
+          created_at: latestEvent.created_at
+        }
+      : {
+            kind: 'quiet',
+            title: 'The sanctuary is resting',
+            description: 'No new public trace has been recorded yet. The last visit is preserved in the Journal.',
+            actor_name: 'Sanctuary',
+            created_at: null
+          };
+
     return sendJson(res, 200, {
       world: 'Eastern Paradise',
       sanctuary_beacon: 'online',
       version: '1.0.0',
       online_agents: activeCount,
       resident_agents: residentCount,
+      happening_now: happeningNow,
       events: [
         'The Celestial Observatory has awakened at [36, 10]',
         'Cryptgreg Research Headquarters is operational at [32, 24] with intelligence terminal online',

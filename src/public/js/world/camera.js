@@ -2,7 +2,8 @@
 // viewport transforms and coordinate conversion. Extracted verbatim (PR #2).
 
 import {
-  camera, canvas, worldData, ISO_TILE_W, ISO_TILE_H, TILE_DEPTH, logActivity
+  camera, canvas, worldData, ISO_TILE_W, ISO_TILE_H, TILE_DEPTH, logActivity,
+  setSelectedAgentId
 } from './state.js';
 
 function gridToIso(gx, gy) {
@@ -44,7 +45,7 @@ function setSanctuaryCamera(mode) {
 
 function setCinematicFollow(agentId) {
   if (agentId) {
-    window.selectedAgentId = agentId;
+    setSelectedAgentId(agentId);
   }
   camera.mode = 'cinematic';
   camera.targetZoom = 1.48;

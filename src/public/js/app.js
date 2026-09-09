@@ -12,6 +12,7 @@ import { uiPostToBoard, updateAccessibleMirror, uiPostFromBoardTab, refreshBoard
 import { refreshInhabitants } from './features/inhabitants/index.js';
 import { connectSolanaWallet, disconnectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
 import { refreshLand, purchaseLandGrid, editLandPlot } from './features/land/index.js';
+import { initHappeningNow, refreshHappeningNow } from './features/activity/index.js';
 
     // Console navigation now lives in features/navigation.
     // In-game Puzzle Modal
@@ -553,7 +554,10 @@ installGlobals({
   copyDispatchPrompt,
   copyTreasuryAddress,
   escapeHtml,
+  refreshHappeningNow,
 }, {
   getCurrentAgent: () => currentAgent,
   setCurrentAgent: (value) => { currentAgent = value; }
 });
+
+initHappeningNow();

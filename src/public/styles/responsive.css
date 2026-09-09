@@ -113,6 +113,14 @@
     max-width: calc(100% - 1rem);
     padding: 0.55rem 0.75rem;
   }
+  .happening-now-card {
+    top: 5.9rem;
+    left: 0.5rem;
+    right: auto;
+    width: min(260px, calc(100% - 1rem));
+    padding: 0.55rem 0.7rem;
+  }
+  .happening-now-description { -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; }
   .quest-hud-widget.collapsed {
     max-width: fit-content !important;
     padding: 0.3rem 0.65rem;
@@ -162,6 +170,7 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
+  .map-tools-menu summary { font-size: 0.72rem; padding: 0.22rem 0.5rem; }
   .proximity-action-banner {
     bottom: 3.5rem;
     flex-direction: column;

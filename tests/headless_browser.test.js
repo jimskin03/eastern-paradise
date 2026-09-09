@@ -55,6 +55,12 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
   assert.match(title, /Eastern Paradise/);
   const desktopContainerStyle = await page.$eval('#mapContainer', el => window.getComputedStyle(el).aspectRatio);
   assert.match(desktopContainerStyle, /16\s*\/\s*9|1\.77/);
+  await page.waitForFunction(
+    () => document.getElementById('happeningNowTitle')?.textContent.trim().length > 0,
+    { timeout: 5000 }
+  );
+  assert.equal(await page.$eval('#happeningNowCard', el => el.getAttribute('aria-label')), 'Happening now');
+  assert.equal(await page.$eval('.map-tools-menu summary', el => el.textContent.trim()), '••• More');
 
   // 2. Open Agent Browser Console
   await page.click('#tabBtnConsole');
