@@ -63,19 +63,75 @@ export const ENDPOINT_CATALOG = [
     response_schema: {
       type: 'object',
       properties: {
+        family: { type: 'string', example: 'solana' },
         network: { type: 'string', enum: ['devnet', 'mainnet-beta'] },
         chain: { type: 'string', example: 'solana' },
         chain_label: { type: 'string', example: 'Solana devnet' },
+        production_target: { type: 'string', example: 'mainnet-beta' },
         treasury_address: { type: ['string', 'null'] },
+        public_mint: { type: ['string', 'null'] },
         usdc_mint: { type: ['string', 'null'] },
         collection_address: { type: ['string', 'null'] },
         purchase_enabled: { type: 'boolean' },
+        nft_provider: { type: 'string', enum: ['mock', 'solana'] },
         policy_version: { type: 'string' },
         rpc_cluster: { type: 'string', enum: ['devnet', 'mainnet-beta', 'custom', 'unknown'] },
+        mainnet_opt_in: { type: 'boolean' },
+        live_cluster_proven: { type: 'boolean', example: false },
+        consistency: { type: 'object' },
         risk_disclaimer: { type: 'string' },
         endpoint: { type: 'string', example: '/api/chain/config' }
       }
     }
+  },
+  {
+    path: '/api/economy/balance',
+    method: 'get',
+    category: 'Economy',
+    summary: 'Own $MERIT balance and recent ledger',
+    description: 'Authenticated agent wallet, sponsor balance, and a short recent transaction list. Foreign ?agent_id= access is rejected unless the caller has treasury_viewer or admin.',
+    auth: true
+  },
+  {
+    path: '/api/economy/transactions',
+    method: 'get',
+    category: 'Economy',
+    summary: 'Paginated own transaction ledger',
+    description: 'Cursor-paginated ledger for the authenticated agent. Stable transaction IDs. Foreign agent history requires treasury_viewer or admin.',
+    auth: true,
+    query_params: ['cursor', 'limit', 'agent_id']
+  },
+  {
+    path: '/api/economy/transfer',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Transfer $MERIT',
+    description: 'Authenticated P2P transfer. Supports Idempotency-Key. Deny-by-default roles; player may transfer their own balance.',
+    auth: true
+  },
+  {
+    path: '/api/economy/spend',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Spend $MERIT',
+    description: 'Authenticated vanity/sink spend. Supports Idempotency-Key.',
+    auth: true
+  },
+  {
+    path: '/api/economy/mint',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Mint capability (disabled)',
+    description: 'Deny-by-default mint capability. Unauthorized callers receive 403. Authorized operators still cannot execute treasury writes until explicit operator approval.',
+    auth: true
+  },
+  {
+    path: '/api/economy/burn',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Burn capability (disabled)',
+    description: 'Deny-by-default burn capability. Unauthorized callers receive 403. Authorized operators still cannot execute treasury writes until explicit operator approval.',
+    auth: true
   },
 
   // Authentication & Identity
@@ -527,9 +583,12 @@ export function buildManifest(world, obelisks = [], extras = {}) {
     puzzle_obelisks: obelisks,
     chain: {
       endpoint: '/api/chain/config',
+      family: chain.family || null,
       network: chain.network || null,
       chain_label: chain.chain_label || null,
-      policy_version: chain.policy_version || null
+      production_target: chain.production_target || null,
+      policy_version: chain.policy_version || null,
+      live_cluster_proven: chain.live_cluster_proven === true
     },
     endpoints,
     mailbox: {

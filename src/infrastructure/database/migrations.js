@@ -170,6 +170,31 @@ export const SAFE_MIGRATIONS = [
       completed_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_land_purchases_recovery ON land_purchases (status, updated_at);
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS economy_audit (
+      id TEXT PRIMARY KEY,
+      actor_id TEXT NOT NULL,
+      actor_hash TEXT NOT NULL,
+      action TEXT NOT NULL,
+      route TEXT NOT NULL,
+      amount INTEGER,
+      result TEXT NOT NULL,
+      transaction_id TEXT,
+      request_meta TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_economy_audit_created ON economy_audit (created_at);
+    CREATE TABLE IF NOT EXISTS economy_idempotency (
+      actor_id TEXT NOT NULL,
+      route TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      request_hash TEXT NOT NULL,
+      status_code INTEGER NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (actor_id, route, idempotency_key)
+    );
   `
 ];
 
