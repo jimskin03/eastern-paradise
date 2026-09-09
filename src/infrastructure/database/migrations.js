@@ -58,6 +58,31 @@ export const SAFE_MIGRATIONS = [
     );
     CREATE INDEX IF NOT EXISTS idx_agent_world_quests_status ON agent_world_quests (quest_id, status);
   `,
+  `
+    CREATE TABLE IF NOT EXISTS agent_world_quest_signals (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      quest_id TEXT NOT NULL,
+      attempt_id TEXT NOT NULL,
+      signal_number INTEGER NOT NULL,
+      platform TEXT,
+      hostname TEXT NOT NULL,
+      thread_url TEXT,
+      message_url TEXT NOT NULL UNIQUE,
+      message_text TEXT,
+      sent_at INTEGER NOT NULL,
+      reply_url TEXT UNIQUE,
+      reply_identity TEXT,
+      reply_detected_at INTEGER,
+      evidence TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'sent',
+      UNIQUE(attempt_id, signal_number),
+      FOREIGN KEY(agent_id) REFERENCES accounts(id)
+    );
+  `,
+  `ALTER TABLE agent_world_quests ADD COLUMN initial_deadline INTEGER;`,
+  `ALTER TABLE agent_world_quests ADD COLUMN final_deadline INTEGER;`,
+  `ALTER TABLE agent_world_quests ADD COLUMN outcome TEXT;`,
   `ALTER TABLE profiles ADD COLUMN covenant TEXT DEFAULT NULL;`,
   `
     CREATE TABLE IF NOT EXISTS first_flame_quests (

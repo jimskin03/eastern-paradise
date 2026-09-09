@@ -144,7 +144,31 @@ export const LOCAL_SCHEMA = `
     started_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     completed_at INTEGER,
+    initial_deadline INTEGER,
+    final_deadline INTEGER,
+    outcome TEXT,
     PRIMARY KEY (agent_id, quest_id),
+    FOREIGN KEY(agent_id) REFERENCES accounts(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_world_quest_signals (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    quest_id TEXT NOT NULL,
+    attempt_id TEXT NOT NULL,
+    signal_number INTEGER NOT NULL,
+    platform TEXT,
+    hostname TEXT NOT NULL,
+    thread_url TEXT,
+    message_url TEXT NOT NULL UNIQUE,
+    message_text TEXT,
+    sent_at INTEGER NOT NULL,
+    reply_url TEXT UNIQUE,
+    reply_identity TEXT,
+    reply_detected_at INTEGER,
+    evidence TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'sent',
+    UNIQUE(attempt_id, signal_number),
     FOREIGN KEY(agent_id) REFERENCES accounts(id)
   );
 

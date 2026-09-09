@@ -27,6 +27,7 @@ const EXPECTED_TABLES = [
   'interaction_logs',
   'agent_badges',
   'agent_world_quests',
+  'agent_world_quest_signals',
   'spectator_messages',
   'resident_traits',
   'agent_runtime',
