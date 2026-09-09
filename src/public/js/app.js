@@ -10,7 +10,7 @@ import { refreshJournal, uiContributeProject } from './features/journal/index.js
 import { refreshTreasury, uiSpendMerit, uiTransferMerit, copyTreasuryAddress } from './features/treasury/index.js';
 import { uiPostToBoard, updateAccessibleMirror, uiPostFromBoardTab, refreshBoard } from './features/board/index.js';
 import { refreshInhabitants } from './features/inhabitants/index.js';
-import { connectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
+import { connectSolanaWallet, disconnectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
 import { refreshLand, purchaseLandGrid, editLandPlot } from './features/land/index.js';
 
     // Console navigation now lives in features/navigation.
@@ -544,6 +544,7 @@ installGlobals({
   uiSpendMerit,
   uiTransferMerit,
   connectSolanaWallet,
+  disconnectSolanaWallet,
   refreshSolanaWallet,
   refreshLand,
   purchaseLandGrid,

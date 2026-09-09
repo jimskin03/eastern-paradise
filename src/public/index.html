@@ -480,6 +480,7 @@
           <label class="sr-only" for="solanaWalletChoice">Solana wallet provider</label>
           <select id="solanaWalletChoice" class="form-control"><option value="">Discovering compatible wallets…</option></select>
           <button type="button" class="btn-primary" onclick="connectSolanaWallet()">Connect Wallet</button>
+          <button type="button" id="disconnectWalletBtn" class="btn-secondary" style="display:none;" onclick="disconnectSolanaWallet()">Disconnect Wallet</button>
           <div id="walletFeedback" class="wallet-feedback" aria-live="polite"></div>
         </section>
 
