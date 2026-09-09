@@ -56,7 +56,7 @@ services:
       - key: SOLANA_TREASURY_ADDRESS
         value: "344ukhxSCRFVgjUstqxWkjfM8gMxofqxZU6o1mEqGZ3t" # PUBLIC-only wallet; no secret in repo
       - key: SOLANA_LAND_COLLECTION_ADDRESS
-        sync: false # MAINNET: collection created on mainnet via scripts/create-land-collection.mjs
+        value: "BMUj4RKqfHYzmxGysLVoucZsgACFHAaMczqh3nbbuBpW" # Mainnet Metaplex Core collection
       - key: SOLANA_USDC_MINT
         sync: false # optional override; defaults to devnet/mainnet USDC by network
       - key: SOLANA_SOL_USD_PRICE

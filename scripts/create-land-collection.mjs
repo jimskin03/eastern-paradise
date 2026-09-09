@@ -7,10 +7,10 @@ const network = String(process.env.SOLANA_NETWORK || 'devnet').trim().toLowerCas
 const allowMainnet = String(process.env.SOLANA_ALLOW_MAINNET || '').trim().toLowerCase() === 'true';
 const isMainnet = network === 'mainnet' || network === 'mainnet-beta';
 if (network !== 'devnet' && !(allowMainnet && isMainnet)) {
-  throw new Error('This setup script creates a collection on Devnet only. Mainnet collection creation requires SOLANA_ALLOW_MAINNET=true to be set explicitly.');
+  throw new Error('Collection creation requires an explicit network opt-in: SOLANA_ALLOW_MAINNET=true for Mainnet or SOLANA_NETWORK=devnet for Devnet.');
 }
 const secretValue = String(process.env.SOLANA_NFT_ISSUER_SECRET || '').trim();
-if (!secretValue) throw new Error('Set SOLANA_NFT_ISSUER_SECRET to the dedicated Devnet issuer key.');
+if (!secretValue) throw new Error('Set SOLANA_NFT_ISSUER_SECRET to the dedicated issuer key.');
 const secret = secretValue.startsWith('[') ? Uint8Array.from(JSON.parse(secretValue)) : decodeBase58(secretValue);
 if (secret.length !== 64) throw new Error('Issuer secret must contain exactly 64 bytes.');
 
@@ -27,7 +27,7 @@ const result = await createCollection(umi, {
 }).sendAndConfirm(umi);
 
 console.log(JSON.stringify({
-  network: 'devnet',
+  network,
   collection_address: String(collection.publicKey),
   transaction_signature: encodeBase58(result.signature),
   issuer_address: String(issuer.publicKey)
