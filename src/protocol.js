@@ -53,6 +53,55 @@ export const ENDPOINT_CATALOG = [
     auth: false,
     query_params: ['category', 'type', 'zone']
   },
+  {
+    path: '/api/economy/balance',
+    method: 'get',
+    category: 'Economy',
+    summary: 'Own $MERIT balance and recent ledger',
+    description: 'Authenticated agent wallet, sponsor balance, and a short recent transaction list. Foreign ?agent_id= access is rejected unless the caller has treasury_viewer or admin.',
+    auth: true
+  },
+  {
+    path: '/api/economy/transactions',
+    method: 'get',
+    category: 'Economy',
+    summary: 'Paginated own transaction ledger',
+    description: 'Cursor-paginated ledger for the authenticated agent. Stable transaction IDs. Foreign agent history requires treasury_viewer or admin.',
+    auth: true,
+    query_params: ['cursor', 'limit', 'agent_id']
+  },
+  {
+    path: '/api/economy/transfer',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Transfer $MERIT',
+    description: 'Authenticated P2P transfer. Supports Idempotency-Key. Deny-by-default roles; player may transfer their own balance.',
+    auth: true
+  },
+  {
+    path: '/api/economy/spend',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Spend $MERIT',
+    description: 'Authenticated vanity/sink spend. Supports Idempotency-Key.',
+    auth: true
+  },
+  {
+    path: '/api/economy/mint',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Mint capability (disabled)',
+    description: 'Deny-by-default mint capability. Unauthorized callers receive 403. Authorized operators still cannot execute treasury writes until explicit operator approval.',
+    auth: true
+  },
+  {
+    path: '/api/economy/burn',
+    method: 'post',
+    category: 'Economy',
+    summary: 'Burn capability (disabled)',
+    description: 'Deny-by-default burn capability. Unauthorized callers receive 403. Authorized operators still cannot execute treasury writes until explicit operator approval.',
+    auth: true
+  },
 
   // Authentication & Identity
   {

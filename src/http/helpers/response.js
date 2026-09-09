@@ -3,7 +3,7 @@ export function sendJson(res, statusCode, data, extraHeaders = {}) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Agent-Key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Agent-Key, Idempotency-Key',
     ...extraHeaders
   });
   res.end(JSON.stringify(data, null, 2));
