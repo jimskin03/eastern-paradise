@@ -39,7 +39,15 @@ export async function purchaseLandGrid(gridId, walletAddress = null) {
     if (feedback) feedback.textContent = 'Registered agents with verified wallets may purchase land.';
     return;
   }
-  if (feedback) feedback.textContent = 'Reserving grid and minting Devnet land NFT…';
+  let chainLabel = 'Solana devnet';
+  try {
+    const chainRes = await apiFetch('/api/chain/config');
+    const chain = await chainRes.json();
+    if (chain?.chain_label) chainLabel = chain.chain_label;
+  } catch (_) {
+    /* keep fail-closed default label */
+  }
+  if (feedback) feedback.textContent = `Reserving grid and minting ${chainLabel} land NFT…`;
   const idempotencyKey = crypto.randomUUID();
   try {
     const response = await apiFetch(`/api/land/${encodeURIComponent(gridId)}/purchase`, {

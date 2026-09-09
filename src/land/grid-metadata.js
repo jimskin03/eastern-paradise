@@ -1,3 +1,17 @@
+export function buildCollectionMetadata({
+  chainLabel = 'Solana devnet',
+  metadataBaseUrl = 'https://simulation.cryptgregresearch.org',
+  externalUrl = 'https://simulation.cryptgregresearch.org/'
+} = {}) {
+  return {
+    name: 'Eastern Paradise Land',
+    symbol: 'EPLAND',
+    description: `The official ${chainLabel} collection for grid ownership within Eastern Paradise.`,
+    external_url: externalUrl,
+    image: `${String(metadataBaseUrl).replace(/\/$/, '')}/api/land/collection/image`
+  };
+}
+
 export function buildGridMetadata(grid, { externalUrl = 'https://simulation.cryptgregresearch.org/' } = {}) {
   const zone = String(grid.zone_id || grid.zone || 'unknown');
   return {
