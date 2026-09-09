@@ -60,6 +60,11 @@ test('6. Headless Chromium Browser Accessibility & DOM Matrix Test', async (t) =
     { timeout: 5000 }
   );
   assert.equal(await page.$eval('#happeningNowCard', el => el.getAttribute('aria-label')), 'Happening now');
+  assert.equal(await page.$eval('#happeningNowCard', el => window.getComputedStyle(el).display), 'none');
+  await page.click('#btnHappeningNow');
+  assert.equal(await page.$eval('#happeningNowCard', el => window.getComputedStyle(el).display), 'block');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$eval('#happeningNowCard', el => window.getComputedStyle(el).display), 'none');
   assert.equal(await page.$eval('.map-tools-menu summary', el => el.textContent.trim()), '••• More');
 
   // 2. Open Agent Browser Console

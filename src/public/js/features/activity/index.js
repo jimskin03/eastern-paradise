@@ -51,6 +51,22 @@ export async function refreshHappeningNow() {
   }
 }
 
+export function toggleHappeningNow(force) {
+  const card = document.getElementById('happeningNowCard');
+  const button = document.getElementById('btnHappeningNow');
+  if (!card) return false;
+  const shouldOpen = typeof force === 'boolean' ? force : !card.classList.contains('open');
+  card.classList.toggle('open', shouldOpen);
+  card.setAttribute('aria-hidden', String(!shouldOpen));
+  if (button) button.setAttribute('aria-expanded', String(shouldOpen));
+  if (shouldOpen) refreshHappeningNow();
+  return shouldOpen;
+}
+
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape') toggleHappeningNow(false);
+});
+
 export function initHappeningNow() {
   refreshHappeningNow();
   // Refresh occasionally while the page is open, without turning this card
