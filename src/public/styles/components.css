@@ -1173,9 +1173,55 @@
 
 .land-account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
+}
+.land-account-grid > * {
+  min-width: 0;
+}
+
+.treasury-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.treasury-stats-grid > * {
+  min-width: 0;
+}
+
+.treasury-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.treasury-actions-grid > * {
+  min-width: 0;
+}
+
+#treasuryTab .card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#treasuryTab .table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 1rem;
+}
+
+.transfer-warning-banner {
+  background: rgba(231, 111, 81, 0.12);
+  border: 1px solid rgba(231, 111, 81, 0.45);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  margin: 1rem 0;
+  font-size: 0.8rem;
+  color: #ffb4a2;
+  line-height: 1.45;
 }
 
 .wallet-card h3, .reserve-card h3 { letter-spacing: .08em; color: var(--accent-gold); }

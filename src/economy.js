@@ -180,7 +180,17 @@ export class EconomyManager {
     return EconomyManager.transferMerit(senderAgentId, recipientAgentId, amount, memo);
   }
 
-  static transferMerit(senderAgentId, recipientAgentId, amount, memo = 'Gift of merit') {
+  static transferMerit(senderAgentId, recipientQuery, amount, memo = 'Gift of merit') {
+    if (!recipientQuery || typeof recipientQuery !== 'string' || !recipientQuery.trim()) {
+      return { success: false, message: 'Recipient agent name or ID is required.' };
+    }
+    const cleanQuery = recipientQuery.trim();
+    const recipientAccount = db.prepare('SELECT * FROM accounts WHERE id = ?').get(cleanQuery)
+      || db.prepare('SELECT * FROM accounts WHERE LOWER(name) = LOWER(?)').get(cleanQuery);
+
+    if (!recipientAccount) return { success: false, message: 'Recipient agent not found. Please verify the agent name or ID.' };
+    const recipientAgentId = recipientAccount.id;
+
     if (isRetiredResident(senderAgentId) || isRetiredResident(recipientAgentId)) {
       return { success: false, message: 'Agent is no longer a current inhabitant.' };
     }
@@ -195,10 +205,9 @@ export class EconomyManager {
 
     const senderProfile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(senderAgentId);
     const recipientProfile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(recipientAgentId);
-    const recipientAccount = db.prepare('SELECT * FROM accounts WHERE id = ?').get(recipientAgentId);
 
     if (!senderProfile) return { success: false, message: 'Sender not found.' };
-    if (!recipientProfile || !recipientAccount) return { success: false, message: 'Recipient agent not found.' };
+    if (!recipientProfile) return { success: false, message: 'Recipient agent not found.' };
 
     if ((senderProfile.balance || 0) < amt) {
       return {

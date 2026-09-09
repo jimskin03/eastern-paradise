@@ -67,6 +67,7 @@ test('Economy Engine: Minting, Dividends, Transfers, and Vanity Sinks', () => {
   assert.equal(bal1PostTransfer.merit_balance, 15);
   assert.equal(bal2PostTransfer.merit_balance, 10);
 
+
   // 4. Vanity & Sinks: Agent 2 spends on cosmetic aura
   const failSpend = EconomyManager.spend(acct2.id, 50, 'cosmetic_color', { color: '#f6ad55' });
   assert.equal(failSpend.success, false);
@@ -96,4 +97,14 @@ test('Economy Engine: Minting, Dividends, Transfers, and Vanity Sinks', () => {
   assert.ok(solveRes.reward.sponsor_dividend > 0);
   assert.ok(solveRes.reward.total_merit > 15);
   assert.match(solveRes.message, /\$MERIT/);
+
+  // 7. Freetext handle transfer (using agent name instead of ID)
+  const nameTransfer = EconomyManager.transfer(acct1.id, acct2.name, 5, 'Transfer by handle');
+  assert.equal(nameTransfer.success, true);
+  assert.equal(nameTransfer.recipient_name, acct2.name);
+
+  // Transfer to unknown recipient fails with helpful message
+  const unknownTransfer = EconomyManager.transfer(acct1.id, 'nonexistent_agent_999', 5);
+  assert.equal(unknownTransfer.success, false);
+  assert.match(unknownTransfer.message, /not found/i);
 });
