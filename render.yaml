@@ -34,22 +34,33 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
-      # Solana Devnet land settlement. Keep the treasury public-only; store the
-      # restricted issuer secret only in Render's encrypted environment settings.
+      # ---- Solana land settlement ----
+      # Network is devnet by default and MAINNET IS DELIBERATELY DISABLED (loadSolanaConfig
+      # throws unless SOLANA_ALLOW_MAINNET=true). To go live on mainnet, set BOTH in the Render
+      # DASHBOARD (not this file, so the repo default stays safe) AFTER the mainnet secrets below
+      # are in place:  SOLANA_NETWORK=mainnet-beta, SOLANA_ALLOW_MAINNET=true, and a MAINNET
+      # SOLANA_RPC_URL. The gate + foot-gun guard reject a devnet RPC for mainnet and vice-versa,
+      # so do NOT flip the network before SOLANA_RPC_URL / SOLANA_NFT_ISSUER_SECRET /
+      # SOLANA_LAND_COLLECTION_ADDRESS / SOLANA_TREASURY_ADDRESS are mainnet-correct, or startup
+      # throws. ROLLBACK = set SOLANA_NETWORK back to devnet and SOLANA_ALLOW_MAINNET to false.
       - key: SOLANA_NETWORK
         value: devnet
+      - key: SOLANA_ALLOW_MAINNET
+        value: "false" # deliberate opt-in; repo default is devnet-only
       - key: SOLANA_RPC_URL
-        sync: false
+        sync: false # mainnet: https://api.mainnet-beta.solana.com (public, rate-limited) or Helius/QuickNode
       - key: SOLANA_NFT_PROVIDER
-        sync: false
+        sync: false # mock | solana (solana enables real land minting)
       - key: SOLANA_NFT_ISSUER_SECRET
-        sync: false
+        sync: false # 64-byte JSON array OR base58; MAINNET = dedicated funded BURNER only
       - key: SOLANA_TREASURY_ADDRESS
-        sync: false
+        sync: false # PUBLIC-only wallet (e.g. MetaMask SOL). NEVER a server-side private key/seed.
       - key: SOLANA_LAND_COLLECTION_ADDRESS
-        sync: false
+        sync: false # MAINNET: collection created on mainnet via scripts/create-land-collection.mjs
+      - key: SOLANA_USDC_MINT
+        sync: false # optional override; defaults to devnet/mainnet USDC by network
       - key: SOLANA_SOL_USD_PRICE
-        value: "0"
+        value: "0" # set non-zero for real USD valuation (static value, not a live oracle)
       # Persistent SQLite: requires a paid plan (Starter, $7/mo) + disk ($0.25/GB/mo).
       # To activate: uncomment the disk block below, set plan: starter, and uncomment DATA_DIR.
       # - key: DATA_DIR

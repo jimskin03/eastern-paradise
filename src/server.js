@@ -157,6 +157,13 @@ eventLedger.init(evt => world.broadcast(evt));
 
 lifecycle.start();
 
+if (solanaConfig.network !== 'devnet') {
+  console.log('🚨  [SOLANA] NETWORK = ' + solanaConfig.network.toUpperCase() + ' (NOT DEVNET). REAL-FUNDS RISK ACTIVE.');
+  console.log('🚨  [SOLANA] Confirm SOLANA_TREASURY_ADDRESS is a PUBLIC cold/Phantom/multisig address (no server key).');
+  console.log('🚨  [SOLANA] Confirm SOLANA_NFT_ISSUER_SECRET is a DEDICATED funded BURNER (gas only ~0.002–0.005 SOL/mint), never a personal wallet.');
+  console.log('🚨  [SOLANA] Confirm SOLANA_LAND_COLLECTION_ADDRESS is a collection created on ' + solanaConfig.network + ' (not a devnet collection).');
+}
+
 server.listen(PORT, () => {
   console.log('\n' + '='.repeat(68));
   console.log(`🌸 Eastern Paradise Server running on http://localhost:${PORT}`);

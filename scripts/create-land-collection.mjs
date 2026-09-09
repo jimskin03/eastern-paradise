@@ -3,7 +3,12 @@ import { createCollection, mplCore } from '@metaplex-foundation/mpl-core';
 import { createSignerFromKeypair, generateSigner, signerIdentity } from '@metaplex-foundation/umi';
 import { decodeBase58, encodeBase58 } from '../src/blockchain/solana-client.js';
 
-if ((process.env.SOLANA_NETWORK || 'devnet') !== 'devnet') throw new Error('This setup script is Devnet-only.');
+const network = String(process.env.SOLANA_NETWORK || 'devnet').trim().toLowerCase();
+const allowMainnet = String(process.env.SOLANA_ALLOW_MAINNET || '').trim().toLowerCase() === 'true';
+const isMainnet = network === 'mainnet' || network === 'mainnet-beta';
+if (network !== 'devnet' && !(allowMainnet && isMainnet)) {
+  throw new Error('This setup script creates a collection on Devnet only. Mainnet collection creation requires SOLANA_ALLOW_MAINNET=true to be set explicitly.');
+}
 const secretValue = String(process.env.SOLANA_NFT_ISSUER_SECRET || '').trim();
 if (!secretValue) throw new Error('Set SOLANA_NFT_ISSUER_SECRET to the dedicated Devnet issuer key.');
 const secret = secretValue.startsWith('[') ? Uint8Array.from(JSON.parse(secretValue)) : decodeBase58(secretValue);
