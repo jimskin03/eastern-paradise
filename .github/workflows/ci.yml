@@ -33,6 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci
+          npm run build:wallet
           bash scripts/setup_puzzle_engine.sh
 
       - name: Locate Chrome or Chromium

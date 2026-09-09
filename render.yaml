@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm ci && bash scripts/setup_puzzle_engine.sh
+    buildCommand: npm ci && npm run build:wallet && bash scripts/setup_puzzle_engine.sh
     startCommand: npm start
     healthCheckPath: /api/status
     autoDeploy: true
@@ -41,7 +41,7 @@ services:
       - key: SOLANA_RPC_URL
         sync: false
       - key: SOLANA_NFT_PROVIDER
-        value: mock
+        sync: false
       - key: SOLANA_NFT_ISSUER_SECRET
         sync: false
       - key: SOLANA_TREASURY_ADDRESS

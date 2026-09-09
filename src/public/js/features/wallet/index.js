@@ -1,4 +1,11 @@
 import { apiFetch } from '../../api/client.js';
+import {
+  connectMetaMask,
+  signWithMetaMask,
+  isMetaMaskAvailable,
+  bytesToBase64,
+  formatWalletError
+} from '../../vendor/metamask-solana.bundle.js';
 
 const discovered = new Map();
 
@@ -20,23 +27,38 @@ function shortAddress(address) {
   return address ? `${address.slice(0, 4)}...${address.slice(-4)}` : '—';
 }
 
-function bytesToBase64(bytes) {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
 function renderWalletChoices() {
   const select = document.getElementById('solanaWalletChoice');
   if (!select) return;
-  const wallets = [...discovered.values()].filter(wallet => wallet.features?.['solana:signMessage']);
-  select.innerHTML = wallets.length
-    ? wallets.map(wallet => `<option value="${window.escapeHtml(wallet.name)}">${window.escapeHtml(wallet.name)}</option>`).join('')
-    : '<option value="">No compatible wallet discovered</option>';
+
+  const choices = [];
+  // MetaMask via @metamask/connect-solana
+  if (isMetaMaskAvailable() || !discovered.size) {
+    choices.push({ name: 'MetaMask', label: 'MetaMask (Solana)' });
+  }
+
+  // Generic Wallet Standard & window.solana wallets
+  for (const wallet of discovered.values()) {
+    if (wallet.name !== 'MetaMask' && wallet.features?.['solana:signMessage']) {
+      choices.push({ name: wallet.name, label: wallet.name });
+    }
+  }
+
+  if (typeof window !== 'undefined' && window.solana?.isPhantom && !discovered.has('Phantom')) {
+    choices.push({ name: 'Phantom', label: 'Phantom' });
+  }
+
+  if (choices.length === 0) {
+    choices.push({ name: 'MetaMask', label: 'MetaMask (Solana)' });
+  }
+
+  select.innerHTML = choices
+    .map(w => `<option value="${window.escapeHtml(w.name)}">${window.escapeHtml(w.label)}</option>`)
+    .join('');
 }
 
 async function signWithWalletStandard(wallet, message) {
-  const account = wallet.accounts.find(item => item.chains?.some(chain => String(chain).startsWith('solana:'))) || wallet.accounts[0];
+  const account = wallet.accounts?.find(item => item.chains?.some(chain => String(chain).startsWith('solana:'))) || wallet.accounts?.[0];
   if (!account) throw new Error('The wallet did not expose a Solana account.');
   const signMessage = wallet.features?.['solana:signMessage']?.signMessage;
   if (!signMessage) throw new Error('This wallet does not support Solana message signing.');
@@ -48,7 +70,11 @@ async function signWithLegacyWallet(provider, message) {
   const publicKey = provider.publicKey;
   if (!publicKey) throw new Error('The wallet did not expose a Solana public key.');
   const signed = await provider.signMessage(new TextEncoder().encode(message), 'utf8');
-  return { address: publicKey.toString(), signature: bytesToBase64(signed.signature || signed), providerName: provider.isMetaMask ? 'MetaMask' : (provider.isPhantom ? 'Phantom' : 'Solana Wallet') };
+  return {
+    address: publicKey.toString(),
+    signature: bytesToBase64(signed.signature || signed),
+    providerName: provider.isMetaMask ? 'MetaMask' : (provider.isPhantom ? 'Phantom' : 'Solana Wallet')
+  };
 }
 
 export async function connectSolanaWallet() {
@@ -58,31 +84,40 @@ export async function connectSolanaWallet() {
     return;
   }
   if (feedback) feedback.textContent = 'Requesting wallet connection…';
-  try {
-    const selectedName = document.getElementById('solanaWalletChoice')?.value;
-    let wallet = discovered.get(selectedName);
-    if (!wallet) wallet = [...discovered.values()].find(item => item.name?.toLowerCase().includes('metamask') && item.features?.['solana:signMessage']) || [...discovered.values()].find(item => item.features?.['solana:signMessage']);
 
+  try {
+    const selectedName = document.getElementById('solanaWalletChoice')?.value || 'MetaMask';
     let address;
     let providerName;
     let sign;
-    if (wallet) {
+
+    if (selectedName === 'MetaMask' || (!discovered.has(selectedName) && isMetaMaskAvailable())) {
+      // Primary supported path: @metamask/connect-solana
+      const mm = await connectMetaMask();
+      address = mm.address;
+      providerName = mm.providerName;
+      sign = message => signWithMetaMask(mm.wallet, mm.account, message);
+    } else if (discovered.has(selectedName)) {
+      // Generic Wallet Standard provider (e.g. Phantom, Solflare, etc.)
+      const wallet = discovered.get(selectedName);
       const connect = wallet.features?.['standard:connect']?.connect;
       if (connect) await connect();
-      const account = wallet.accounts.find(item => item.chains?.some(chain => String(chain).startsWith('solana:'))) || wallet.accounts[0];
+      const account = wallet.accounts?.find(item => item.chains?.some(chain => String(chain).startsWith('solana:'))) || wallet.accounts?.[0];
       if (!account) throw new Error('The wallet did not expose a Solana account.');
       address = account.address;
       providerName = wallet.name;
       sign = message => signWithWalletStandard(wallet, message);
     } else if (window.solana?.signMessage) {
+      // Legacy window.solana fallback (Phantom / Solflare)
       const connected = await window.solana.connect();
       address = (connected?.publicKey || window.solana.publicKey).toString();
-      providerName = window.solana.isMetaMask ? 'MetaMask' : (window.solana.isPhantom ? 'Phantom' : 'Solana Wallet');
+      providerName = window.solana.isPhantom ? 'Phantom' : (window.solana.isMetaMask ? 'MetaMask' : 'Solana Wallet');
       sign = message => signWithLegacyWallet(window.solana, message);
     } else {
-      throw new Error('No Solana Wallet Standard message-signing wallet was found. Update MetaMask or install a compatible Solana wallet.');
+      throw new Error('No Solana Wallet Standard message-signing wallet was found. Please install MetaMask or a compatible Solana wallet.');
     }
 
+    // Step 2: Request server challenge for this address
     const challengeResponse = await apiFetch('/api/wallet/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${window.currentAgent.api_key}` },
@@ -90,7 +125,11 @@ export async function connectSolanaWallet() {
     });
     const challenge = await challengeResponse.json();
     if (!challengeResponse.ok) throw new Error(challenge.message || 'Could not create wallet challenge.');
-    const signed = await sign(challenge.message);
+
+    // Step 3: Sign exact challenge bytes (no prefix or modification)
+    const signatureBase64 = typeof sign === 'function' ? await sign(challenge.message) : sign.signature;
+
+    // Step 4: Verify with server
     const verifyResponse = await apiFetch('/api/wallet/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${window.currentAgent.api_key}` },
@@ -98,17 +137,19 @@ export async function connectSolanaWallet() {
         challenge_id: challenge.challenge_id,
         wallet_address: address,
         message: challenge.message,
-        signature: signed.signature,
+        signature: signatureBase64,
         signature_encoding: 'base64'
       })
     });
     const verified = await verifyResponse.json();
     if (!verifyResponse.ok) throw new Error(verified.message || 'Wallet signature verification failed.');
+
     sessionStorage.setItem('ep_wallet_provider_name', providerName);
     if (feedback) feedback.textContent = 'Ownership verified.';
     await refreshSolanaWallet();
   } catch (error) {
-    if (feedback) feedback.textContent = error.message;
+    const formatted = formatWalletError(error);
+    if (feedback) feedback.textContent = formatted.message;
   }
 }
 
