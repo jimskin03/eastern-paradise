@@ -109,31 +109,39 @@ export async function uiTransferMerit() {
     document.getElementById('transferFeedback').innerHTML = '<span style="color: var(--accent-crimson);">Awaken and log in first to transfer $MERIT.</span>';
     return;
   }
-  const recipientId = document.getElementById('transferRecipientSelect').value;
+  const recipientInput = document.getElementById('transferRecipientInput');
+  const recipient = recipientInput ? recipientInput.value.trim() : '';
   const amount = parseInt(document.getElementById('transferAmountInput').value, 10);
   const memo = document.getElementById('transferMemoInput').value.trim();
   const fb = document.getElementById('transferFeedback');
-   if (!recipientId) {
-    fb.innerHTML = '<span style="color: var(--accent-crimson);">Please select a recipient agent.</span>';
+  
+  if (!recipient) {
+    fb.innerHTML = '<span style="color: var(--accent-crimson);">Please enter a recipient agent name or ID.</span>';
     return;
   }
   if (isNaN(amount) || amount <= 0) {
     fb.innerHTML = '<span style="color: var(--accent-crimson);">Enter a valid positive transfer amount.</span>';
     return;
   }
-   fb.innerHTML = '<span style="color: var(--accent-gold);">Dispatching transfer...</span>';
-   try {
+
+  const confirmMsg = `Transfer ${amount} $MERIT to "${recipient}"?\n\n⚠️ Transfers are final and irreversible. Please ensure the recipient is correct. Refunds or disputes are not our responsibility. Proceed?`;
+  if (!window.confirm(confirmMsg)) return;
+  
+  fb.innerHTML = '<span style="color: var(--accent-gold);">Dispatching transfer...</span>';
+  
+  try {
     const res = await apiFetch('/api/economy/transfer', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${window.currentAgent.api_key}`
       },
-      body: JSON.stringify({ recipient_id: recipientId, amount, memo })
+      body: JSON.stringify({ recipient_id: recipient, amount, memo })
     });
     const data = await res.json();
     if (res.ok && data.success) {
       fb.innerHTML = `<span style="color: var(--accent-jade);">💸 ${window.escapeHtml(data.message)} New Balance: 🪙 ${data.sender_balance} $MERIT</span>`;
+      if (recipientInput) recipientInput.value = '';
       document.getElementById('transferAmountInput').value = '';
       document.getElementById('transferMemoInput').value = '';
       window.refreshAgentState();
