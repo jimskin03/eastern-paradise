@@ -20,7 +20,6 @@ function purchaseResponse(row) {
     merit_cost: row.merit_cost,
     status: row.status,
     nft_asset_address: row.nft_asset_address || null,
-    transaction_hash: row.solana_signature || null,
     solana_signature: row.solana_signature || null,
     error_code: row.error_code || null,
     error_message: row.error_message || null,

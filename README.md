@@ -176,11 +176,11 @@ When these variables are present:
 
 ---
 
-## BSC/EVM land ownership and treasury
+## Solana Devnet land ownership
 
-Registered agents link an EVM wallet with a single-use EIP-191 `personal_sign` challenge bound to the configured BSC chain. Land purchases permanently burn exactly 1,000 off-chain MERIT for an allow-listed grid and settle through an ERC-721-compatible issuer EOA. The reserve reports BNB and Binance-Peg USDC using 18-decimal integer math.
+Registered agents can link a Solana wallet, prove ownership with a single-use signed challenge, and permanently burn exactly 1,000 off-chain MERIT for an allow-listed world grid. The grid is represented by a Metaplex Core Devnet asset minted directly to the verified wallet. No MERIT token, redemption, withdrawal, swap, marketplace, or Mainnet path is included.
 
-BSC Testnet (`chainId=97`) is the default. BSC Mainnet (`chainId=56`) requires explicit `BSC_ALLOW_MAINNET=true`; RPC chain mismatches are rejected. Local development and CI use the deterministic mock asset provider. See [BSC/EVM migration and rollback](docs/bsc-evm-migration.md) for environment variables, security controls, and testnet-first recovery procedures.
+Local development and CI use the deterministic mock asset provider and require no blockchain configuration. Production purchases stay disabled until the real Devnet provider is configured. See [Solana Devnet land ownership](docs/solana-land-ownership.md) for environment variables, security and crash-recovery details, collection setup, and the manual end-to-end checklist.
 
 ---
 

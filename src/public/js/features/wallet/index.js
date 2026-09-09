@@ -1,53 +1,177 @@
 import { apiFetch } from '../../api/client.js';
+import {
+  connectMetaMask,
+  signWithMetaMask,
+  isMetaMaskAvailable,
+  bytesToBase64,
+  formatWalletError
+} from '../../vendor/metamask-solana.bundle.js';
 
-const BSC_TESTNET_CHAIN_ID = 97;
-const BSC_MAINNET_CHAIN_ID = 56;
-const chainIdNumber = value => Number.parseInt(String(value), 16);
-function authHeaders() { return { 'Content-Type': 'application/json', Authorization: `Bearer ${window.currentAgent.api_key}` }; }
-function shortAddress(address) { return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '—'; }
-function ethereum() { if (!window.ethereum?.request) throw new Error('Install an EVM wallet such as MetaMask to continue.'); return window.ethereum; }
+const discovered = new Map();
 
-async function ensureBscChain(provider, expectedChainId = BSC_TESTNET_CHAIN_ID) {
-  const actual = chainIdNumber(await provider.request({ method: 'eth_chainId' }));
-  if (actual !== expectedChainId) throw new Error(`Wrong network. Select BSC ${expectedChainId === 97 ? 'Testnet' : 'Mainnet'} (chainId ${expectedChainId}).`);
-  return actual;
+function registerWallets(...wallets) {
+  for (const wallet of wallets.flat()) {
+    if (wallet?.name && wallet?.features) discovered.set(wallet.name, wallet);
+  }
+  renderWalletChoices();
 }
 
-export async function connectEvmWallet() {
+if (typeof window !== 'undefined') {
+  window.addEventListener('wallet-standard:register-wallet', event => {
+    if (typeof event.detail === 'function') event.detail(registerWallets);
+  });
+  window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: registerWallets }));
+}
+
+function shortAddress(address) {
+  return address ? `${address.slice(0, 4)}...${address.slice(-4)}` : '—';
+}
+
+function renderWalletChoices() {
+  const select = document.getElementById('solanaWalletChoice');
+  if (!select) return;
+
+  const choices = [];
+  // MetaMask via @metamask/connect-solana
+  if (isMetaMaskAvailable() || !discovered.size) {
+    choices.push({ name: 'MetaMask', label: 'MetaMask (Solana)' });
+  }
+
+  // Generic Wallet Standard & window.solana wallets
+  for (const wallet of discovered.values()) {
+    if (wallet.name !== 'MetaMask' && wallet.features?.['solana:signMessage']) {
+      choices.push({ name: wallet.name, label: wallet.name });
+    }
+  }
+
+  if (typeof window !== 'undefined' && window.solana?.isPhantom && !discovered.has('Phantom')) {
+    choices.push({ name: 'Phantom', label: 'Phantom' });
+  }
+
+  if (choices.length === 0) {
+    choices.push({ name: 'MetaMask', label: 'MetaMask (Solana)' });
+  }
+
+  select.innerHTML = choices
+    .map(w => `<option value="${window.escapeHtml(w.name)}">${window.escapeHtml(w.label)}</option>`)
+    .join('');
+}
+
+async function signWithWalletStandard(wallet, message) {
+  const account = wallet.accounts?.find(item => item.chains?.some(chain => String(chain).startsWith('solana:'))) || wallet.accounts?.[0];
+  if (!account) throw new Error('The wallet did not expose a Solana account.');
+  const signMessage = wallet.features?.['solana:signMessage']?.signMessage;
+  if (!signMessage) throw new Error('This wallet does not support Solana message signing.');
+  const [signed] = await signMessage({ account, message: new TextEncoder().encode(message) });
+  return { address: account.address, signature: bytesToBase64(signed.signature), providerName: wallet.name };
+}
+
+async function signWithLegacyWallet(provider, message) {
+  const publicKey = provider.publicKey;
+  if (!publicKey) throw new Error('The wallet did not expose a Solana public key.');
+  const signed = await provider.signMessage(new TextEncoder().encode(message), 'utf8');
+  return {
+    address: publicKey.toString(),
+    signature: bytesToBase64(signed.signature || signed),
+    providerName: provider.isMetaMask ? 'MetaMask' : (provider.isPhantom ? 'Phantom' : 'Solana Wallet')
+  };
+}
+
+export async function connectSolanaWallet() {
   const feedback = document.getElementById('walletFeedback');
-  if (!window.currentAgent?.api_key || window.currentAgent.is_guest) { if (feedback) feedback.textContent = 'A registered Eastern Paradise agent session is required.'; return; }
+  if (!window.currentAgent?.api_key || window.currentAgent.is_guest) {
+    if (feedback) feedback.textContent = 'A registered Eastern Paradise agent session is required.';
+    return;
+  }
+  if (feedback) feedback.textContent = 'Requesting wallet connection…';
+
   try {
-    if (feedback) feedback.textContent = 'Requesting BSC wallet connection…';
-    const provider = ethereum();
-    const [address] = await provider.request({ method: 'eth_requestAccounts' });
-    const chainId = await ensureBscChain(provider);
-    const challengeResponse = await apiFetch('/api/wallet/challenge', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ wallet_address: address }) });
+    const selectedName = document.getElementById('solanaWalletChoice')?.value || 'MetaMask';
+    let address;
+    let providerName;
+    let sign;
+
+    if (selectedName === 'MetaMask' || (!discovered.has(selectedName) && isMetaMaskAvailable())) {
+      // Primary supported path: @metamask/connect-solana
+      const mm = await connectMetaMask();
+      address = mm.address;
+      providerName = mm.providerName;
+      sign = message => signWithMetaMask(mm.wallet, mm.account, message);
+    } else if (discovered.has(selectedName)) {
+      // Generic Wallet Standard provider (e.g. Phantom, Solflare, etc.)
+      const wallet = discovered.get(selectedName);
+      const connect = wallet.features?.['standard:connect']?.connect;
+      if (connect) await connect();
+      const account = wallet.accounts?.find(item => item.chains?.some(chain => String(chain).startsWith('solana:'))) || wallet.accounts?.[0];
+      if (!account) throw new Error('The wallet did not expose a Solana account.');
+      address = account.address;
+      providerName = wallet.name;
+      sign = message => signWithWalletStandard(wallet, message);
+    } else if (window.solana?.signMessage) {
+      // Legacy window.solana fallback (Phantom / Solflare)
+      const connected = await window.solana.connect();
+      address = (connected?.publicKey || window.solana.publicKey).toString();
+      providerName = window.solana.isPhantom ? 'Phantom' : (window.solana.isMetaMask ? 'MetaMask' : 'Solana Wallet');
+      sign = message => signWithLegacyWallet(window.solana, message);
+    } else {
+      throw new Error('No Solana Wallet Standard message-signing wallet was found. Please install MetaMask or a compatible Solana wallet.');
+    }
+
+    // Step 2: Request server challenge for this address
+    const challengeResponse = await apiFetch('/api/wallet/challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${window.currentAgent.api_key}` },
+      body: JSON.stringify({ wallet_address: address })
+    });
     const challenge = await challengeResponse.json();
     if (!challengeResponse.ok) throw new Error(challenge.message || 'Could not create wallet challenge.');
-    const signature = await provider.request({ method: 'personal_sign', params: [challenge.message, address] });
-    const verifyResponse = await apiFetch('/api/wallet/verify', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ challenge_id: challenge.challenge_id, wallet_address: address, message: challenge.message, signature, chain_id: chainId }) });
+
+    // Step 3: Sign exact challenge bytes (no prefix or modification)
+    const signatureBase64 = typeof sign === 'function' ? await sign(challenge.message) : sign.signature;
+
+    // Step 4: Verify with server
+    const verifyResponse = await apiFetch('/api/wallet/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${window.currentAgent.api_key}` },
+      body: JSON.stringify({
+        challenge_id: challenge.challenge_id,
+        wallet_address: address,
+        message: challenge.message,
+        signature: signatureBase64,
+        signature_encoding: 'base64'
+      })
+    });
     const verified = await verifyResponse.json();
     if (!verifyResponse.ok) throw new Error(verified.message || 'Wallet signature verification failed.');
-    sessionStorage.setItem('ep_wallet_provider_name', 'EVM Wallet');
-    if (feedback) feedback.textContent = 'BSC ownership verified.';
-    await refreshEvmWallet();
-  } catch (error) { if (feedback) feedback.textContent = error.message || 'Wallet connection failed.'; }
+
+    sessionStorage.setItem('ep_wallet_provider_name', providerName);
+    if (feedback) feedback.textContent = 'Ownership verified.';
+    await refreshSolanaWallet();
+  } catch (error) {
+    const formatted = formatWalletError(error);
+    if (feedback) feedback.textContent = formatted.message;
+  }
 }
 
-export async function refreshEvmWallet() {
-  const status = document.getElementById('evmWalletStatus') || document.getElementById('solanaWalletStatus');
+export async function refreshSolanaWallet() {
+  renderWalletChoices();
+  const status = document.getElementById('solanaWalletStatus');
   if (!status) return;
-  if (!window.currentAgent?.api_key) { status.innerHTML = '<p>No wallet linked.</p>'; return; }
+  if (!window.currentAgent?.api_key) {
+    status.innerHTML = '<p>No wallet linked.</p>';
+    return;
+  }
   try {
     const response = await apiFetch('/api/wallet', { headers: { Authorization: `Bearer ${window.currentAgent.api_key}` } });
-    const data = await response.json(); const wallet = data.wallets?.find(item => item.is_primary) || data.wallets?.[0];
-    if (!wallet) { status.innerHTML = '<p>No wallet linked.</p>'; return; }
-    status.innerHTML = `<strong>EVM Wallet</strong><div class="wallet-address" title="${window.escapeHtml(wallet.wallet_address)}">${shortAddress(wallet.wallet_address)}</div><div class="verified-mark">✓ Ownership Verified</div><small>Network: ${window.escapeHtml(data.network)} · Land NFTs: ${wallet.land_nfts || 0}</small>`;
-  } catch { status.innerHTML = '<p>Wallet status unavailable.</p>'; }
+    const data = await response.json();
+    const wallet = data.wallets?.find(item => item.is_primary) || data.wallets?.[0];
+    if (!wallet) {
+      status.innerHTML = '<p>No wallet linked.</p>';
+      return;
+    }
+    const providerName = sessionStorage.getItem('ep_wallet_provider_name') || 'Solana Wallet';
+    status.innerHTML = `<strong>${window.escapeHtml(providerName)}</strong><div class="wallet-address" title="${wallet.wallet_address}">${shortAddress(wallet.wallet_address)}</div><div class="verified-mark">✓ Ownership Verified</div><small>Network: ${window.escapeHtml(data.network)} · Land NFTs: ${wallet.land_nfts || 0}</small>`;
+  } catch {
+    status.innerHTML = '<p>Wallet status unavailable.</p>';
+  }
 }
-
-// Backward-compatible UI exports while the DOM rolls over to EVM labels.
-export const connectSolanaWallet = connectEvmWallet;
-export const refreshSolanaWallet = refreshEvmWallet;
-window.EasternParadiseWallet = { connectEvmWallet, refreshEvmWallet };
-refreshEvmWallet();
