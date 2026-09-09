@@ -14,7 +14,8 @@ export async function handleStatusRoutes(ctx) {
       active_agents_count: world.activeAgents.size,
       connected_spectators_count: runtime.getConnectedSpectatorCount(),
       uptime_seconds: Math.floor(process.uptime()),
-      last_activity_ago_seconds: Math.floor((Date.now() - runtime.getLastActivityTime()) / 1000)
+      last_activity_ago_seconds: Math.floor((Date.now() - runtime.getLastActivityTime()) / 1000),
+      simulation: runtime.getSimulationMetrics?.()
     });
   }
 

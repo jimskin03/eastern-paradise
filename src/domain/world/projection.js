@@ -126,7 +126,9 @@ export function getAllEntitiesForSpectator(world) {
       role: agent.role || null,
       aspiration: agent.aspiration || null,
       public_intent: agent.public_intent || agent.status,
-      needs: agent.needs || null
+      needs: agent.needs || null,
+      action_state: agent.action_state || null,
+      simulation_state: agent.simulation_state || null
     })),
     zones: world.zones,
     obstacles: world.obstacles,

@@ -410,7 +410,14 @@ test('Living Sanctuary: A.Ilicia Ollama Whisper & Fallback Handling', async (t) 
   // Run tick to trigger whisper processing
   await residentManager.tick();
 
-  const processed = db.prepare('SELECT * FROM spectator_messages WHERE id = ?').get(msgId);
+  // Reply generation is deliberately detached from the simulation tick. Wait
+  // for the per-resident queue to acknowledge it instead of making every tick
+  // wait on network/LLM latency.
+  let processed = db.prepare('SELECT * FROM spectator_messages WHERE id = ?').get(msgId);
+  for (let attempt = 0; processed.delivery_status !== 'acknowledged' && attempt < 50; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 20));
+    processed = db.prepare('SELECT * FROM spectator_messages WHERE id = ?').get(msgId);
+  }
   assert.equal(processed.delivery_status, 'acknowledged');
   assert.ok(processed.response_text.length > 0);
   assert.match(processed.response_text, /(reflection|ripple|stillness|mirror|pond)/i);

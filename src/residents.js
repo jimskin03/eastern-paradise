@@ -159,6 +159,27 @@ const residentQueues = new Map(); // residentId -> Array of { whisper, res }
 const residentGenerating = new Set(); // residentId currently generating
 const enqueuedWhisperIds = new Set(); // whisperId currently queued or generating
 
+export const ResidentState = Object.freeze({
+  IDLE: 'IDLE',
+  PLAN: 'PLAN',
+  MOVE: 'MOVE',
+  ACT: 'ACT',
+  WAIT: 'WAIT'
+});
+
+const LEGACY_ACTION_STATE = Object.freeze({
+  [ResidentState.IDLE]: 'idle',
+  [ResidentState.PLAN]: 'planning',
+  [ResidentState.MOVE]: 'walking',
+  [ResidentState.ACT]: 'acting',
+  [ResidentState.WAIT]: 'waiting'
+});
+
+function residentStateFromAction(actionState) {
+  return Object.entries(LEGACY_ACTION_STATE)
+    .find(([, legacyState]) => legacyState === actionState)?.[0] || ResidentState.IDLE;
+}
+
 export class ResidentReplyQueue {
   static getQueue(residentId) {
     if (!residentQueues.has(residentId)) {
@@ -251,6 +272,14 @@ export class ResidentReplyQueue {
       res.public_intent = `Reflecting on a message from visitor ${whisper.sender_name}`;
       res.needs.social = Math.min(100, res.needs.social + 20);
       res.action_duration_ms = 3000;
+      if (typeof residentManager.transition === 'function') {
+        residentManager.transition(res, ResidentState.ACT);
+      } else {
+        // Keep the queue independently testable and compatible with focused
+        // callers that only provide persistence.
+        res.simulation_state = ResidentState.ACT;
+        res.action_state = LEGACY_ACTION_STATE[ResidentState.ACT];
+      }
       residentManager.persistRuntime(res);
       return response;
     } catch (err) {
@@ -366,6 +395,7 @@ export class ResidentManager {
         },
         path: [],
         action_state: runtimeRow.action_state || 'idle',
+        simulation_state: residentStateFromAction(runtimeRow.action_state),
         action_duration_ms: runtimeRow.action_duration_ms || 0,
         last_action_at: now,
         last_active: now,
@@ -389,17 +419,17 @@ export class ResidentManager {
   /**
    * Main AI loop executed on world simulation ticks.
    */
-  async tick() {
+  async tick({ now = Date.now(), deltaMs = 1000 } = {}) {
     if (!this.worldEngine) return;
 
-    const now = Date.now();
+    const elapsedMs = Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0);
     for (const [id, res] of this.residents.entries()) {
       // 1. If currently performing an active action with duration
       if (res.action_duration_ms > 0) {
-        res.action_duration_ms -= 1000;
+        res.action_duration_ms -= elapsedMs;
         if (res.action_duration_ms <= 0) {
           res.action_duration_ms = 0;
-          res.action_state = 'idle';
+          this.transition(res, ResidentState.IDLE);
         } else {
           continue;
         }
@@ -416,8 +446,18 @@ export class ResidentManager {
         }
       }
 
-      if (!ResidentReplyQueue.isGenerating(res.id) && ResidentReplyQueue.getQueue(res.id).length > 0) {
-        await ResidentReplyQueue.processNext(this, res);
+      if (ResidentReplyQueue.isGenerating(res.id)) {
+        this.transition(res, ResidentState.WAIT);
+        continue;
+      }
+
+      if (ResidentReplyQueue.getQueue(res.id).length > 0) {
+        this.transition(res, ResidentState.WAIT);
+        // LLM/network work is intentionally detached from the high-frequency
+        // simulation loop. The queue serializes replies per resident.
+        void ResidentReplyQueue.processNext(this, res).catch(err => {
+          console.error('[ResidentManager] Reply queue error:', err.message);
+        });
         continue;
       }
 
@@ -455,9 +495,15 @@ export class ResidentManager {
       res.needs.curiosity = Math.max(0, res.needs.curiosity - 0.3);
       res.needs.social = Math.max(0, res.needs.social - 0.3);
 
+      this.transition(res, ResidentState.PLAN);
       this.selectNextGoal(res);
       this.persistRuntime(res);
     }
+  }
+
+  transition(res, state) {
+    res.simulation_state = state;
+    res.action_state = LEGACY_ACTION_STATE[state] || LEGACY_ACTION_STATE[ResidentState.IDLE];
   }
 
   selectNextGoal(res) {
@@ -542,17 +588,17 @@ export class ResidentManager {
     const path = NavigationSystem.findPath(res.pos, targetPos, isWalkable, { allowAdjacent: true });
     res.path = path;
     if (path.length > 0) {
-      res.action_state = 'walking';
+      this.transition(res, ResidentState.MOVE);
     } else if (Math.hypot(res.pos[0] - targetPos[0], res.pos[1] - targetPos[1]) <= 1.5) {
       // Same-tile goals must complete, including the final chime repair step.
       this.executeArrivalAction(res);
     } else {
-      res.action_state = 'idle';
+      this.transition(res, ResidentState.IDLE);
     }
   }
 
   executeArrivalAction(res) {
-    res.action_state = 'acting';
+    this.transition(res, ResidentState.ACT);
     res.action_duration_ms = 4000;
 
     if (res.daily_challenge_target) {
@@ -723,7 +769,7 @@ export class ResidentManager {
   greetVisitor(res, visitor) {
     const text = `Welcome, ${visitor.name}. Even a quiet arrival sends a new ripple through the sanctuary.`;
     res.public_intent = `Welcoming ${visitor.name}`;
-    res.action_state = 'acting';
+    this.transition(res, ResidentState.ACT);
     res.action_duration_ms = 4000;
     res.needs.social = 100;
     SocialSystem.modifyRelationship(res.id, visitor.id, 4, 3);
