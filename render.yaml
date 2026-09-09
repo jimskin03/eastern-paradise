@@ -54,7 +54,7 @@ services:
       - key: SOLANA_NFT_ISSUER_SECRET
         sync: false # 64-byte JSON array OR base58; MAINNET = dedicated funded BURNER only
       - key: SOLANA_TREASURY_ADDRESS
-        sync: false # PUBLIC-only wallet (e.g. MetaMask SOL). NEVER a server-side private key/seed.
+        value: "344ukhxSCRFVgjUstqxWkjfM8gMxofqxZU6o1mEqGZ3t" # PUBLIC-only wallet; no secret in repo
       - key: SOLANA_LAND_COLLECTION_ADDRESS
         sync: false # MAINNET: collection created on mainnet via scripts/create-land-collection.mjs
       - key: SOLANA_USDC_MINT
