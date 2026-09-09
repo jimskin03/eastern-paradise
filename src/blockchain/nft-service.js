@@ -131,13 +131,12 @@ export class SolanaLandAssetProvider extends LandAssetProvider {
     try {
       const builder = core.create(this.umi, {
         asset,
-        collection: umiSdk.publicKey(this.config.collectionAddress),
+        collection: this.config.collectionAddress ? { publicKey: umiSdk.publicKey(this.config.collectionAddress) } : undefined,
         owner: umiSdk.publicKey(recipientWallet),
         name,
         uri: metadataUri,
         plugins: [{
           type: 'Attributes',
-          authority: core.pluginAuthority('None'),
           attributeList: [
             { key: 'Grid ID', value: grid.grid_id },
             { key: 'Grid X', value: String(grid.x) },
@@ -146,13 +145,13 @@ export class SolanaLandAssetProvider extends LandAssetProvider {
           ]
         }, { type: 'ImmutableMetadata' }]
       });
-      const transaction = await builder.buildAndSign(this.umi);
-      const rawSignature = await this.umi.rpc.sendTransaction(transaction);
+      const result = await builder.sendAndConfirm(this.umi);
       return {
         assetAddress: String(asset.publicKey),
-        signature: encodeBase58(rawSignature),
+        signature: encodeBase58(result.signature),
         owner: recipientWallet,
-        collectionAddress: this.config.collectionAddress
+        collectionAddress: this.config.collectionAddress,
+        alreadyConfirmed: true
       };
     } catch (error) {
       try {
@@ -189,7 +188,16 @@ export class SolanaLandAssetProvider extends LandAssetProvider {
 
   async getAssetOwner(assetAddress) {
     await this.initialize();
-    const asset = await this.sdk.core.fetchAsset(this.umi, this.sdk.umiSdk.publicKey(assetAddress));
+    let asset;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        asset = await this.sdk.core.fetchAsset(this.umi, this.sdk.umiSdk.publicKey(assetAddress));
+        break;
+      } catch (err) {
+        if (attempt === 4) throw err;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
     const updateAuthority = asset.updateAuthority;
     const collectionAddress = updateAuthority?.type === 'Collection'
       ? String(updateAuthority.address)
