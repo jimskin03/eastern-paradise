@@ -446,6 +446,7 @@ function render() {
     helpers: { gridToIso, drawTree: drawPixelTree, drawRock: drawPixelRock,
       drawNode: drawSanctuaryNode, drawAgent: drawThronglet }
   });
+  window.EasternParadiseLand?.drawLandOverlay(ctx, camera, gridToIso);
 
   // 3. Floating Speech Bubbles & In-World Thoughts
   setBubbles(bubbles.filter(b => time < b.expiresAt));

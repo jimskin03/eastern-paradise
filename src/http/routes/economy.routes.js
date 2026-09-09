@@ -3,7 +3,11 @@ import { sendJson } from '../helpers/response.js';
 
 export async function handleEconomyRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
-  const { AuthService, EconomyManager, world } = services;
+  const { AuthService, EconomyManager, Treasury, world } = services;
+
+  if (pathname === '/api/economy/reserve' && req.method === 'GET') {
+    return sendJson(res, 200, await Treasury.getReserve());
+  }
 
   if (pathname === '/api/economy/balance' && req.method === 'GET') {
     const account = AuthService.authenticate(req);

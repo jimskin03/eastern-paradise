@@ -28,6 +28,13 @@ import { attachWorldWebSocket } from './realtime/world-websocket.js';
 import { createLifecycle } from './runtime/lifecycle.js';
 import { areWeAloneQuest } from './quests/are-we-alone.js';
 import { firstFlameQuest } from './quests/first-flame.js';
+import { solanaConfig } from './blockchain/config.js';
+import { WalletAuthService } from './blockchain/wallet-auth.js';
+import { TreasuryService } from './blockchain/treasury.js';
+import { createLandAssetProvider } from './blockchain/nft-service.js';
+import { OwnershipSyncService } from './blockchain/ownership-sync.js';
+import { GridRegistry as GridRegistryService } from './land/grid-registry.js';
+import { GridPurchaseService } from './land/grid-purchase.js';
 
 export {
   sendApiError,
@@ -41,6 +48,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
+
+const WalletAuth = new WalletAuthService({ db });
+const LandAssetProvider = createLandAssetProvider(solanaConfig);
+const GridRegistry = new GridRegistryService({ db, world });
+const GridPurchase = new GridPurchaseService({
+  db,
+  assetProvider: LandAssetProvider,
+  metadataBaseUrl: solanaConfig.metadataBaseUrl,
+  collectionAddress: solanaConfig.collectionAddress || null
+});
+const OwnershipSync = new OwnershipSyncService({
+  db,
+  assetProvider: LandAssetProvider,
+  collectionAddress: solanaConfig.collectionAddress || null
+});
+const Treasury = new TreasuryService({
+  config: solanaConfig,
+  supplyProvider: () => ({
+    ...EconomyManager.getSupplyStats(),
+    land: {
+      available: db.prepare("SELECT COUNT(*) AS count FROM land_grids WHERE status = 'available'").get()?.count || 0,
+      owned: db.prepare("SELECT COUNT(*) AS count FROM land_grids WHERE status = 'owned'").get()?.count || 0
+    }
+  })
+});
 
 const services = {
   db,
@@ -65,7 +97,14 @@ const services = {
   buildInstructionsMarkdown,
   getHomepagePrompts,
   areWeAloneQuest,
-  firstFlameQuest
+  firstFlameQuest,
+  solanaConfig,
+  WalletAuth,
+  Treasury,
+  LandAssetProvider,
+  OwnershipSync,
+  GridRegistry,
+  GridPurchase
 };
 
 const limits = { checkRateLimit, checkGuestCreationLimit, checkWhisperLimit };
@@ -101,6 +140,13 @@ if (CloudStorage.isEnabled()) {
     process.exit(0);
   });
 }
+
+GridRegistry.seedInitialRegion();
+GridPurchase.recoverStuck().catch(err => console.error('[Land:Recovery] Startup reconciliation failed:', err.message));
+setInterval(() => {
+  GridPurchase.recoverStuck().catch(err => console.error('[Land:Recovery] Periodic reconciliation failed:', err.message));
+}, 5 * 60 * 1000).unref();
+setInterval(() => WalletAuth.pruneExpiredChallenges(), 10 * 60 * 1000).unref();
 
 AuthService.purgeAllGuests();
 setInterval(() => MailboxService.pruneExpired(), 10 * 60 * 1000).unref();

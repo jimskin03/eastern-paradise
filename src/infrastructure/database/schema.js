@@ -270,6 +270,65 @@ export const LOCAL_SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages (recipient_id, sequence);
   CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id, sequence);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency ON messages (conversation_id, sender_id, client_message_id);
+
+  CREATE TABLE IF NOT EXISTS wallet_links (
+    agent_id TEXT NOT NULL,
+    chain TEXT NOT NULL DEFAULT 'solana',
+    wallet_address TEXT NOT NULL UNIQUE,
+    verified_at INTEGER NOT NULL,
+    is_primary INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (agent_id, wallet_address)
+  );
+
+  CREATE TABLE IF NOT EXISTS wallet_challenges (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    nonce TEXT NOT NULL UNIQUE,
+    message TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    consumed_at INTEGER,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_wallet_challenges_expiry ON wallet_challenges (expires_at);
+
+  CREATE TABLE IF NOT EXISTS land_grids (
+    grid_id TEXT PRIMARY KEY,
+    x INTEGER NOT NULL,
+    y INTEGER NOT NULL,
+    zone_id TEXT,
+    status TEXT NOT NULL DEFAULT 'unavailable' CHECK (status IN ('unavailable', 'public', 'available', 'reserved', 'minting', 'owned')),
+    owner_agent_id TEXT,
+    owner_wallet TEXT,
+    nft_asset_address TEXT UNIQUE,
+    purchase_id TEXT,
+    purchased_at INTEGER,
+    plot_name TEXT,
+    plot_description TEXT,
+    UNIQUE(x, y)
+  );
+  CREATE INDEX IF NOT EXISTS idx_land_grids_owner_wallet ON land_grids (owner_wallet);
+  CREATE INDEX IF NOT EXISTS idx_land_grids_status ON land_grids (status);
+
+  CREATE TABLE IF NOT EXISTS land_purchases (
+    id TEXT PRIMARY KEY,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    agent_id TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    grid_id TEXT NOT NULL,
+    merit_cost INTEGER NOT NULL DEFAULT 1000 CHECK (merit_cost = 1000),
+    status TEXT NOT NULL CHECK (status IN ('created', 'reserved', 'minting', 'confirmed', 'refunding', 'refunded', 'failed')),
+    nft_asset_address TEXT,
+    solana_signature TEXT,
+    error_code TEXT,
+    error_message TEXT,
+    submit_attempts INTEGER NOT NULL DEFAULT 0,
+    last_recovery_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_land_purchases_recovery ON land_purchases (status, updated_at);
 `;
 
 export function createLocalSchema(db) {

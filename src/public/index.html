@@ -482,6 +482,31 @@
         <button class="tab-btn active" onclick="refreshTreasury()">↻ Refresh Treasury</button>
       </div>
 
+      <div class="land-account-grid">
+        <section class="card wallet-card" aria-labelledby="solanaWalletHeading">
+          <h3 id="solanaWalletHeading">SOLANA WALLET</h3>
+          <div id="solanaWalletStatus"><p>No wallet linked.</p></div>
+          <label class="sr-only" for="solanaWalletChoice">Solana wallet provider</label>
+          <select id="solanaWalletChoice" class="form-control"><option value="">Discovering compatible wallets…</option></select>
+          <button type="button" class="btn-primary" onclick="connectSolanaWallet()">Connect Wallet</button>
+          <div id="walletFeedback" class="wallet-feedback" aria-live="polite"></div>
+        </section>
+
+        <section class="card reserve-card" aria-labelledby="reserveHeading">
+          <h3 id="reserveHeading">SANCTUARY RESERVE</h3>
+          <dl class="reserve-ledger">
+            <div><dt>Treasury</dt><dd id="reserveTreasuryAddress">Not configured</dd></div>
+            <div><dt>USDC</dt><dd id="reserveUsdc">0.00</dd></div>
+            <div><dt>SOL</dt><dd id="reserveSol">0.00</dd></div>
+            <div><dt>Outstanding MERIT</dt><dd id="reserveOutstandingMerit">0</dd></div>
+            <div><dt>MERIT Reserve Value</dt><dd id="reserveValuePerMerit">$0.000000 / MERIT</dd></div>
+            <div><dt>Available / Owned grids</dt><dd><span id="reserveAvailableLand">0</span> / <span id="reserveOwnedLand">0</span></dd></div>
+            <div><dt>MERIT burned by land</dt><dd id="reserveLandBurned">0</dd></div>
+          </dl>
+          <p class="reserve-disclaimer">Reserve Value is informational and is not a guaranteed redemption rate.</p>
+        </section>
+      </div>
+
       <!-- Stats Row -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
         <div class="card" style="border-color: #ffd700;">

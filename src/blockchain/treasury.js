@@ -1,0 +1,65 @@
+import { SolanaRpcClient } from './solana-client.js';
+
+export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+
+export class TreasuryService {
+  constructor({ config, rpcClient, supplyProvider, cacheTtlMs = 60_000, now = () => Date.now() }) {
+    this.config = config;
+    this.rpcClient = rpcClient || new SolanaRpcClient({ rpcUrl: config.rpcUrl });
+    this.supplyProvider = supplyProvider;
+    this.cacheTtlMs = cacheTtlMs;
+    this.now = now;
+    this.cached = null;
+  }
+
+  async refresh() {
+    const supply = this.supplyProvider();
+    if (!this.config.treasuryConfigured) {
+      return this.format({ sol: 0, usdc: 0, successfulAt: null, stale: false, supply });
+    }
+    try {
+      const [sol, usdc] = await Promise.all([
+        this.rpcClient.getSolBalance(this.config.treasuryAddress),
+        this.rpcClient.getTokenBalance(this.config.treasuryAddress, DEVNET_USDC_MINT)
+      ]);
+      this.cached = { sol, usdc, successfulAt: this.now() };
+      return this.format({ ...this.cached, stale: false, supply });
+    } catch (error) {
+      if (this.cached) return this.format({ ...this.cached, stale: true, supply, error: error.message });
+      return this.format({ sol: 0, usdc: 0, successfulAt: null, stale: true, supply, error: error.message });
+    }
+  }
+
+  async getReserve({ force = false } = {}) {
+    if (!force && this.cached && this.now() - this.cached.successfulAt < this.cacheTtlMs) {
+      return this.format({ ...this.cached, stale: false, supply: this.supplyProvider() });
+    }
+    return this.refresh();
+  }
+
+  format({ sol, usdc, successfulAt, stale, supply, error }) {
+    const estimatedUsd = Number((usdc + sol * this.config.solUsdPrice).toFixed(6));
+    const outstanding = Number(supply.outstanding || 0);
+    return {
+      network: this.config.network,
+      treasury_address: this.config.treasuryAddress || null,
+      reserve: {
+        sol: Number(sol || 0),
+        usdc: Number(usdc || 0),
+        estimated_usd: estimatedUsd,
+        last_successful_refresh: successfulAt,
+        stale: Boolean(stale)
+      },
+      merit: {
+        outstanding,
+        minted: Number(supply.minted || 0),
+        burned: Number(supply.burned || 0),
+        burned_land: Number(supply.burnedLand || 0),
+        reserve_value_per_merit: outstanding > 0 ? estimatedUsd / outstanding : 0
+      },
+      land: supply.land || { available: 0, owned: 0 },
+      ...(error ? { warning: 'Reserve RPC unavailable; cached or zero values are shown.' } : {})
+    };
+  }
+}
+

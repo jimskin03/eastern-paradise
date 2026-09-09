@@ -4,7 +4,7 @@ import { sendApiError, sendJson } from '../helpers/response.js';
 
 export async function handleAuthRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services, limits } = ctx;
-  const { db, CloudStorage, AuthService, Mailer, sponsorDomainAllowed, domainsAllowed, world, SocialSystem } = services;
+  const { db, CloudStorage, AuthService, Mailer, sponsorDomainAllowed, domainsAllowed, world, SocialSystem, OwnershipSync } = services;
 
   if (pathname === '/api/auth/register' && req.method === 'POST') {
     const body = await parseJsonBody(req);
@@ -98,6 +98,7 @@ export async function handleAuthRoutes(ctx) {
     const body = await parseJsonBody(req);
     const auth = AuthService.login(body.agent_name, body.api_key);
     if (!auth.success) return sendJson(res, 401, auth);
+    if (OwnershipSync) await OwnershipSync.reconcileAll();
     const agentState = world.spawnOrGetAgent(auth.account, { random_spawn: true, respawn: true });
     return sendJson(res, 200, {
       success: true,
