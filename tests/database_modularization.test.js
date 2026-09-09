@@ -49,6 +49,7 @@ const EXPECTED_TABLES = [
 const EXPECTED_INDEXES = [
   'idx_messages_conv_seq',
   'idx_messages_recipient',
+  'idx_messages_recipient_unread',
   'idx_messages_sender',
   'idx_messages_idempotency',
   'idx_agent_world_quests_status',

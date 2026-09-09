@@ -400,7 +400,8 @@ test('state, interactions, and spectator projection preserve external contracts'
     };
     world.activeAgents.set(nearby.id, nearby);
     const state = world.getState(agentId);
-    assert.deepEqual(Object.keys(state).sort(), ['agent', 'current_zone', 'surroundings']);
+    assert.deepEqual(Object.keys(state).sort(), ['agent', 'current_zone', 'inbox', 'surroundings']);
+    assert.deepEqual(Object.keys(state.inbox).sort(), ['check_recommended', 'oldest_unread_at', 'unread_count']);
     assert.ok(state.surroundings.visible_agents.some(other => other.id === nearby.id && other.distance === 1));
     assert.ok(state.surroundings.interactive_nodes.length > 0);
     assert.ok(Array.isArray(state.surroundings.available_directions));
