@@ -5,28 +5,29 @@ import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { createLifecycle } from '../src/runtime/lifecycle.js';
+import { shouldRecordActivity } from '../src/http/router.js';
 import { handleAdminRoutes } from '../src/http/routes/admin.routes.js';
 
-test('Lifecycle preserves idle, spectator-aware tick, wake, and status-broadcast behavior', t => {
+test('Lifecycle serializes ticks while preserving idle, spectator-aware wake, and status behavior', async t => {
   const originalNow = Date.now;
-  const originalSetInterval = globalThis.setInterval;
-  const originalClearInterval = globalThis.clearInterval;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
   let now = 1_000;
-  const intervalCallbacks = [];
+  const scheduledCallbacks = [];
   const cleared = [];
 
   Date.now = () => now;
-  globalThis.setInterval = (callback, delay) => {
+  globalThis.setTimeout = (callback, delay) => {
     assert.equal(delay, 3_000);
     const token = { callback, delay };
-    intervalCallbacks.push(token);
+    scheduledCallbacks.push(token);
     return token;
   };
-  globalThis.clearInterval = token => cleared.push(token);
+  globalThis.clearTimeout = token => cleared.push(token);
   t.after(() => {
     Date.now = originalNow;
-    globalThis.setInterval = originalSetInterval;
-    globalThis.clearInterval = originalClearInterval;
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
   });
 
   const calls = { residentTicks: 0, ambientTicks: 0, removed: [], broadcasts: 0 };
@@ -38,7 +39,7 @@ test('Lifecycle preserves idle, spectator-aware tick, wake, and status-broadcast
     tickAmbientWandering() { calls.ambientTicks += 1; },
     removeAgent(id) { calls.removed.push(id); }
   };
-  const residentManager = { tick() { calls.residentTicks += 1; } };
+  const residentManager = { tick({ deltaMs }) { calls.residentTicks += 1; calls.deltaMs = deltaMs; } };
   let spectatorCount = 0;
   const lifecycle = createLifecycle({ world, residentManager });
   lifecycle.setRealtimeGateway({
@@ -49,26 +50,69 @@ test('Lifecycle preserves idle, spectator-aware tick, wake, and status-broadcast
   assert.equal(lifecycle.getState(), 'ACTIVE');
   assert.equal(lifecycle.getIdleTimeoutMs(), 30_000);
   lifecycle.start();
-  assert.equal(intervalCallbacks.length, 1);
+  assert.equal(scheduledCallbacks.length, 1);
 
   now += 10 * 60 * 1_000 + 1;
-  intervalCallbacks[0].callback();
+  await scheduledCallbacks[0].callback();
   assert.equal(lifecycle.getState(), 'IDLE');
-  assert.deepEqual(cleared, [intervalCallbacks[0]]);
+  assert.deepEqual(cleared, []);
   assert.equal(calls.residentTicks, 0);
 
   lifecycle.markActivity();
   assert.equal(lifecycle.getState(), 'ACTIVE');
   assert.equal(calls.broadcasts, 1);
-  assert.equal(intervalCallbacks.length, 2);
+  assert.equal(scheduledCallbacks.length, 2);
 
   spectatorCount = 1;
   now += 30_001;
-  intervalCallbacks[1].callback();
+  await scheduledCallbacks[1].callback();
   assert.equal(lifecycle.getState(), 'ACTIVE');
   assert.equal(calls.residentTicks, 1);
+  assert.equal(calls.deltaMs, 30_001);
   assert.equal(calls.ambientTicks, 1);
   assert.deepEqual(calls.removed, ['visitor']);
+});
+
+test('Lifecycle does not begin a second simulation while the first is awaiting I/O', async t => {
+  const originalSetTimeout = globalThis.setTimeout;
+  const scheduledCallbacks = [];
+  globalThis.setTimeout = (callback, delay) => {
+    const token = { callback, delay };
+    scheduledCallbacks.push(token);
+    return token;
+  };
+  t.after(() => { globalThis.setTimeout = originalSetTimeout; });
+
+  let releaseTick;
+  let residentTicks = 0;
+  const lifecycle = createLifecycle({
+    world: { activeAgents: new Map(), tickAmbientWandering() {}, removeAgent() {} },
+    residentManager: {
+      tick() {
+        residentTicks += 1;
+        return new Promise(resolve => { releaseTick = resolve; });
+      }
+    }
+  });
+
+  lifecycle.start();
+  const firstTick = scheduledCallbacks[0].callback();
+  assert.equal(lifecycle.getSimulationMetrics().tickInFlight, true);
+  assert.equal(await lifecycle.runSimulationTick(), false);
+  assert.equal(residentTicks, 1);
+
+  releaseTick();
+  await firstTick;
+  assert.equal(lifecycle.getSimulationMetrics().completedTicks, 1);
+  assert.equal(scheduledCallbacks.length, 2);
+});
+
+test('Only meaningful API traffic is counted as lifecycle activity', () => {
+  assert.equal(shouldRecordActivity('/api/auth/guest'), true);
+  assert.equal(shouldRecordActivity('/api/status'), false);
+  assert.equal(shouldRecordActivity('/api/metrics'), false);
+  assert.equal(shouldRecordActivity('/healthz'), false);
+  assert.equal(shouldRecordActivity('/js/app.js'), false);
 });
 
 test('Admin routes preserve disabled endpoint guards', async t => {

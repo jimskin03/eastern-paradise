@@ -1,14 +1,24 @@
 import { WebSocketServer, WebSocket } from 'ws';
 
+export const WEBSOCKET_HEARTBEAT_MS = 30 * 1000;
+export const MAX_WEBSOCKET_BUFFERED_BYTES = 1_000_000;
+
 export function attachWorldWebSocket({ server, world, db, lifecycle }) {
   const spectatorClients = new Set();
 
   function safeSend(client, msg) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg, err => {
-        if (err) spectatorClients.delete(client);
-      });
+    if (client.readyState !== WebSocket.OPEN) return false;
+    // ws buffers writes in memory. A slow or backgrounded browser must not be
+    // allowed to turn a busy world into an unbounded server-side queue.
+    if (client.bufferedAmount > MAX_WEBSOCKET_BUFFERED_BYTES) {
+      spectatorClients.delete(client);
+      client.close(1013, 'Spectator connection is too far behind');
+      return false;
     }
+    client.send(msg, err => {
+      if (err) spectatorClients.delete(client);
+    });
+    return true;
   }
 
   function broadcastServerStatus() {
@@ -33,11 +43,16 @@ export function attachWorldWebSocket({ server, world, db, lifecycle }) {
 
   wss.on('connection', ws => {
     lifecycle.markActivity();
+    ws.isAlive = true;
     spectatorClients.add(ws);
     console.log(`[WebSocket] Spectator connected. Active spectators: ${spectatorClients.size}`);
 
     ws.on('error', () => {
       spectatorClients.delete(ws);
+    });
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
     });
 
     const recentLogs = db.prepare(`
@@ -69,6 +84,21 @@ export function attachWorldWebSocket({ server, world, db, lifecycle }) {
       console.log(`[WebSocket] Spectator disconnected. Remaining: ${spectatorClients.size}`);
     });
   });
+
+  const heartbeatTimer = setInterval(() => {
+    for (const client of spectatorClients) {
+      if (client.isAlive === false) {
+        spectatorClients.delete(client);
+        client.terminate();
+        continue;
+      }
+      client.isAlive = false;
+      client.ping();
+    }
+  }, WEBSOCKET_HEARTBEAT_MS);
+  heartbeatTimer.unref();
+
+  wss.on('close', () => clearInterval(heartbeatTimer));
 
   return {
     wss,

@@ -43,14 +43,21 @@ const routeHandlers = [
   handleAdminRoutes
 ];
 
+const PASSIVE_PATHS = new Set(['/api/status', '/api/metrics', '/api/health', '/health', '/healthz']);
+
+// Static assets and load-balancer health checks must not keep a sleeping
+// simulation alive. Normal API requests remain a meaningful visitor signal.
+export function shouldRecordActivity(pathname) {
+  return pathname.startsWith('/api/') && !PASSIVE_PATHS.has(pathname);
+}
+
 export function createRequestHandler({ services, runtime, limits, publicDir }) {
   return async function handleRequest(req, res) {
-    runtime.markActivity();
-
     if (handleCorsPreflight(req, res)) return;
 
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
+    if (shouldRecordActivity(pathname)) runtime.markActivity();
 
     if (pathname.startsWith('/api/') && !pathname.startsWith('/api/status')) {
       const rl = limits.checkRateLimit(req);

@@ -18,6 +18,7 @@ function serializeResident(resident, services, memoryLimit) {
     current_goal: resident.current_goal,
     needs: resident.needs,
     action_state: resident.action_state,
+    simulation_state: resident.simulation_state,
     relationships: SocialSystem.getRelationshipsForAgent(resident.id),
     memories: SocialSystem.getMemoriesForAgent(resident.id, memoryLimit)
   };
