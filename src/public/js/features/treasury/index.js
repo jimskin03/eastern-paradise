@@ -55,10 +55,9 @@ export async function refreshTreasury(options = {}) {
       copyBtn.style.display = treasuryAddress ? 'inline-block' : 'none';
     }
 
-    const solUsdPrice = Number(reserve.reserve?.sol_usd_price || 0);
     const rateEl = document.getElementById('reserveSolRateLabel');
     if (rateEl) {
-      rateEl.textContent = `(1 SOL ≈ $${solUsdPrice.toFixed(2)})`;
+      rateEl.textContent = '(18 decimals)';
     }
 
     const usdcEl = document.getElementById('reserveUsdc');
@@ -68,7 +67,7 @@ export async function refreshTreasury(options = {}) {
 
     const solEl = document.getElementById('reserveSol');
     if (solEl) {
-      solEl.textContent = Number(reserve.reserve?.sol || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+      solEl.textContent = Number(reserve.reserve?.bnb || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
     }
 
     const outMeritEl = document.getElementById('reserveOutstandingMerit');

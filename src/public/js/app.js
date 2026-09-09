@@ -10,7 +10,7 @@ import { refreshJournal, uiContributeProject } from './features/journal/index.js
 import { refreshTreasury, uiSpendMerit, uiTransferMerit, copyTreasuryAddress } from './features/treasury/index.js';
 import { uiPostToBoard, updateAccessibleMirror, uiPostFromBoardTab, refreshBoard } from './features/board/index.js';
 import { refreshInhabitants } from './features/inhabitants/index.js';
-import { connectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
+import { connectEvmWallet, refreshEvmWallet } from './features/wallet/index.js';
 import { refreshLand, purchaseLandGrid, editLandPlot } from './features/land/index.js';
 
     // Console navigation now lives in features/navigation.
@@ -324,7 +324,7 @@ import { refreshLand, purchaseLandGrid, editLandPlot } from './features/land/ind
 
         // Update Machine-Readable DOM Mirror for Headless Browsers
         updateAccessibleMirror(state, prof);
-        refreshSolanaWallet();
+        refreshEvmWallet();
 
       } catch (err) {
         console.error('Error refreshing state:', err);
@@ -543,8 +543,8 @@ installGlobals({
   refreshTreasury,
   uiSpendMerit,
   uiTransferMerit,
-  connectSolanaWallet,
-  refreshSolanaWallet,
+  connectEvmWallet,
+  refreshEvmWallet,
   refreshLand,
   purchaseLandGrid,
   editLandPlot,

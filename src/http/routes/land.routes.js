@@ -12,7 +12,7 @@ function matchesAdminToken(req) {
 
 export async function handleLandRoutes(ctx) {
   const { req, res, pathname, services } = ctx;
-  const { AuthService, GridRegistry, GridPurchase, WalletAuth, OwnershipSync, solanaConfig } = services;
+  const { AuthService, GridRegistry, GridPurchase, WalletAuth, OwnershipSync, bscConfig } = services;
 
   if (pathname === '/api/land' && req.method === 'GET') {
     return sendJson(res, 200, { success: true, price_merit: 1000, grids: GridRegistry.list() });
@@ -24,7 +24,7 @@ export async function handleLandRoutes(ctx) {
       symbol: 'EPLAND',
       description: 'The official Devnet collection for grid ownership within Eastern Paradise.',
       external_url: 'https://simulation.cryptgregresearch.org/',
-      image: `${solanaConfig.metadataBaseUrl}/api/land/collection/image`
+      image: `${bscConfig.metadataBaseUrl}/api/land/collection/image`
     });
   }
 
@@ -58,7 +58,7 @@ export async function handleLandRoutes(ctx) {
 
   if (action === 'metadata' && req.method === 'GET') {
     const metadata = buildGridMetadata(grid, { externalUrl: 'https://simulation.cryptgregresearch.org/' });
-    metadata.image = `${solanaConfig.metadataBaseUrl}/api/land/${encodeURIComponent(grid.grid_id)}/image`;
+    metadata.image = `${bscConfig.metadataBaseUrl}/api/land/${encodeURIComponent(grid.grid_id)}/image`;
     res.setHeader('Cache-Control', 'public, max-age=3600');
     return sendJson(res, 200, metadata);
   }
@@ -73,7 +73,7 @@ export async function handleLandRoutes(ctx) {
   if (action === 'purchase' && req.method === 'POST') {
     const account = AuthService.authenticate(req);
     if (!account) return sendJson(res, 401, { success: false, message: 'Valid Eastern Paradise authentication is required.' });
-    if (!solanaConfig.purchaseEnabled) return sendJson(res, 503, { success: false, message: 'Land purchasing is disabled until the Devnet NFT provider is configured.' });
+    if (!bscConfig.purchaseEnabled) return sendJson(res, 503, { success: false, message: 'Land purchasing is disabled until the Devnet NFT provider is configured.' });
     const body = await parseJsonBody(req);
     const wallet = body.wallet_address || WalletAuth.listWallets(account.id).find(item => item.is_primary)?.wallet_address;
     const idempotencyKey = req.headers['idempotency-key'] || body.idempotency_key;
