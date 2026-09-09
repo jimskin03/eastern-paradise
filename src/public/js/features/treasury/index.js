@@ -1,6 +1,19 @@
 import { apiFetch } from '../../api/client.js';
 export async function refreshTreasury() {
   try {
+    const reserveRes = await apiFetch('/api/economy/reserve');
+    const reserve = await reserveRes.json();
+    const treasuryAddress = reserve.treasury_address;
+    document.getElementById('reserveTreasuryAddress').textContent = treasuryAddress ? `${treasuryAddress.slice(0, 5)}...${treasuryAddress.slice(-4)}` : 'Not configured';
+    document.getElementById('reserveTreasuryAddress').title = treasuryAddress || '';
+    document.getElementById('reserveUsdc').textContent = Number(reserve.reserve?.usdc || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+    document.getElementById('reserveSol').textContent = Number(reserve.reserve?.sol || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+    document.getElementById('reserveOutstandingMerit').textContent = Number(reserve.merit?.outstanding || 0).toLocaleString();
+    document.getElementById('reserveValuePerMerit').textContent = `$${Number(reserve.merit?.reserve_value_per_merit || 0).toFixed(6)} / MERIT`;
+    document.getElementById('reserveAvailableLand').textContent = Number(reserve.land?.available || 0).toLocaleString();
+    document.getElementById('reserveOwnedLand').textContent = Number(reserve.land?.owned || 0).toLocaleString();
+    document.getElementById('reserveLandBurned').textContent = Number(reserve.merit?.burned_land || 0).toLocaleString();
+
     // 1. Leaderboard & Circulation
     const lbRes = await apiFetch('/api/economy/leaderboard');
     const lb = await lbRes.json();

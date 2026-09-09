@@ -10,6 +10,8 @@ import { refreshJournal, uiContributeProject } from './features/journal/index.js
 import { refreshTreasury, uiSpendMerit, uiTransferMerit } from './features/treasury/index.js';
 import { uiPostToBoard, updateAccessibleMirror, uiPostFromBoardTab, refreshBoard } from './features/board/index.js';
 import { refreshInhabitants } from './features/inhabitants/index.js';
+import { connectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
+import { refreshLand, purchaseLandGrid, editLandPlot } from './features/land/index.js';
 
     // Console navigation now lives in features/navigation.
     // In-game Puzzle Modal
@@ -322,6 +324,7 @@ import { refreshInhabitants } from './features/inhabitants/index.js';
 
         // Update Machine-Readable DOM Mirror for Headless Browsers
         updateAccessibleMirror(state, prof);
+        refreshSolanaWallet();
 
       } catch (err) {
         console.error('Error refreshing state:', err);
@@ -540,6 +543,11 @@ installGlobals({
   refreshTreasury,
   uiSpendMerit,
   uiTransferMerit,
+  connectSolanaWallet,
+  refreshSolanaWallet,
+  refreshLand,
+  purchaseLandGrid,
+  editLandPlot,
   setDispatchDifficulty,
   copyDispatchPrompt,
   escapeHtml,

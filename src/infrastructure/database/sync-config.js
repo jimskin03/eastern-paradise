@@ -17,7 +17,10 @@ export const SYNC_TABLES = [
   'world_objects',
   'world_events',
   'world_clock',
-  'messages'
+  'messages',
+  'wallet_links',
+  'land_grids',
+  'land_purchases'
 ];
 
 export const TABLE_PK = {
@@ -39,5 +42,8 @@ export const TABLE_PK = {
   world_objects: 'id',
   world_events: 'id',
   world_clock: 'id',
-  messages: 'message_id'
+  messages: 'message_id',
+  wallet_links: ['agent_id', 'wallet_address'],
+  land_grids: 'grid_id',
+  land_purchases: 'id'
 };

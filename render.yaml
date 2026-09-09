@@ -34,6 +34,22 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # Solana Devnet land settlement. Keep the treasury public-only; store the
+      # restricted issuer secret only in Render's encrypted environment settings.
+      - key: SOLANA_NETWORK
+        value: devnet
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: SOLANA_NFT_PROVIDER
+        value: mock
+      - key: SOLANA_NFT_ISSUER_SECRET
+        sync: false
+      - key: SOLANA_TREASURY_ADDRESS
+        sync: false
+      - key: SOLANA_LAND_COLLECTION_ADDRESS
+        sync: false
+      - key: SOLANA_SOL_USD_PRICE
+        value: "0"
       # Persistent SQLite: requires a paid plan (Starter, $7/mo) + disk ($0.25/GB/mo).
       # To activate: uncomment the disk block below, set plan: starter, and uncomment DATA_DIR.
       # - key: DATA_DIR

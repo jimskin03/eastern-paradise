@@ -38,7 +38,11 @@ const EXPECTED_TABLES = [
   'world_clock',
   'messages',
   'first_flame_quests',
-  'first_flame_hearths'
+  'first_flame_hearths',
+  'wallet_links',
+  'wallet_challenges',
+  'land_grids',
+  'land_purchases'
 ];
 
 const EXPECTED_INDEXES = [
@@ -47,6 +51,10 @@ const EXPECTED_INDEXES = [
   'idx_messages_sender',
   'idx_messages_idempotency',
   'idx_agent_world_quests_status',
+  'idx_wallet_challenges_expiry',
+  'idx_land_grids_owner_wallet',
+  'idx_land_grids_status',
+  'idx_land_purchases_recovery',
   'idx_sync_changes_tbl_id'
 ];
 

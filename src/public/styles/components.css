@@ -1170,3 +1170,25 @@
   color: var(--accent-bamboo);
   font-weight: 500;
 }
+
+.land-account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.wallet-card h3, .reserve-card h3 { letter-spacing: .08em; color: var(--accent-gold); }
+.wallet-card .form-control { margin: .75rem 0; }
+.wallet-address { color: var(--accent-gold); font: 700 1.05rem monospace; margin: .3rem 0; }
+.verified-mark { color: var(--accent-jade); margin: .3rem 0; }
+.wallet-feedback, .land-feedback { color: var(--text-muted); font-size: .78rem; margin-top: .55rem; }
+.reserve-ledger { margin: 0; }
+.reserve-ledger > div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,.08); padding: .36rem 0; }
+.reserve-ledger dt { color: var(--text-muted); }
+.reserve-ledger dd { margin: 0; text-align: right; font-family: monospace; }
+.reserve-disclaimer { color: #f4cf87; font-size: .75rem; margin: .8rem 0 0; }
+.land-inspector { margin-top: .75rem; border: 1px solid rgba(244,207,135,.45); border-radius: 8px; padding: .75rem; background: rgba(16,45,37,.55); }
+.land-inspector.land-owned { border-color: rgba(174,120,220,.75); }
+.land-inspector.land-reserved, .land-inspector.land-minting { border-color: rgba(238,145,65,.75); }
+.land-price { color: #f4cf87; font-size: 1.1rem; font-weight: 700; margin: .4rem 0; }

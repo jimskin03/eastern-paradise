@@ -380,21 +380,44 @@ export class EconomyManager {
       LIMIT ?
     `).all(limit);
 
-    const totalCirculation = db.prepare(`
-      SELECT SUM(balance) as total_merit, SUM(total_earned) as total_minted
-      FROM (
-        SELECT balance, total_earned FROM profiles WHERE agent_id NOT IN (${RETIRED_RESIDENT_SQL})
-        UNION ALL
-        SELECT balance, total_earned FROM guest_top_scores WHERE agent_id NOT IN (SELECT id FROM accounts)
-      )
-    `).get();
+    const supply = EconomyManager.getSupplyStats();
 
     return {
       currency_name: '$MERIT',
-      total_circulation: totalCirculation?.total_merit || 0,
-      total_minted: totalCirculation?.total_minted || 0,
+      total_circulation: supply.outstanding,
+      total_minted: supply.minted,
+      total_burned: supply.burned,
+      total_land_burned: supply.burnedLand,
       top_agents: topAgents,
       top_sponsors: topSponsors
+    };
+  }
+
+  /**
+   * Authoritative Model B supply view. Outstanding MERIT is derived from the
+   * balances that currently exist, while mint/burn totals come from the ledger.
+   */
+  static getSupplyStats() {
+    const balances = db.prepare(`
+      SELECT
+        COALESCE(SUM(p.balance), 0) AS agent_balance,
+        COALESCE(SUM(a.sponsor_balance), 0) AS sponsor_balance
+      FROM accounts a
+      JOIN profiles p ON p.agent_id = a.id
+      WHERE a.id NOT IN (${RETIRED_RESIDENT_SQL})
+    `).get();
+    const ledger = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN sender_id = 'SANCTUARY_MINT' THEN amount ELSE 0 END), 0) AS minted,
+        COALESCE(SUM(CASE WHEN recipient_id = 'SANCTUARY_BURN' THEN amount ELSE 0 END), 0) AS burned,
+        COALESCE(SUM(CASE WHEN type = 'land_purchase_burn' THEN amount ELSE 0 END), 0) AS burned_land
+      FROM transactions
+    `).get();
+    return {
+      outstanding: Number(balances?.agent_balance || 0) + Number(balances?.sponsor_balance || 0),
+      minted: Number(ledger?.minted || 0),
+      burned: Number(ledger?.burned || 0),
+      burnedLand: Number(ledger?.burned_land || 0)
     };
   }
 }

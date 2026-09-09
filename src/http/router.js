@@ -18,9 +18,13 @@ import { handleStatusRoutes } from './routes/status.routes.js';
 import { handleAdminRoutes } from './routes/admin.routes.js';
 import { handlePuzzleRoutes } from './routes/puzzles.routes.js';
 import { handleBeaconRoutes } from './routes/beacon.routes.js';
+import { handleWalletRoutes } from './routes/wallet.routes.js';
+import { handleLandRoutes } from './routes/land.routes.js';
 
 const routeHandlers = [
   handleBeaconRoutes,
+  handleWalletRoutes,
+  handleLandRoutes,
   handleProtocolRoutes,
   handleAuthRoutes,
   handleAgentRoutes,

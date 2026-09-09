@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { TreasuryService } from '../src/blockchain/treasury.js';
+
+const config = { network: 'devnet', rpcUrl: 'https://example.test', treasuryAddress: 'treasury', treasuryConfigured: true, solUsdPrice: 20 };
+
+test('reserve calculation is deterministic and handles zero outstanding without division by zero', async () => {
+  const rpcClient = { getSolBalance: async () => 2, getTokenBalance: async () => 10 };
+  let supply = { outstanding: 1000, minted: 2000, burned: 1000, burnedLand: 1000 };
+  const service = new TreasuryService({ config, rpcClient, supplyProvider: () => supply });
+  let result = await service.getReserve();
+  assert.equal(result.reserve.estimated_usd, 50);
+  assert.equal(result.merit.reserve_value_per_merit, 0.05);
+  supply = { ...supply, outstanding: 0 };
+  result = await service.getReserve();
+  assert.equal(result.merit.reserve_value_per_merit, 0);
+});
+
+test('reserve RPC failure never breaks the game and stale cache is returned', async () => {
+  let fail = false;
+  const rpcClient = {
+    getSolBalance: async () => { if (fail) throw new Error('rpc down'); return 3; },
+    getTokenBalance: async () => 5
+  };
+  let now = 1000;
+  const service = new TreasuryService({ config, rpcClient, supplyProvider: () => ({ outstanding: 100 }), cacheTtlMs: 10, now: () => now });
+  const fresh = await service.getReserve();
+  assert.equal(fresh.reserve.estimated_usd, 65);
+  fail = true;
+  now += 20;
+  const stale = await service.getReserve();
+  assert.equal(stale.reserve.estimated_usd, 65);
+  assert.equal(stale.reserve.stale, true);
+  assert.match(stale.warning, /unavailable/i);
+});
+

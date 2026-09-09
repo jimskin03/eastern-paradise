@@ -646,6 +646,18 @@ function updateInspector(x, y, pinned = false, clickPos = null) {
     </div>
   `;
 
+  const landGrid = window.EasternParadiseLand?.getLandGrid(x, y);
+  if (landGrid) {
+    const landSession = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+    const shortWallet = landGrid.owner_wallet ? `${landGrid.owner_wallet.slice(0, 4)}...${landGrid.owner_wallet.slice(-4)}` : null;
+    const shortNft = landGrid.nft_asset_address ? `${landGrid.nft_asset_address.slice(0, 7)}...${landGrid.nft_asset_address.slice(-4)}` : null;
+    html += `<div class="land-inspector land-${landGrid.status}"><strong>${landGrid.status === 'owned' ? 'OWNED' : landGrid.status.toUpperCase()}</strong>
+      ${landGrid.status === 'available' ? `<div class="land-price">1,000 MERIT</div><button type="button" class="btn-primary" onclick="purchaseLandGrid('${landGrid.grid_id}')">PURCHASE</button>` : ''}
+      ${landGrid.status === 'owned' ? `<div>Agent: ${escapeHtml(landGrid.owner_agent_name || landGrid.owner_agent_id || 'Unlinked wallet')}</div><div>Wallet: ${escapeHtml(shortWallet)}</div><div>NFT: ${escapeHtml(shortNft)}</div>${landGrid.plot_name ? `<div>Plot: ${escapeHtml(landGrid.plot_name)}</div>` : ''}${landGrid.plot_description ? `<p>${escapeHtml(landGrid.plot_description)}</p>` : ''}${landGrid.owner_agent_id && landGrid.owner_agent_id === landSession?.id ? `<button type="button" class="btn-secondary" onclick="editLandPlot('${landGrid.grid_id}')">Rename / Describe Plot</button>` : ''}` : ''}
+      ${['reserved', 'minting'].includes(landGrid.status) ? '<p>Ownership settlement is in progress.</p>' : ''}
+      <div id="landPurchaseFeedback" class="land-feedback"></div></div>`;
+  }
+
   if (nodeOnTile) {
     const isHQ = nodeOnTile.id === 'cryptgreg_hq' || nodeOnTile.type === 'headquarters';
     const isTerminal = nodeOnTile.id === 'cryptgreg_terminal' || nodeOnTile.type === 'terminal';
