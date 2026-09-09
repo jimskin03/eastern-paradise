@@ -27,11 +27,13 @@ test('mainnet is DENIED without explicit opt-in (default-denied)', () => {
 test('mainnet-beta allowed ONLY with SOLANA_ALLOW_MAINNET=true AND a mainnet RPC', () => {
   const c = loadSolanaConfig(base({ SOLANA_NETWORK: 'mainnet-beta', SOLANA_ALLOW_MAINNET: 'true', SOLANA_RPC_URL: MAINNET_RPC }));
   assert.equal(c.network, 'mainnet-beta');
+  assert.equal(c.chainLabel, 'Solana mainnet-beta');
 });
 
-test('mainnet allowed with opt-in and mainnet RPC', () => {
+test('mainnet alias is accepted with opt-in and canonicalized to mainnet-beta', () => {
   const c = loadSolanaConfig(base({ SOLANA_NETWORK: 'mainnet', SOLANA_ALLOW_MAINNET: 'true', SOLANA_RPC_URL: MAINNET_RPC }));
-  assert.equal(c.network, 'mainnet');
+  assert.equal(c.network, 'mainnet-beta');
+  assert.equal(c.chainLabel, 'Solana mainnet-beta');
 });
 
 test('mainnet + opt-in but DEVNET RPC rejected (foot-gun guard)', () => {

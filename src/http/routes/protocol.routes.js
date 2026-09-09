@@ -39,7 +39,9 @@ export async function handleProtocolRoutes(ctx) {
         zone_id: n.zone_id,
         zone_name: n.zone_name
       }));
-    return sendJson(res, 200, buildManifest(world, obelisks));
+    return sendJson(res, 200, buildManifest(world, obelisks, {
+      chain: services.getPublicChainConfig?.(services.solanaConfig)
+    }));
   }
 
   if (pathname === '/api/map' && req.method === 'GET') {

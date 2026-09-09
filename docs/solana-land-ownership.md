@@ -1,13 +1,15 @@
-# Solana Devnet land ownership
+# Solana land ownership
 
 Eastern Paradise keeps MERIT entirely off-chain. A verified agent may permanently burn exactly 1,000 MERIT to acquire one allow-listed grid. A Metaplex Core asset in the official Eastern Paradise Land collection is minted directly to the linked wallet; after minting, its Solana owner is authoritative and SQLite is an index.
 
+Canonical public labels come from **`GET /api/chain/config`**. That endpoint exposes only network, chain label, public treasury address, public mint, collection address, purchase enablement, policy version, RPC cluster class, and a risk disclaimer. It never returns RPC URLs, issuer secrets, or API keys. UI copy, collection metadata, and documentation must follow that payload so Devnet and mainnet-beta labels cannot contradict each other.
+
 ## Configuration
 
-Copy the values in `.env.example` into the deployment environment. `SOLANA_NETWORK` is restricted to `devnet` in this release.
+Copy the values in `.env.example` into the deployment environment. Repository defaults are fail-closed **devnet**. `SOLANA_NETWORK=mainnet-beta` is rejected unless `SOLANA_ALLOW_MAINNET=true` is set explicitly and `SOLANA_RPC_URL` is a matching mainnet RPC. The alias `mainnet` is accepted only with the same opt-in and is canonicalized to `mainnet-beta`.
 
-- `SOLANA_RPC_URL`: configurable Devnet JSON-RPC endpoint.
-- `SOLANA_NFT_PROVIDER`: `mock` for tests/local development, `solana` for the Devnet adapter.
+- `SOLANA_RPC_URL`: JSON-RPC endpoint for the configured cluster. Do not point a mainnet network at a devnet RPC (or the reverse); startup fails closed.
+- `SOLANA_NFT_PROVIDER`: `mock` for tests/local development, `solana` for the live adapter on the configured cluster.
 - `SOLANA_NFT_ISSUER_SECRET`: 64-byte JSON array or base58 secret for a dedicated, low-balance operational issuer. Never use the treasury key and never expose this value to browser JavaScript.
 - `SOLANA_TREASURY_ADDRESS`: public address only. The web application never needs its secret.
 - `SOLANA_LAND_COLLECTION_ADDRESS`: Metaplex Core collection created for Eastern Paradise Land.
@@ -30,7 +32,7 @@ The Core asset records grid ID, X, Y, and world as on-chain Attributes with no p
 2. Fund only that public address with enough Devnet SOL for the expected pilot mints.
 3. Set `SOLANA_NFT_ISSUER_SECRET`, `SOLANA_RPC_URL`, and `PUBLIC_BASE_URL` in a private shell/session.
 4. Run `node scripts/create-land-collection.mjs`. Record the printed public collection address in `SOLANA_LAND_COLLECTION_ADDRESS`; never record or print the secret.
-5. Set `SOLANA_NFT_PROVIDER=solana`, restart, and confirm `/api/economy/reserve` reports `devnet`.
+5. Set `SOLANA_NFT_PROVIDER=solana`, restart, and confirm `GET /api/chain/config` reports `network` and `chain_label` for the intended cluster (`devnet` locally). Never assume production is mainnet-beta from this document.
 
 ## Manual end-to-end checklist
 
@@ -50,4 +52,4 @@ The Core asset records grid ID, X, Y, and world as on-chain Attributes with no p
 - Adds read-only Devnet treasury NAV and Model B MERIT supply reporting.
 - Adds an explicit pilot grid registry, 1,000-MERIT purchase state machine, Metaplex Core provider seam, crash recovery, and chain-authoritative ownership sync.
 - Adds local/Turso schemas, delta sync for durable ownership data, metadata/image endpoints, map overlays, owner plot profile fields, documentation, and deterministic mock tests.
-- Explicitly does not add a MERIT token, redemption, withdrawals, swaps, marketplace, rent, staking, yield, royalties, or Mainnet support.
+- Explicitly does not add a MERIT token, redemption, withdrawals, swaps, marketplace, rent, staking, yield, royalties, or any guaranteed-value promise. Mainnet-beta remains opt-in and fail-closed.

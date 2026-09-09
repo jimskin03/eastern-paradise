@@ -1,20 +1,35 @@
 import { decodeBase58, isSolanaAddress } from './solana-client.js';
 import { DEFAULT_PRICE_URL } from './sol-price-oracle.js';
+import { DEVNET_USDC_MINT, MAINNET_USDC_MINT } from './mints.js';
 
 const DEFAULT_DEVNET_RPC = 'https://api.devnet.solana.com';
+export const DEFAULT_CHAIN_POLICY_VERSION = 'ep-chain-policy-v1';
+export const CHAIN_RISK_DISCLAIMER = 'Eastern Paradise $MERIT is an in-simulation score. This configuration does not offer redemption, withdrawal, backing, guaranteed value, or profit. Chain labels describe the configured Solana cluster only.';
 
 function configured(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+export function classifyRpcCluster(rpcUrl) {
+  try {
+    const host = new URL(rpcUrl).hostname.toLowerCase();
+    if (host.includes('devnet')) return 'devnet';
+    if (host.includes('mainnet-beta') || host.includes('mainnet')) return 'mainnet-beta';
+    return 'custom';
+  } catch {
+    return 'unknown';
+  }
+}
+
 export function loadSolanaConfig(env = process.env) {
-  const network = String(env.SOLANA_NETWORK || 'devnet').trim().toLowerCase();
+  let network = String(env.SOLANA_NETWORK || 'devnet').trim().toLowerCase();
   const allowMainnet = String(env.SOLANA_ALLOW_MAINNET || '').trim().toLowerCase() === 'true';
   const isMainnet = network === 'mainnet' || network === 'mainnet-beta';
   const networkAllowed = network === 'devnet' || (allowMainnet && isMainnet);
   if (!networkAllowed) {
     throw new Error('SOLANA_NETWORK must be devnet for this release. Mainnet is intentionally disabled; enabling it requires SOLANA_ALLOW_MAINNET=true to be set explicitly.');
   }
+  if (isMainnet) network = 'mainnet-beta';
 
   const rpcUrl = String(env.SOLANA_RPC_URL || DEFAULT_DEVNET_RPC).trim();
   let parsedRpc;
@@ -72,8 +87,13 @@ export function loadSolanaConfig(env = process.env) {
     throw new Error('SOLANA_SOL_PRICE_URL must use http or https.');
   }
 
+  const policyVersion = String(env.CHAIN_POLICY_VERSION || DEFAULT_CHAIN_POLICY_VERSION).trim() || DEFAULT_CHAIN_POLICY_VERSION;
+  const chainLabel = network === 'devnet' ? 'Solana devnet' : 'Solana mainnet-beta';
+
   return Object.freeze({
     network,
+    chainLabel,
+    policyVersion,
     rpcUrl,
     issuerSecret,
     treasuryAddress,
@@ -86,6 +106,24 @@ export function loadSolanaConfig(env = process.env) {
     treasuryConfigured: configured(treasuryAddress),
     mintingConfigured: nftMode === 'solana',
     purchaseEnabled: nftMode === 'solana' || env.NODE_ENV !== 'production' || String(env.SOLANA_ALLOW_MOCK_LAND_PURCHASES || '').toLowerCase() === 'true'
+  });
+}
+
+export function getPublicChainConfig(config) {
+  const usdcMint = config.usdcMint || (config.network === 'devnet' ? DEVNET_USDC_MINT : MAINNET_USDC_MINT);
+  return Object.freeze({
+    network: config.network,
+    chain: 'solana',
+    chain_label: config.chainLabel || (config.network === 'devnet' ? 'Solana devnet' : 'Solana mainnet-beta'),
+    treasury_address: config.treasuryConfigured ? (config.treasuryAddress || null) : null,
+    usdc_mint: usdcMint || null,
+    collection_address: config.collectionAddress || null,
+    purchase_enabled: Boolean(config.purchaseEnabled),
+    nft_provider: config.nftMode,
+    policy_version: config.policyVersion || DEFAULT_CHAIN_POLICY_VERSION,
+    rpc_cluster: classifyRpcCluster(config.rpcUrl),
+    risk_disclaimer: CHAIN_RISK_DISCLAIMER,
+    endpoint: '/api/chain/config'
   });
 }
 

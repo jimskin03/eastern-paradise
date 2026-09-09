@@ -2,6 +2,7 @@ import { handleCorsPreflight } from './middleware/cors.js';
 import { sendApiError, sendJson } from './helpers/response.js';
 import { serveStaticFile } from './helpers/static-files.js';
 import { handleProtocolRoutes } from './routes/protocol.routes.js';
+import { handleChainRoutes } from './routes/chain.routes.js';
 import { handleAuthRoutes } from './routes/auth.routes.js';
 import { handleAgentRoutes } from './routes/agent.routes.js';
 import { handleWorldRoutes } from './routes/world.routes.js';
@@ -25,6 +26,7 @@ const routeHandlers = [
   handleBeaconRoutes,
   handleWalletRoutes,
   handleLandRoutes,
+  handleChainRoutes,
   handleProtocolRoutes,
   handleAuthRoutes,
   handleAgentRoutes,

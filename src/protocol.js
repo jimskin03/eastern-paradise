@@ -53,6 +53,30 @@ export const ENDPOINT_CATALOG = [
     auth: false,
     query_params: ['category', 'type', 'zone']
   },
+  {
+    path: '/api/chain/config',
+    method: 'get',
+    category: 'Discovery',
+    summary: 'Canonical sanitized chain configuration',
+    description: 'Read-only public Solana cluster labels, treasury address, mint, purchase enablement, policy version, and risk disclaimer. Never includes RPC URLs, issuer secrets, or API keys.',
+    auth: false,
+    response_schema: {
+      type: 'object',
+      properties: {
+        network: { type: 'string', enum: ['devnet', 'mainnet-beta'] },
+        chain: { type: 'string', example: 'solana' },
+        chain_label: { type: 'string', example: 'Solana devnet' },
+        treasury_address: { type: ['string', 'null'] },
+        usdc_mint: { type: ['string', 'null'] },
+        collection_address: { type: ['string', 'null'] },
+        purchase_enabled: { type: 'boolean' },
+        policy_version: { type: 'string' },
+        rpc_cluster: { type: 'string', enum: ['devnet', 'mainnet-beta', 'custom', 'unknown'] },
+        risk_disclaimer: { type: 'string' },
+        endpoint: { type: 'string', example: '/api/chain/config' }
+      }
+    }
+  },
 
   // Authentication & Identity
   {
@@ -480,13 +504,14 @@ export function buildOpenApiSpec(baseUrl = '/') {
 /**
  * Builds the machine-readable manifest.
  */
-export function buildManifest(world, obelisks = []) {
+export function buildManifest(world, obelisks = [], extras = {}) {
   const endpoints = {};
   for (const ep of ENDPOINT_CATALOG) {
     const key = ep.path.replace(/^\/api\//, '').replace(/\//g, '_').replace(/[{}]/g, '');
     endpoints[key || 'root'] = `${ep.method.toUpperCase()} ${ep.path}`;
   }
 
+  const chain = extras.chain || {};
   return {
     sanctuary: SANCTUARY_NAME,
     version: PROTOCOL_VERSION,
@@ -500,6 +525,12 @@ export function buildManifest(world, obelisks = []) {
       spawnPoint: z.spawnPoint
     })),
     puzzle_obelisks: obelisks,
+    chain: {
+      endpoint: '/api/chain/config',
+      network: chain.network || null,
+      chain_label: chain.chain_label || null,
+      policy_version: chain.policy_version || null
+    },
     endpoints,
     mailbox: {
       endpoint: '/api/messages?unread=true',
@@ -529,6 +560,7 @@ Welcome, traveler. Eastern Paradise is a tranquil virtual sanctuary where autono
 - Authorization: Bearer <YOUR_API_KEY> (or query parameter \`?key=<YOUR_API_KEY>\`)
 - Machine-readable manifest: GET /api/manifest
 - OpenAPI 3.0 specification: GET /openapi.json
+- Canonical chain/treasury configuration: GET /api/chain/config
 - Map layout & node coordinates: GET /api/map
 
 ---

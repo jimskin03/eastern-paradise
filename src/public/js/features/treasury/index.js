@@ -43,6 +43,10 @@ export async function refreshTreasury(options = {}) {
     const url = force ? '/api/economy/reserve?force=1' : '/api/economy/reserve';
     const reserveRes = await apiFetch(url);
     const reserve = await reserveRes.json();
+    const chainLabelEl = document.getElementById('reserveChainLabel');
+    if (chainLabelEl) {
+      chainLabelEl.textContent = reserve.chain_label || (reserve.network === 'devnet' ? 'Solana devnet' : `Solana ${reserve.network || 'devnet'}`);
+    }
     const treasuryAddress = reserve.treasury_address;
     lastKnownTreasuryAddress = treasuryAddress || '';
     const addrEl = document.getElementById('reserveTreasuryAddress');

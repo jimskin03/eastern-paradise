@@ -1,8 +1,8 @@
 import { SolanaRpcClient } from './solana-client.js';
 import { SolPriceOracle } from './sol-price-oracle.js';
+import { DEVNET_USDC_MINT, MAINNET_USDC_MINT } from './mints.js';
 
-export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-export const MAINNET_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+export { DEVNET_USDC_MINT, MAINNET_USDC_MINT };
 
 export class TreasuryService {
   constructor({ config, rpcClient, priceOracle, supplyProvider, cacheTtlMs = 60_000, now = () => Date.now() }) {
@@ -54,6 +54,7 @@ export class TreasuryService {
     const outstanding = Number(supply.outstanding || 0);
     return {
       network: this.config.network,
+      chain_label: this.config.chainLabel || (this.config.network === 'devnet' ? 'Solana devnet' : 'Solana mainnet-beta'),
       treasury_address: this.config.treasuryAddress || null,
       reserve: {
         sol: Number(sol || 0),
