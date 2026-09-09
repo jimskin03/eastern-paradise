@@ -44,9 +44,9 @@ services:
       # SOLANA_LAND_COLLECTION_ADDRESS / SOLANA_TREASURY_ADDRESS are mainnet-correct, or startup
       # throws. ROLLBACK = set SOLANA_NETWORK back to devnet and SOLANA_ALLOW_MAINNET to false.
       - key: SOLANA_NETWORK
-        value: devnet
+        sync: false # set explicitly in Render; repo fallback remains devnet
       - key: SOLANA_ALLOW_MAINNET
-        value: "false" # deliberate opt-in; repo default is devnet-only
+        sync: false # explicit production opt-in; keep false unless Mainnet is intended
       - key: SOLANA_RPC_URL
         sync: false # mainnet: https://api.mainnet-beta.solana.com (public, rate-limited) or Helius/QuickNode
       - key: SOLANA_NFT_PROVIDER
