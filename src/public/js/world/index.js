@@ -9,7 +9,7 @@ import * as state from './state.js';
 import soundSystem from './audio.js';
 import {
   gridToIso, isoToGrid, fitTerrariumCamera, setSanctuaryCamera, zoomSanctuary,
-  toggleSanctuaryExpanded, toggleCameraMode, updateCanvasDimensions
+  toggleSanctuaryExpanded, toggleCameraMode, updateCanvasDimensions, setCinematicFollow
 } from './camera.js';
 import { initWebSocket } from './websocket.js';
 import * as inspector from './inspector.js';
@@ -30,6 +30,7 @@ window.gridToIso = gridToIso;
 window.isoToGrid = isoToGrid;
 window.fitTerrariumCamera = fitTerrariumCamera;
 window.focusAilicia = inspector.focusAilicia;
+window.focusAgentInCinematic = setCinematicFollow;
 window.focusNearestObelisk = inspector.focusNearestObelisk;
 window.focusTruthMonolith = inspector.focusTruthMonolith;
 window.openAgentProfileInspector = inspector.openAgentProfileInspector;
@@ -38,6 +39,7 @@ window.closeInspectorModal = inspector.closeInspectorModal;
 window.isInspectorModalOpen = inspector.isInspectorModalOpen;
 window.handleInspectorBackdropClick = inspector.handleInspectorBackdropClick;
 window.clearSelectedAgent = inspector.clearSelectedAgent;
+window.setSelectedAgentId = state.setSelectedAgentId;
 window.inspectAgentFromRoster = inspector.inspectAgentFromRoster;
 window.submitWhisperToAgent = inspector.submitWhisperToAgent;
 window.inspectTile = inspector.inspectTile;

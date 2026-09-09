@@ -48,6 +48,14 @@ test('5. End-to-End Server HTTP Endpoints & Instructions API', async (t) => {
   assert.equal(statusRes.data.server_name, 'Eastern Paradise');
   assert.equal(statusRes.data.lifecycle_state, 'ACTIVE');
 
+  // The spectator story prompt is backed by the same discovery/event data as
+  // the agent-facing beacon and remains available before a guest enters.
+  const discoveryRes = await req('/api/discovery');
+  assert.equal(discoveryRes.status, 200);
+  assert.ok(discoveryRes.data.happening_now);
+  assert.match(discoveryRes.data.happening_now.kind, /agent|event|quiet/);
+  assert.ok(discoveryRes.data.happening_now.title);
+
   // 3. Register a test agent
   const agentName = `ApiTest_${Date.now().toString().slice(-4)}`;
   const regRes = await req('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, {

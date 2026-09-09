@@ -187,6 +187,69 @@
   margin-bottom: 0.4rem;
 }
 
+/* Compact spectator story prompt. It stays on the map and points to existing
+   Chronicle data instead of adding another permanent dashboard panel. */
+.happening-now-card {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 25;
+  width: min(300px, calc(100% - 2rem));
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(46, 196, 182, 0.42);
+  border-radius: 10px;
+  background: rgba(10, 22, 22, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.happening-now-kicker {
+  color: var(--accent-jade);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.3rem;
+}
+
+.happening-now-title {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.happening-now-description {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  margin-top: 0.25rem;
+  max-height: 2.25rem;
+  overflow: hidden;
+}
+
+.happening-now-meta {
+  color: var(--accent-gold);
+  font-size: 0.68rem;
+  margin-top: 0.45rem;
+}
+
+.happening-now-action {
+  background: rgba(46, 196, 182, 0.14);
+  border: 1px solid rgba(46, 196, 182, 0.5);
+  border-radius: 999px;
+  color: var(--accent-jade);
+  cursor: pointer;
+  font-size: 0.7rem;
+  margin-top: 0.55rem;
+  padding: 0.25rem 0.65rem;
+}
+
+.happening-now-action:hover,
+.happening-now-action:focus-visible {
+  background: rgba(46, 196, 182, 0.28);
+  color: #fff;
+}
+
 .quest-hud-badge {
   font-size: 0.68rem;
   font-weight: 700;
@@ -436,6 +499,45 @@
   background: rgba(255, 255, 255, 0.15);
   margin: 0 0.2rem;
 }
+
+.map-tools-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.map-tools-menu summary {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  list-style: none;
+  padding: 0.28rem 0.65rem;
+}
+
+.map-tools-menu summary::-webkit-details-marker { display: none; }
+
+.map-tools-menu summary:hover,
+.map-tools-menu[open] summary {
+  border-color: var(--accent-jade);
+  color: var(--accent-jade);
+}
+
+.map-tools-menu-items {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.5rem);
+  display: grid;
+  gap: 0.35rem;
+  min-width: 145px;
+  padding: 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: rgba(10, 16, 18, 0.98);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+}
+
+.map-tools-menu-items button { justify-content: flex-start; }
 
 /* Floating In-Canvas Celebratory Toast */
 .celebration-toast {
