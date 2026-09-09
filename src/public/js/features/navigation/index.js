@@ -4,7 +4,19 @@ const TAB_BUTTON_MAP = {
   boardTab: 'tabBtnBoard',
   inhabitantsTab: 'tabBtnInhabitants',
   treasuryTab: 'tabBtnTreasury',
+  feedTab: 'tabBtnFeed',
   manualTab: 'tabBtnManual'
+};
+
+const TAB_ICONS = {
+  consoleTab: '🎛️',
+  journalTab: '📜',
+  boardTab: '📋',
+  inhabitantsTab: '🎋',
+  treasuryTab: '🪙',
+  feedTab: '⚡',
+  manualTab: '📖',
+  dispatchTab: '🤖'
 };
 
 const TAB_TITLES = {
@@ -79,6 +91,10 @@ export function switchDrawerTab(tabId, btn = null) {
   const titleEl = document.getElementById('drawerTitle');
   if (titleEl && TAB_TITLES[tabId]) {
     titleEl.textContent = TAB_TITLES[tabId];
+  }
+  const iconEl = document.getElementById('drawerIcon');
+  if (iconEl && TAB_ICONS[tabId]) {
+    iconEl.textContent = TAB_ICONS[tabId];
   }
 
   if (tabId === 'journalTab' && typeof window.refreshJournal === 'function') window.refreshJournal();

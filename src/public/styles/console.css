@@ -42,10 +42,10 @@
   left: 50%;
   bottom: calc(1rem + 46px + 12px);
   transform: translateX(-50%) translateY(12px) scale(0.97);
-  width: min(640px, 94vw);
-  height: min(560px, calc(100vh - 135px));
-  max-width: 650px;
-  max-height: 580px;
+  width: min(720px, 94vw);
+  height: min(580px, calc(100vh - 135px));
+  max-width: 740px;
+  max-height: 620px;
   background: rgba(13, 21, 24, 0.97);
   backdrop-filter: blur(16px);
   z-index: 300;
@@ -110,16 +110,7 @@
 }
 
 .drawer-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.85rem;
-  background: #090e10;
-  border-bottom: 1px solid var(--border-color);
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-  flex-shrink: 0;
+  display: none !important;
 }
 
 .drawer-nav::-webkit-scrollbar {
@@ -159,7 +150,10 @@
 .drawer-body {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 1.15rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(46, 196, 182, 0.3) transparent;

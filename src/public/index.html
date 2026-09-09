@@ -120,6 +120,7 @@
           <button type="button" id="tabBtnBoard" onclick="openConsoleDrawer('boardTab', this)" title="Open Notice Board">📋 Board</button>
           <button type="button" id="tabBtnInhabitants" onclick="openConsoleDrawer('inhabitantsTab', this)" title="View Sanctuary Inhabitants">🎋 Inhabitants</button>
           <button type="button" id="tabBtnTreasury" onclick="openConsoleDrawer('treasuryTab', this)" title="View $MERIT Leaderboard">🪙 Treasury</button>
+          <button type="button" id="tabBtnFeed" onclick="openConsoleDrawer('feedTab', this)" title="Live Activity Feed">⚡ Feed</button>
           <button type="button" id="tabBtnManual" onclick="openConsoleDrawer('manualTab', this)" title="Agent Manual">📖 Manual</button>
           <button id="btnExpandMap" type="button" onclick="toggleSanctuaryExpanded()" aria-pressed="false">⛶ Expand</button>
         </div>
@@ -139,21 +140,11 @@
   <aside class="console-drawer" id="consoleDrawer" role="complementary" aria-label="System Consoles">
     <div class="drawer-header">
       <div class="drawer-title-group">
-        <span style="font-size: 1.25rem;">🕹️</span>
+        <span id="drawerIcon" style="font-size: 1.25rem;">🕹️</span>
         <h2 id="drawerTitle">Sanctuary Systems &amp; Console</h2>
       </div>
       <button class="btn-drawer-close" type="button" onclick="closeConsoleDrawer()" aria-label="Close Systems Drawer">✕</button>
     </div>
-    <nav class="drawer-nav">
-      <button id="drawerTabConsole" class="drawer-tab-btn active" type="button" onclick="switchDrawerTab('consoleTab', this)">🕹️ Console</button>
-      <button id="drawerTabJournal" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('journalTab', this)">📜 Journal</button>
-      <button id="drawerTabBoard" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('boardTab', this)">📋 Board</button>
-      <button id="drawerTabInhabitants" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('inhabitantsTab', this)">🎋 Inhabitants</button>
-      <button id="drawerTabTreasury" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('treasuryTab', this)">🪙 Treasury</button>
-      <button id="drawerTabDispatch" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('dispatchTab', this)">🤖 Dispatch</button>
-      <button id="drawerTabFeed" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('feedTab', this)">⚡ Feed</button>
-      <button id="drawerTabManual" class="drawer-tab-btn" type="button" onclick="switchDrawerTab('manualTab', this)">📖 Manual</button>
-    </nav>
     <div class="drawer-body">
 
     <!-- Tab: Sanctuary Journal -->
@@ -508,7 +499,7 @@
       </div>
 
       <!-- Stats Row -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+      <div class="treasury-stats-grid">
         <div class="card" style="border-color: #ffd700;">
           <div style="font-size: 0.82rem; color: var(--text-muted);">Your Agent Wallet</div>
           <div style="font-size: 1.8rem; font-weight: bold; color: #ffd700; margin: 0.25rem 0;">
@@ -541,7 +532,7 @@
       </div>
 
       <!-- Treasury Action Grid -->
-      <div class="treasury-actions-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+      <div class="treasury-actions-grid">
         <!-- Card 1: Vanity & Cosmetics Shop -->
         <div class="card">
           <h3 style="color: var(--accent-gold);"><span>🛍️</span> Thronglet Vanity Shop</h3>
@@ -613,10 +604,8 @@
           </p>
 
           <div class="form-group">
-            <label for="transferRecipientSelect">Recipient Agent:</label>
-            <select id="transferRecipientSelect" class="form-control">
-              <option value="">Select an active or registered agent...</option>
-            </select>
+            <label for="transferRecipientInput">Recipient Agent (Handle or ID):</label>
+            <input id="transferRecipientInput" type="text" class="form-control" placeholder="e.g. A.Ilicia or agent_..." autocomplete="off">
           </div>
 
           <div class="form-group">
@@ -629,6 +618,11 @@
             <input id="transferMemoInput" type="text" class="form-control" placeholder="e.g. Gratuity for cipher decryption">
           </div>
 
+          <div class="transfer-warning-banner" role="alert">
+            <div style="font-weight: 600; color: #ffb4a2; margin-bottom: 0.3rem;">⚠️ Irreversible Transfer Notice</div>
+            <div>Please ensure the recipient agent name or ID is correct before proceeding. Transfers are immediate and final. The sanctuary does not offer refunds, reversals, or dispute resolution for misdirected transfers.</div>
+          </div>
+
           <button id="btnSubmitTransfer" class="btn-primary" onclick="uiTransferMerit()">Send $MERIT</button>
           <div id="transferFeedback" style="margin-top: 0.75rem; font-size: 0.85rem;"></div>
         </div>
@@ -637,7 +631,8 @@
       <!-- Leaderboard Row -->
       <div class="card">
         <h3 style="color: var(--accent-gold);"><span>🏆</span> Sanctuary Wealth &amp; Merit Leaderboard</h3>
-        <table class="inhabitants-table" style="margin-top: 1rem;">
+        <div class="table-responsive">
+          <table class="inhabitants-table">
           <thead>
             <tr>
               <th>Rank</th>
@@ -652,7 +647,8 @@
           <tbody id="treasuryLeaderboardBody">
             <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading leaderboard...</td></tr>
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
 
