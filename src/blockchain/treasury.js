@@ -1,6 +1,7 @@
 import { SolanaRpcClient } from './solana-client.js';
 
 export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+export const MAINNET_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 export class TreasuryService {
   constructor({ config, rpcClient, supplyProvider, cacheTtlMs = 60_000, now = () => Date.now() }) {
@@ -12,6 +13,11 @@ export class TreasuryService {
     this.cached = null;
   }
 
+  usdcMint() {
+    if (this.config.usdcMint) return this.config.usdcMint;
+    return this.config.network === 'devnet' ? DEVNET_USDC_MINT : MAINNET_USDC_MINT;
+  }
+
   async refresh() {
     const supply = this.supplyProvider();
     if (!this.config.treasuryConfigured) {
@@ -20,7 +26,7 @@ export class TreasuryService {
     try {
       const [sol, usdc] = await Promise.all([
         this.rpcClient.getSolBalance(this.config.treasuryAddress),
-        this.rpcClient.getTokenBalance(this.config.treasuryAddress, DEVNET_USDC_MINT)
+        this.rpcClient.getTokenBalance(this.config.treasuryAddress, this.usdcMint())
       ]);
       this.cached = { sol, usdc, successfulAt: this.now() };
       return this.format({ ...this.cached, stale: false, supply });

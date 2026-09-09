@@ -8,8 +8,11 @@ function configured(value) {
 
 export function loadSolanaConfig(env = process.env) {
   const network = String(env.SOLANA_NETWORK || 'devnet').trim().toLowerCase();
-  if (network !== 'devnet') {
-    throw new Error('SOLANA_NETWORK must be devnet for this release. Mainnet is intentionally disabled.');
+  const allowMainnet = String(env.SOLANA_ALLOW_MAINNET || '').trim().toLowerCase() === 'true';
+  const isMainnet = network === 'mainnet' || network === 'mainnet-beta';
+  const networkAllowed = network === 'devnet' || (allowMainnet && isMainnet);
+  if (!networkAllowed) {
+    throw new Error('SOLANA_NETWORK must be devnet for this release. Mainnet is intentionally disabled; enabling it requires SOLANA_ALLOW_MAINNET=true to be set explicitly.');
   }
 
   const rpcUrl = String(env.SOLANA_RPC_URL || DEFAULT_DEVNET_RPC).trim();
@@ -21,6 +24,14 @@ export function loadSolanaConfig(env = process.env) {
   }
   if (!['http:', 'https:'].includes(parsedRpc.protocol)) {
     throw new Error('SOLANA_RPC_URL must use http or https.');
+  }
+  // Foot-gun guard: never let a mainnet config read a devnet RPC (and vice-versa).
+  const rpcHost = parsedRpc.hostname;
+  if (isMainnet && /devnet/i.test(rpcHost)) {
+    throw new Error('SOLANA_RPC_URL points at a devnet RPC but SOLANA_NETWORK is mainnet-beta. Point SOLANA_RPC_URL at a mainnet RPC (e.g. https://api.mainnet-beta.solana.com).');
+  }
+  if (!isMainnet && rpcHost.includes('mainnet-beta')) {
+    throw new Error('SOLANA_RPC_URL points at a mainnet RPC but SOLANA_NETWORK is devnet. Use a devnet RPC (e.g. https://api.devnet.solana.com).');
   }
 
   const issuerSecret = String(env.SOLANA_NFT_ISSUER_SECRET || '').trim();
@@ -57,6 +68,7 @@ export function loadSolanaConfig(env = process.env) {
     collectionAddress,
     nftMode,
     solUsdPrice: configuredSolUsd,
+    usdcMint: String(env.SOLANA_USDC_MINT || '').trim(),
     metadataBaseUrl: String(env.PUBLIC_BASE_URL || 'https://simulation.cryptgregresearch.org').replace(/\/$/, ''),
     treasuryConfigured: configured(treasuryAddress),
     mintingConfigured: nftMode === 'solana',
