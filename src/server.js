@@ -28,10 +28,10 @@ import { attachWorldWebSocket } from './realtime/world-websocket.js';
 import { createLifecycle } from './runtime/lifecycle.js';
 import { areWeAloneQuest } from './quests/are-we-alone.js';
 import { firstFlameQuest } from './quests/first-flame.js';
-import { solanaConfig } from './blockchain/config.js';
-import { WalletAuthService } from './blockchain/wallet-auth.js';
-import { TreasuryService } from './blockchain/treasury.js';
-import { createLandAssetProvider } from './blockchain/nft-service.js';
+import { bscConfig } from './blockchain/config-bsc.js';
+import { WalletAuthService } from './blockchain/wallet-auth-bsc.js';
+import { TreasuryService } from './blockchain/treasury-bsc.js';
+import { createLandAssetProvider } from './blockchain/nft-service-bsc.js';
 import { OwnershipSyncService } from './blockchain/ownership-sync.js';
 import { GridRegistry as GridRegistryService } from './land/grid-registry.js';
 import { GridPurchaseService } from './land/grid-purchase.js';
@@ -49,22 +49,22 @@ const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
 
-const WalletAuth = new WalletAuthService({ db });
-const LandAssetProvider = createLandAssetProvider(solanaConfig);
+const WalletAuth = new WalletAuthService({ db, config: bscConfig });
+const LandAssetProvider = createLandAssetProvider(bscConfig);
 const GridRegistry = new GridRegistryService({ db, world });
 const GridPurchase = new GridPurchaseService({
   db,
   assetProvider: LandAssetProvider,
-  metadataBaseUrl: solanaConfig.metadataBaseUrl,
-  collectionAddress: solanaConfig.collectionAddress || null
+  metadataBaseUrl: bscConfig.metadataBaseUrl,
+  collectionAddress: bscConfig.collectionAddress || null
 });
 const OwnershipSync = new OwnershipSyncService({
   db,
   assetProvider: LandAssetProvider,
-  collectionAddress: solanaConfig.collectionAddress || null
+  collectionAddress: bscConfig.collectionAddress || null
 });
 const Treasury = new TreasuryService({
-  config: solanaConfig,
+  config: bscConfig,
   supplyProvider: () => ({
     ...EconomyManager.getSupplyStats(),
     land: {
@@ -98,7 +98,7 @@ const services = {
   getHomepagePrompts,
   areWeAloneQuest,
   firstFlameQuest,
-  solanaConfig,
+  bscConfig,
   WalletAuth,
   Treasury,
   LandAssetProvider,

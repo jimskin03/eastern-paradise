@@ -8,7 +8,7 @@ function walletFailure(res, error) {
 
 export async function handleWalletRoutes(ctx) {
   const { req, res, pathname, services } = ctx;
-  const { AuthService, WalletAuth, OwnershipSync, db, solanaConfig } = services;
+  const { AuthService, WalletAuth, OwnershipSync, db, bscConfig } = services;
 
   if (pathname === '/api/wallet/challenge' && req.method === 'POST') {
     const account = AuthService.authenticate(req);
@@ -33,10 +33,10 @@ export async function handleWalletRoutes(ctx) {
         challengeId: body.challenge_id,
         walletAddress: body.wallet_address,
         signature: body.signature,
-        signatureEncoding: body.signature_encoding,
-        message: body.message
+        message: body.message,
+        chainId: body.chain_id
       });
-      return sendJson(res, 200, { success: true, wallet, network: solanaConfig.network });
+      return sendJson(res, 200, { success: true, wallet, network: bscConfig.network });
     } catch (error) {
       return walletFailure(res, error);
     }
@@ -50,7 +50,7 @@ export async function handleWalletRoutes(ctx) {
       ...wallet,
       land_nfts: db.prepare(`SELECT COUNT(*) AS count FROM land_grids WHERE status = 'owned' AND owner_wallet = ?`).get(wallet.wallet_address)?.count || 0
     }));
-    return sendJson(res, 200, { success: true, network: solanaConfig.network, wallets });
+    return sendJson(res, 200, { success: true, network: bscConfig.network, wallets });
   }
 
   if (pathname.startsWith('/api/wallet/') && req.method === 'DELETE') {
