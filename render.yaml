@@ -20,7 +20,7 @@ services:
       - key: BSC_ALLOW_MAINNET
         value: "false"
       - key: BSC_TREASURY_ADDRESS
-        sync: false
+        value: "0x688216227347F731c57FBa260a9F505663b039b0"
       - key: BSC_NFT_PROVIDER
         value: "mock"
       - key: BSC_NFT_ISSUER_PRIVATE_KEY
