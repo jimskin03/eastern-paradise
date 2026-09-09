@@ -32,7 +32,13 @@ export class SolPriceOracle {
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       let response;
       try {
-        response = await this.fetchImpl(endpoint.toString(), { signal: controller.signal });
+        response = await this.fetchImpl(endpoint.toString(), {
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'Eastern-Paradise-Reserve/1.0'
+          }
+        });
       } finally {
         clearTimeout(timeout);
       }
