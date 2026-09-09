@@ -11,7 +11,7 @@ const response = (body, ok = true, status = 200) => ({
 test('price oracle reads SOL/USD from the configured feed', async () => {
   let requestedUrl;
   const oracle = new SolPriceOracle({
-    url: 'https://prices.example.test/simple/price',
+    url: 'https://api.coingecko.com/api/v3/simple/price',
     fetchImpl: async url => {
       requestedUrl = url;
       return response({ solana: { usd: 151.25 } });
@@ -24,6 +24,17 @@ test('price oracle reads SOL/USD from the configured feed', async () => {
   assert.equal(result.stale, false);
   assert.match(requestedUrl, /ids=solana/);
   assert.match(requestedUrl, /vs_currencies=usd/);
+});
+
+test('price oracle accepts the default Coinbase spot response shape', async () => {
+  const oracle = new SolPriceOracle({
+    fetchImpl: async () => response({ data: { amount: '103.725' } })
+  });
+
+  const result = await oracle.getPrice();
+
+  assert.equal(result.price, 103.725);
+  assert.equal(result.stale, false);
 });
 
 test('price oracle rejects malformed or non-positive feed values', async () => {

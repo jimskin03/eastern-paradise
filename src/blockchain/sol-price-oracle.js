@@ -1,4 +1,4 @@
-const DEFAULT_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price';
+const DEFAULT_PRICE_URL = 'https://api.coinbase.com/v2/prices/SOL-USD/spot';
 
 export class SolPriceOracle {
   constructor({
@@ -24,8 +24,10 @@ export class SolPriceOracle {
 
     try {
       const endpoint = new URL(this.url);
-      endpoint.searchParams.set('ids', 'solana');
-      endpoint.searchParams.set('vs_currencies', 'usd');
+      if (endpoint.hostname.endsWith('coingecko.com')) {
+        endpoint.searchParams.set('ids', 'solana');
+        endpoint.searchParams.set('vs_currencies', 'usd');
+      }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       let response;
@@ -36,7 +38,7 @@ export class SolPriceOracle {
       }
       if (!response.ok) throw new Error(`SOL price feed HTTP ${response.status}`);
       const payload = await response.json();
-      const price = Number(payload?.solana?.usd);
+      const price = Number(payload?.data?.amount ?? payload?.solana?.usd ?? payload?.price);
       if (!Number.isFinite(price) || price <= 0) throw new Error('SOL price feed returned an invalid price.');
       this.cached = { price, fetchedAt: this.now() };
       return { price, stale: false };
