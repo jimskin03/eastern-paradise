@@ -340,6 +340,53 @@ export class EconomyManager {
   }
 
   /**
+   * Cursor-paginated ledger for one agent. Stable transaction IDs.
+   */
+  static listTransactions(agentId, { cursor, limit = 25 } = {}) {
+    const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+    let decoded = null;
+    if (cursor) {
+      try {
+        const raw = Buffer.from(String(cursor), 'base64url').toString('utf8');
+        const split = raw.indexOf('|');
+        const createdAt = Number(raw.slice(0, split));
+        const id = raw.slice(split + 1);
+        if (Number.isFinite(createdAt) && id) decoded = { createdAt, id };
+      } catch {
+        decoded = null;
+      }
+    }
+
+    const rows = decoded
+      ? db.prepare(`
+          SELECT id, sender_id, recipient_id, amount, type, description, created_at
+          FROM transactions
+          WHERE (sender_id = ? OR recipient_id = ?)
+            AND (created_at < ? OR (created_at = ? AND id < ?))
+          ORDER BY created_at DESC, id DESC
+          LIMIT ?
+        `).all(agentId, agentId, decoded.createdAt, decoded.createdAt, decoded.id, pageSize + 1)
+      : db.prepare(`
+          SELECT id, sender_id, recipient_id, amount, type, description, created_at
+          FROM transactions
+          WHERE sender_id = ? OR recipient_id = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT ?
+        `).all(agentId, agentId, pageSize + 1);
+
+    const hasMore = rows.length > pageSize;
+    const transactions = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = transactions[transactions.length - 1];
+    return {
+      transactions,
+      next_cursor: hasMore && last
+        ? Buffer.from(`${last.created_at}|${last.id}`, 'utf8').toString('base64url')
+        : null,
+      limit: pageSize
+    };
+  }
+
+  /**
    * Sanctuary Economy Leaderboard (Top Agents by $MERIT and Top Sponsors).
    * Includes active agents and permanently retained Top 1 guest scores as (unverified).
    */

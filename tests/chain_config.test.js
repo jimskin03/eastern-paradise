@@ -29,9 +29,9 @@ test('GET catalog includes sanitized /api/chain/config', () => {
   assert.equal(entry.auth, false);
   assert.ok(entry.response_schema.properties.live_cluster_proven);
   assert.ok(entry.response_schema.properties.family);
-  assert.equal(
+  assert.ok(
     ENDPOINT_CATALOG.some((ep) => ep.path === '/api/economy/transactions' && ep.summary?.includes('Paginated')),
-    false
+    'merged 2T-2 catalog still lists the paginated ledger'
   );
 
   const openapi = buildOpenApiSpec('https://simulation.cryptgregresearch.org');
