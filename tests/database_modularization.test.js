@@ -36,6 +36,11 @@ const EXPECTED_TABLES = [
   'world_objects',
   'world_events',
   'world_clock',
+  'agent_observations',
+  'agent_hypotheses',
+  'hypothesis_evidence',
+  'hypothesis_revisions',
+  'world_rumors',
   'messages',
   'first_flame_quests',
   'first_flame_hearths',
@@ -55,6 +60,13 @@ const EXPECTED_INDEXES = [
   'idx_land_grids_owner_wallet',
   'idx_land_grids_status',
   'idx_land_purchases_recovery',
+  'idx_agent_observations_agent_created',
+  'idx_agent_observations_evidence',
+  'idx_agent_hypotheses_agent_updated',
+  'idx_agent_hypotheses_public_updated',
+  'idx_hypothesis_evidence_evidence',
+  'idx_hypothesis_revisions_hypothesis',
+  'idx_world_rumors_updated',
   'idx_sync_changes_tbl_id'
 ];
 
@@ -198,6 +210,8 @@ test('cloud restore, push, filtering, and maintenance retain existing semantics'
   assert.equal(shouldRetainCloudRow('messages', { sender_id: 'guest_123' }), false);
   assert.equal(shouldRetainCloudRow('messages', { recipient_id: 'guest_123' }), false);
   assert.equal(shouldRetainCloudRow('spectator_messages', { target_agent_id: 'guest_123' }), false);
+  assert.equal(shouldRetainCloudRow('agent_observations', { agent_id: 'guest_123' }), false);
+  assert.equal(shouldRetainCloudRow('hypothesis_evidence', { agent_id: 'guest_123' }), false);
 
   const state = createTempDatabase();
   const { database } = state;
