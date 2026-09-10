@@ -1,6 +1,7 @@
 import { apiFetch } from './api/client.js';
 import { openConsoleDrawer, closeConsoleDrawer, toggleConsoleDrawer, switchDrawerTab, switchTab, setPlayerMode, focusPlayer } from './features/navigation/index.js';
 import { installGlobals } from './compatibility/globals.js';
+import { initMoreMenu } from './features/navigation/more-menu.js';
 import { loadSession, saveSession, clearSession } from './state/session-store.js';
 import { openQuestModal, closeQuestModal, handleQuestBackdropClick, handleQuestAction, skipQuestTutorial, resetQuestTutorial, toggleQuestHud, handleQuestHudClick } from './features/quests/index.js';
 import { openDispatchModal, closeDispatchModal, handleDispatchBackdropClick, setDispatchDifficulty, copyDispatchPrompt, escapeHtml } from './features/dispatch/index.js';
@@ -562,3 +563,4 @@ installGlobals({
 });
 
 initHappeningNow();
+initMoreMenu();
