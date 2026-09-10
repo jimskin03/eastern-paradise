@@ -118,8 +118,21 @@ export async function handleQuestRoutes(ctx) {
             agent_id: account.id,
             agent_name: account.name,
             node_id: 'shrine_distant_echoes',
-            merit_earned: result.reward.merit_earned,
-            total_merit: result.reward.total_merit
+            outcome: 'red_pill',
+            badge: result.badge
+          });
+        }
+        break;
+      case 'advance_timeout':
+        result = areWeAloneQuest.advanceTimeout(account.id);
+        if (result.success && result.blue_pill_granted) {
+          world.broadcast({
+            type: 'distant_echoes_silent',
+            agent_id: account.id,
+            agent_name: account.name,
+            node_id: 'shrine_distant_echoes',
+            outcome: 'blue_pill',
+            badge: result.badge
           });
         }
         break;

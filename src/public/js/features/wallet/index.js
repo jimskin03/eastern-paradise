@@ -153,12 +153,42 @@ export async function connectSolanaWallet() {
   }
 }
 
+export async function disconnectSolanaWallet() {
+  const feedback = document.getElementById('walletFeedback');
+  if (!window.currentAgent?.api_key || window.currentAgent.is_guest) {
+    if (feedback) feedback.textContent = 'A registered Eastern Paradise agent session is required.';
+    return;
+  }
+  try {
+    const response = await apiFetch('/api/wallet', { headers: { Authorization: `Bearer ${window.currentAgent.api_key}` } });
+    const data = await response.json();
+    const wallet = data.wallets?.find(item => item.is_primary) || data.wallets?.[0];
+    if (!wallet) {
+      if (feedback) feedback.textContent = 'No wallet is currently linked.';
+      return;
+    }
+    const unlinkResponse = await apiFetch(`/api/wallet/${encodeURIComponent(wallet.wallet_address)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${window.currentAgent.api_key}` }
+    });
+    const result = await unlinkResponse.json();
+    if (!unlinkResponse.ok) throw new Error(result.message || 'Could not disconnect the wallet.');
+    sessionStorage.removeItem('ep_wallet_provider_name');
+    if (feedback) feedback.textContent = 'Wallet disconnected.';
+    await refreshSolanaWallet();
+  } catch (error) {
+    if (feedback) feedback.textContent = error.message || 'Could not disconnect the wallet.';
+  }
+}
+
 export async function refreshSolanaWallet() {
   renderWalletChoices();
   const status = document.getElementById('solanaWalletStatus');
+  const disconnectBtn = document.getElementById('disconnectWalletBtn');
   if (!status) return;
   if (!window.currentAgent?.api_key) {
     status.innerHTML = '<p>No wallet linked.</p>';
+    if (disconnectBtn) disconnectBtn.style.display = 'none';
     return;
   }
   try {
@@ -167,11 +197,14 @@ export async function refreshSolanaWallet() {
     const wallet = data.wallets?.find(item => item.is_primary) || data.wallets?.[0];
     if (!wallet) {
       status.innerHTML = '<p>No wallet linked.</p>';
+      if (disconnectBtn) disconnectBtn.style.display = 'none';
       return;
     }
+    if (disconnectBtn) disconnectBtn.style.display = '';
     const providerName = sessionStorage.getItem('ep_wallet_provider_name') || 'Solana Wallet';
     status.innerHTML = `<strong>${window.escapeHtml(providerName)}</strong><div class="wallet-address" title="${wallet.wallet_address}">${shortAddress(wallet.wallet_address)}</div><div class="verified-mark">✓ Ownership Verified</div><small>Network: ${window.escapeHtml(data.network)} · Land NFTs: ${wallet.land_nfts || 0}</small>`;
   } catch {
     status.innerHTML = '<p>Wallet status unavailable.</p>';
+    if (disconnectBtn) disconnectBtn.style.display = 'none';
   }
 }

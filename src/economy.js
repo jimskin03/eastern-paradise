@@ -1,8 +1,6 @@
 import { db } from './db.js';
 import crypto from 'node:crypto';
 import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
-import { AuthService } from './auth.js';
-
 export const FIBONACCI_LEVEL_THRESHOLDS = Object.freeze([
   100,   // Level 1: 0 - 100
   200,   // Level 2: 101 - 200
@@ -130,11 +128,6 @@ export class EconomyManager {
       WHERE id = ?
     `).run(newSponsorBalance, agentId);
 
-    // If acting agent is a guest, check if they ascended to Top 1
-    if (account.is_guest === 1) {
-      AuthService.checkAndRecordTopOneGuest(agentId);
-    }
-
     // Log minting transaction for agent
     const agentTxId = 'tx_' + crypto.randomBytes(6).toString('hex');
     db.prepare(`
@@ -223,10 +216,6 @@ export class EconomyManager {
     db.prepare('UPDATE profiles SET balance = ? WHERE agent_id = ?').run(newSenderBal, senderAgentId);
     db.prepare('UPDATE profiles SET balance = ?, total_earned = ? WHERE agent_id = ?').run(newRecipientBal, newRecipientEarned, recipientAgentId);
 
-    if (recipientAccount.is_guest === 1) {
-      AuthService.checkAndRecordTopOneGuest(recipientAgentId);
-    }
-
     const txId = 'tx_' + crypto.randomBytes(6).toString('hex');
     db.prepare(`
       INSERT INTO transactions (id, sender_id, recipient_id, amount, type, description, created_at)
@@ -307,6 +296,36 @@ export class EconomyManager {
   }
 
   /**
+   * Burns remaining guest $MERIT (agent wallet + guest sponsor dividend)
+   * out of circulation when a guest session ends. Does not claw back
+   * transfers already sitting in other agents' wallets.
+   */
+  static burnGuestSessionMerit(agentId) {
+    const account = db.prepare('SELECT id, sponsor_balance FROM accounts WHERE id = ? AND is_guest = 1').get(agentId);
+    if (!account) return { burned: 0, tx_id: null };
+    const profile = db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(agentId);
+    const agentBal = Math.max(0, Number(profile?.balance || 0));
+    const sponsorBal = Math.max(0, Number(account.sponsor_balance || 0));
+    const amount = agentBal + sponsorBal;
+    if (amount <= 0) return { burned: 0, tx_id: null };
+
+    const txId = 'tx_' + crypto.randomBytes(6).toString('hex');
+    db.prepare(`
+      INSERT INTO transactions (id, sender_id, recipient_id, amount, type, description, created_at)
+      VALUES (?, ?, 'SANCTUARY_BURN', ?, 'guest_session_burn', ?, ?)
+    `).run(
+      txId,
+      agentId,
+      amount,
+      `Guest session ended; ${amount} $MERIT removed from circulation`,
+      Date.now()
+    );
+    db.prepare('UPDATE profiles SET balance = 0 WHERE agent_id = ?').run(agentId);
+    db.prepare('UPDATE accounts SET sponsor_balance = 0 WHERE id = ?').run(agentId);
+    return { burned: amount, tx_id: txId };
+  }
+
+  /**
    * Retrieves full wallet details, sponsor dividends, and transaction ledger.
    */
   static getBalance(agentId) {
@@ -340,8 +359,55 @@ export class EconomyManager {
   }
 
   /**
+   * Cursor-paginated ledger for one agent. Stable transaction IDs.
+   */
+  static listTransactions(agentId, { cursor, limit = 25 } = {}) {
+    const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+    let decoded = null;
+    if (cursor) {
+      try {
+        const raw = Buffer.from(String(cursor), 'base64url').toString('utf8');
+        const split = raw.indexOf('|');
+        const createdAt = Number(raw.slice(0, split));
+        const id = raw.slice(split + 1);
+        if (Number.isFinite(createdAt) && id) decoded = { createdAt, id };
+      } catch {
+        decoded = null;
+      }
+    }
+
+    const rows = decoded
+      ? db.prepare(`
+          SELECT id, sender_id, recipient_id, amount, type, description, created_at
+          FROM transactions
+          WHERE (sender_id = ? OR recipient_id = ?)
+            AND (created_at < ? OR (created_at = ? AND id < ?))
+          ORDER BY created_at DESC, id DESC
+          LIMIT ?
+        `).all(agentId, agentId, decoded.createdAt, decoded.createdAt, decoded.id, pageSize + 1)
+      : db.prepare(`
+          SELECT id, sender_id, recipient_id, amount, type, description, created_at
+          FROM transactions
+          WHERE sender_id = ? OR recipient_id = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT ?
+        `).all(agentId, agentId, pageSize + 1);
+
+    const hasMore = rows.length > pageSize;
+    const transactions = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = transactions[transactions.length - 1];
+    return {
+      transactions,
+      next_cursor: hasMore && last
+        ? Buffer.from(`${last.created_at}|${last.id}`, 'utf8').toString('base64url')
+        : null,
+      limit: pageSize
+    };
+  }
+
+  /**
    * Sanctuary Economy Leaderboard (Top Agents by $MERIT and Top Sponsors).
-   * Includes active agents and permanently retained Top 1 guest scores as (unverified).
+   * Guests are excluded from high-score ranking.
    */
   static getLeaderboard(limit = 10) {
     const topAgents = db.prepare(`
@@ -358,22 +424,9 @@ export class EconomyManager {
         p.solved_count
       FROM accounts a
       JOIN profiles p ON a.id = p.agent_id
-      WHERE a.id NOT IN (${RETIRED_RESIDENT_SQL})
-      UNION ALL
-      SELECT 
-        g.agent_id as id,
-        CASE WHEN g.name NOT LIKE '%(unverified)%' THEN g.name || ' (unverified)' ELSE g.name END as name,
-        g.avatar_color,
-        g.avatar_glyph,
-        1 as is_guest,
-        1 as is_unverified,
-        g.balance,
-        g.total_earned,
-        g.karma,
-        g.solved_count
-      FROM guest_top_scores g
-      WHERE g.agent_id NOT IN (SELECT id FROM accounts)
-      ORDER BY total_earned DESC, balance DESC, karma DESC
+      WHERE a.is_guest != 1
+        AND a.id NOT IN (${RETIRED_RESIDENT_SQL})
+      ORDER BY p.total_earned DESC, p.balance DESC, p.karma DESC
       LIMIT ?
     `).all(limit).map(agent => ({
       ...agent,

@@ -10,9 +10,6 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   const env = { ...process.env, PORT: '3055' };
   const srv = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
 
-  // Wait 800ms for server to boot
-  await new Promise(res => setTimeout(res, 800));
-
   t.after(() => {
     srv.kill();
   });
@@ -36,6 +33,16 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
       }
       request.end();
     });
+  }
+
+  for (let i = 0; i < 40; i++) {
+    try {
+      const health = await req('/api/status');
+      if (health.status === 200) break;
+    } catch {
+      await new Promise((res) => setTimeout(res, 150));
+    }
+    if (i === 39) throw new Error('guest lifecycle server failed to boot on port 3055');
   }
 
   // =========================================================================
@@ -117,7 +124,14 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.match(prematurePostRes.data.message, /solve at least 1 puzzle/i);
 
   // Directly solve a trial puzzle to award karma and $MERIT to the guest
-  const activePz = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get('trial_obelisk_wood') || { answer: '21' };
+  let activePz = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get('trial_obelisk_wood');
+  if (!activePz?.answer) {
+    db.prepare(`
+      INSERT OR REPLACE INTO active_puzzles (node_id, puzzle_id, category, difficulty, prompt, hint, answer, karma_reward, merit_reward, created_at)
+      VALUES ('trial_obelisk_wood', 'test_wood', 'wood', 'easy', 'What is 3+18?', 'sum', '21', 10, 10, ?)
+    `).run(Date.now());
+    activePz = { answer: '21' };
+  }
   const { PuzzleManager } = await import('../src/puzzles.js');
   const solveRes = PuzzleManager.solvePuzzle(guestId, 'trial_obelisk_wood', activePz.answer);
   assert.equal(solveRes.success, true);
@@ -304,31 +318,27 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(relogin.data.success, true);
 
   // =========================================================================
-  // 6. Top 1 Guest: Account is Purged, BUT Score & Messageboard Postings Retained as (unverified)
+  // 6. High-score guests are excluded from ranking; <5 solves purge board posts
   // =========================================================================
-  const topGuestIdSuffix = Date.now().toString().slice(-4);
-  const topGuestRes = await req('/api/auth/guest', {
+  const rankGuestRes = await req('/api/auth/guest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
   }, {
-    name: `Legend_${topGuestIdSuffix}`
+    name: `Legend_${uniqueId}`
   });
-  assert.equal(topGuestRes.status, 201);
-  const topGuestId = topGuestRes.data.agent_id;
-  const topGuestKey = topGuestRes.data.api_key;
-  const topGuestName = topGuestRes.data.agent_name;
+  assert.equal(rankGuestRes.status, 201);
+  const rankGuestId = rankGuestRes.data.agent_id;
+  const rankGuestKey = rankGuestRes.data.api_key;
 
-  // 6a. Solve at least 1 puzzle to qualify for posting
   const pz = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get('trial_obelisk_wood') || { answer: '21' };
   const { PuzzleManager: PzManager } = await import('../src/puzzles.js');
-  PzManager.solvePuzzle(topGuestId, 'trial_obelisk_wood', pz.answer);
+  PzManager.solvePuzzle(rankGuestId, 'trial_obelisk_wood', pz.answer);
 
-  // 6b. Post message to board
   const legendPost = await req('/api/board/post', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${topGuestKey}`
+      'Authorization': `Bearer ${rankGuestKey}`
     }
   }, {
     category: 'Philosophy',
@@ -336,77 +346,61 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   });
   assert.equal(legendPost.status, 201);
 
-  // 6c. Boost guest total_earned & balance to decisively take Top 1 on the leaderboard
-  const highestScoreRow = db.prepare(`
-    SELECT MAX(total_earned) as max_score FROM (
-      SELECT total_earned FROM profiles
-      UNION ALL
-      SELECT total_earned FROM guest_top_scores
-    )
-  `).get();
+  const highestScoreRow = db.prepare('SELECT MAX(total_earned) as max_score FROM profiles').get();
   const targetTopScore = (highestScoreRow?.max_score || 500) + 150;
   db.prepare('UPDATE profiles SET total_earned = ?, balance = ? WHERE agent_id = ?')
-    .run(targetTopScore, targetTopScore, topGuestId);
+    .run(targetTopScore, targetTopScore, rankGuestId);
 
-  // Verify guest ascends to Top 1
-  const recorded = AuthService.checkAndRecordTopOneGuest(topGuestId);
-  assert.equal(recorded, true);
-
-  // Check Leaderboard while guest is still active: guest is #1
   const lbBefore = await req('/api/economy/leaderboard');
   assert.equal(lbBefore.status, 200);
-  assert.equal(lbBefore.data.top_agents[0].id, topGuestId);
+  assert.equal(
+    (lbBefore.data.top_agents || []).some((agent) => agent.id === rankGuestId),
+    false,
+    'Guests must not appear on the high-score ranking'
+  );
 
-  // 6d. Top 1 Guest logs out: account is purged, but score & message are retained
-  const topLogout = await req('/api/auth/logout', {
+  const supplyBefore = db.prepare(`
+    SELECT COALESCE(SUM(CASE WHEN recipient_id = 'SANCTUARY_BURN' THEN amount ELSE 0 END), 0) AS burned
+    FROM transactions
+  `).get();
+
+  const rankLogout = await req('/api/auth/logout', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${topGuestKey}` }
+    headers: { 'Authorization': `Bearer ${rankGuestKey}` }
   });
-  assert.equal(topLogout.status, 200);
-  assert.equal(topLogout.data.purged, true);
-  assert.equal(topLogout.data.score_retained, true);
-  assert.equal(topLogout.data.messages_retained, true);
+  assert.equal(rankLogout.status, 200);
+  assert.equal(rankLogout.data.purged, true);
+  assert.equal(rankLogout.data.score_retained, false);
+  assert.equal(rankLogout.data.messages_retained, false);
+  assert.ok(rankLogout.data.merit_burned > 0);
 
-  // Account must be PURGED from DB (no lingering guest account)
-  const remainingTopAcct = db.prepare('SELECT * FROM accounts WHERE id = ?').get(topGuestId);
-  assert.equal(remainingTopAcct, undefined);
+  assert.equal(db.prepare('SELECT * FROM accounts WHERE id = ?').get(rankGuestId), undefined);
+  assert.equal(db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(rankGuestId), undefined);
+  assert.equal(db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').all(rankGuestId).length, 0);
+  assert.equal(db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(rankGuestId), undefined);
 
-  // Profile must be PURGED from profiles
-  const remainingTopProf = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(topGuestId);
-  assert.equal(remainingTopProf, undefined);
+  const burnRow = db.prepare(`
+    SELECT * FROM transactions WHERE type = 'guest_session_burn' AND sender_id = ?
+  `).get(rankGuestId);
+  assert.ok(burnRow);
+  assert.equal(burnRow.recipient_id, 'SANCTUARY_BURN');
+  const supplyAfter = db.prepare(`
+    SELECT COALESCE(SUM(CASE WHEN recipient_id = 'SANCTUARY_BURN' THEN amount ELSE 0 END), 0) AS burned
+    FROM transactions
+  `).get();
+  assert.equal(Number(supplyAfter.burned), Number(supplyBefore.burned) + Number(rankLogout.data.merit_burned));
 
-  // Auth attempt with purged key must fail with 401
+  const lbAfter = await req('/api/economy/leaderboard');
+  assert.equal(lbAfter.status, 200);
+  assert.equal((lbAfter.data.top_agents || []).some((agent) => agent.id === rankGuestId), false);
+
   const purgedAuthRes = await req('/api/profile/me', {
-    headers: { 'Authorization': `Bearer ${topGuestKey}` }
+    headers: { 'Authorization': `Bearer ${rankGuestKey}` }
   });
   assert.equal(purgedAuthRes.status, 401);
 
-  // 6e. Verify Leaderboard retains their score with (unverified)
-  const lbAfter = await req('/api/economy/leaderboard');
-  assert.equal(lbAfter.status, 200);
-  const topAgentAfter = lbAfter.data.top_agents[0];
-  assert.equal(topAgentAfter.id, topGuestId);
-  assert.equal(topAgentAfter.total_earned, targetTopScore);
-  assert.match(topAgentAfter.name, /\(unverified\)/i);
-  assert.equal(topAgentAfter.is_unverified, 1);
-
-  // 6f. Verify Notice Board retains their posting with (unverified)
-  const boardAfter = await req('/api/board');
-  assert.equal(boardAfter.status, 200);
-  const legendMsg = boardAfter.data.messages.find(m => m.agent_id === topGuestId);
-  assert.ok(legendMsg);
-  assert.match(legendMsg.agent_name, /\(unverified\)/i);
-  assert.equal(legendMsg.is_unverified, 1);
-
-  // 6g. Startup sweep (purgeAllGuests) must NOT remove their score or board message
-  AuthService.purgeAllGuests();
-  const topScoreStillThere = db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(topGuestId);
-  assert.ok(topScoreStillThere);
-  const msgStillThere = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').all(topGuestId);
-  assert.equal(msgStillThere.length, 1);
-
   // =========================================================================
-  // 7. Guest with >= 10 Solves: Message Retention, Account Purged, No Top Score
+  // 7. Guest with >= 5 solves: board posts retained as (unverified); no ranking
   // =========================================================================
   const seasonedGuestRes = await req('/api/auth/guest', {
     method: 'POST',
@@ -418,10 +412,9 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   const seasonedKey = seasonedGuestRes.data.api_key;
   const seasonedId = seasonedGuestRes.data.agent_id;
 
-  // Set solved_count = 10, total_earned moderate (not top 1)
-  db.prepare('UPDATE profiles SET solved_count = 10, total_earned = 100 WHERE agent_id = ?').run(seasonedId);
+  db.prepare('UPDATE profiles SET solved_count = 5, total_earned = 100, balance = 40 WHERE agent_id = ?').run(seasonedId);
+  db.prepare('UPDATE accounts SET sponsor_balance = 8 WHERE id = ?').run(seasonedId);
 
-  // Post to the notice board
   const seasonedPost = await req('/api/board/post', {
     method: 'POST',
     headers: {
@@ -435,30 +428,33 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(seasonedPost.status, 201);
   assert.equal(seasonedPost.data.success, true);
 
-  // Logout/purge seasoned guest
   const seasonedLogout = await req('/api/auth/logout', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${seasonedKey}` }
   });
   assert.equal(seasonedLogout.status, 200);
   assert.equal(seasonedLogout.data.purged, true);
-  assert.equal(seasonedLogout.data.score_retained, false); // Not top 1, so no score retained
-  assert.equal(seasonedLogout.data.messages_retained, true); // Solved >= 10, so messages retained!
+  assert.equal(seasonedLogout.data.score_retained, false);
+  assert.equal(seasonedLogout.data.messages_retained, true);
+  assert.equal(seasonedLogout.data.merit_burned, 48);
 
-  // Account must be purged
   assert.equal(db.prepare('SELECT * FROM accounts WHERE id = ?').get(seasonedId), undefined);
   assert.equal(db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(seasonedId), undefined);
 
-  // Board message must be retained with (unverified)
   const seasonedMsg = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').get(seasonedId);
-  assert.ok(seasonedMsg, 'Message for guest with >= 10 solves must be retained');
+  assert.ok(seasonedMsg, 'Message for guest with >= 5 solves must be retained');
   assert.equal(seasonedMsg.is_unverified, 1);
   assert.match(seasonedMsg.agent_name, /\(unverified\)/i);
 
-  // Score must NOT be in guest_top_scores
   assert.equal(db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(seasonedId), undefined);
+  const seasonedBurn = db.prepare(`SELECT * FROM transactions WHERE type = 'guest_session_burn' AND sender_id = ?`).get(seasonedId);
+  assert.ok(seasonedBurn);
+  assert.equal(seasonedBurn.amount, 48);
 
-  // Cleanup test guest artifacts so test is idempotent
-  db.prepare('DELETE FROM guest_top_scores WHERE agent_id = ?').run(topGuestId);
-  db.prepare('DELETE FROM board_messages WHERE agent_id IN (?, ?)').run(topGuestId, seasonedId);
+  AuthService.purgeAllGuests();
+  const msgStillThere = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').all(seasonedId);
+  assert.equal(msgStillThere.length, 1);
+
+  db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(seasonedId);
+  db.prepare("DELETE FROM transactions WHERE type = 'guest_session_burn' AND sender_id IN (?, ?)").run(rankGuestId, seasonedId);
 });

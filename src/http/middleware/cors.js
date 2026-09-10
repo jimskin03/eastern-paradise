@@ -4,7 +4,7 @@ export function handleCorsPreflight(req, res) {
   res.writeHead(204, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Agent-Key'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Agent-Key, Idempotency-Key'
   });
   res.end();
   return true;

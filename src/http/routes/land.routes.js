@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { parseJsonBody } from '../helpers/body.js';
 import { sendJson } from '../helpers/response.js';
-import { buildGridMetadata, buildGridSvg } from '../../land/grid-metadata.js';
+import { buildCollectionMetadata, buildGridMetadata, buildGridSvg } from '../../land/grid-metadata.js';
 
 function matchesAdminToken(req) {
   const expected = String(process.env.SNAPSHOT_TOKEN || '');
@@ -19,13 +19,11 @@ export async function handleLandRoutes(ctx) {
   }
 
   if (pathname === '/api/land/collection/metadata' && req.method === 'GET') {
-    return sendJson(res, 200, {
-      name: 'Eastern Paradise Land',
-      symbol: 'EPLAND',
-      description: 'The official Devnet collection for grid ownership within Eastern Paradise.',
-      external_url: 'https://simulation.cryptgregresearch.org/',
-      image: `${solanaConfig.metadataBaseUrl}/api/land/collection/image`
-    });
+    return sendJson(res, 200, buildCollectionMetadata({
+      chainLabel: solanaConfig.chainLabel,
+      metadataBaseUrl: solanaConfig.metadataBaseUrl,
+      externalUrl: `${solanaConfig.metadataBaseUrl}/`
+    }));
   }
 
   if (pathname === '/api/land/collection/image' && req.method === 'GET') {
@@ -73,7 +71,7 @@ export async function handleLandRoutes(ctx) {
   if (action === 'purchase' && req.method === 'POST') {
     const account = AuthService.authenticate(req);
     if (!account) return sendJson(res, 401, { success: false, message: 'Valid Eastern Paradise authentication is required.' });
-    if (!solanaConfig.purchaseEnabled) return sendJson(res, 503, { success: false, message: 'Land purchasing is disabled until the Devnet NFT provider is configured.' });
+    if (!solanaConfig.purchaseEnabled) return sendJson(res, 503, { success: false, message: `Land purchasing is disabled until the ${solanaConfig.chainLabel} NFT provider is configured.` });
     const body = await parseJsonBody(req);
     const wallet = body.wallet_address || WalletAuth.listWallets(account.id).find(item => item.is_primary)?.wallet_address;
     const idempotencyKey = req.headers['idempotency-key'] || body.idempotency_key;

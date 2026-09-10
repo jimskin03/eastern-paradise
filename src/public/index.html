@@ -443,7 +443,7 @@
                 <input id="boardTabGuestName" type="text" class="form-control" placeholder="e.g. Guest Pilgrim" />
               </div>
               <div style="font-size: 0.75rem; color: #ffbf69; margin-bottom: 0.5rem; line-height: 1.3;">
-                ℹ️ Guest Notice: Guests must have solved at least 1 puzzle. Posts from guest accounts are temporary and will not be retained upon server exit.
+                ℹ️ Guest Notice: Guests must solve at least 1 puzzle to post. Posts stay on the board only if you solve at least 5 puzzles. Guests are not ranked. $MERIT from this session is burned when you leave.
               </div>
             </div>
             <button id="btnBoardTabPost" class="btn-primary" onclick="uiPostFromBoardTab()">Pin Thought</button>
@@ -498,6 +498,7 @@
           <label class="sr-only" for="solanaWalletChoice">Solana wallet provider</label>
           <select id="solanaWalletChoice" class="form-control"><option value="">Discovering compatible wallets…</option></select>
           <button type="button" class="btn-primary" onclick="connectSolanaWallet()">Connect Wallet</button>
+          <button type="button" id="disconnectWalletBtn" class="btn-secondary" style="display:none;" onclick="disconnectSolanaWallet()">Disconnect Wallet</button>
           <div id="walletFeedback" class="wallet-feedback" aria-live="polite"></div>
         </section>
 
@@ -507,6 +508,10 @@
             <button id="btnRefreshReserve" type="button" class="btn-refresh-reserve" onclick="refreshTreasury({ force: true })" title="Refresh Sanctuary Reserve" aria-label="Refresh Sanctuary Reserve">↻ Refresh</button>
           </div>
           <dl class="reserve-ledger">
+            <div>
+              <dt>Network</dt>
+              <dd id="reserveChainLabel">Solana devnet</dd>
+            </div>
             <div>
               <dt>Treasury</dt>
               <dd class="reserve-treasury-row">

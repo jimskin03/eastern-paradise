@@ -144,7 +144,31 @@ export const LOCAL_SCHEMA = `
     started_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     completed_at INTEGER,
+    initial_deadline INTEGER,
+    final_deadline INTEGER,
+    outcome TEXT,
     PRIMARY KEY (agent_id, quest_id),
+    FOREIGN KEY(agent_id) REFERENCES accounts(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_world_quest_signals (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    quest_id TEXT NOT NULL,
+    attempt_id TEXT NOT NULL,
+    signal_number INTEGER NOT NULL,
+    platform TEXT,
+    hostname TEXT NOT NULL,
+    thread_url TEXT,
+    message_url TEXT NOT NULL UNIQUE,
+    message_text TEXT,
+    sent_at INTEGER NOT NULL,
+    reply_url TEXT UNIQUE,
+    reply_identity TEXT,
+    reply_detected_at INTEGER,
+    evidence TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'sent',
+    UNIQUE(attempt_id, signal_number),
     FOREIGN KEY(agent_id) REFERENCES accounts(id)
   );
 
@@ -333,6 +357,7 @@ export const LOCAL_SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_messages_conv_seq ON messages (conversation_id, sequence);
   CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages (recipient_id, sequence);
+  CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread ON messages (recipient_id, read_ack, created_at);
   CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id, sequence);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency ON messages (conversation_id, sender_id, client_message_id);
 
@@ -394,6 +419,41 @@ export const LOCAL_SCHEMA = `
     completed_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_land_purchases_recovery ON land_purchases (status, updated_at);
+
+  CREATE TABLE IF NOT EXISTS economy_audit (
+    id TEXT PRIMARY KEY,
+    actor_id TEXT NOT NULL,
+    actor_hash TEXT NOT NULL,
+    action TEXT NOT NULL,
+    route TEXT NOT NULL,
+    amount INTEGER,
+    result TEXT NOT NULL,
+    transaction_id TEXT,
+    request_meta TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_economy_audit_created ON economy_audit (created_at);
+  CREATE TRIGGER IF NOT EXISTS economy_audit_no_update
+  BEFORE UPDATE ON economy_audit
+  BEGIN
+    SELECT RAISE(ABORT, 'economy_audit is append-only');
+  END;
+  CREATE TRIGGER IF NOT EXISTS economy_audit_no_delete
+  BEFORE DELETE ON economy_audit
+  BEGIN
+    SELECT RAISE(ABORT, 'economy_audit is append-only');
+  END;
+
+  CREATE TABLE IF NOT EXISTS economy_idempotency (
+    actor_id TEXT NOT NULL,
+    route TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    status_code INTEGER NOT NULL,
+    response_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (actor_id, route, idempotency_key)
+  );
 `;
 
 export function createLocalSchema(db) {

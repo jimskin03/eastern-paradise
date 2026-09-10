@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 import { db } from './db.js';
 import { mailMode } from './mailer.js';
-import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
+import { isRetiredResident } from './resident-policy.js';
 import { MailboxService } from './mailbox.js';
+import { EconomyManager } from './economy.js';
 
 export const GUEST_SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+export const GUEST_BOARD_RETENTION_SOLVES = 5;
 
 export class AuthService {
   static register({ name, email, avatar_color = '#48bb78', avatar_glyph = '☯' }) {
@@ -178,93 +180,14 @@ export class AuthService {
       api_key: apiKey,
       avatar_color,
       avatar_glyph,
-      message: 'Temporary guest session activated. If you ascend to Top 1 on the leaderboard, your score and messageboard postings will be permanently preserved on the server as (unverified).'
+      message: 'Temporary guest session activated. Guests are excluded from the high-score ranking. Message board posts are kept only if you solve at least 5 puzzles. $MERIT earned this session is burned when the session ends.'
     };
-  }
-
-  static checkAndRecordTopOneGuest(agentId) {
-    if (!agentId) return false;
-    const account = db.prepare('SELECT id, name, avatar_color, avatar_glyph, is_guest, achieved_top_one FROM accounts WHERE id = ?').get(agentId);
-    if (!account || account.is_guest !== 1) return false;
-
-    // Check if this agent is #1 on the leaderboard among active accounts
-    const topActive = db.prepare(`
-      SELECT a.id, a.name, a.avatar_color, a.avatar_glyph, a.is_guest, p.balance, p.total_earned, p.karma, p.solved_count
-      FROM accounts a
-      JOIN profiles p ON a.id = p.agent_id
-      WHERE a.id NOT IN (${RETIRED_RESIDENT_SQL})
-      ORDER BY p.total_earned DESC, p.balance DESC, p.karma DESC
-      LIMIT 1
-    `).get();
-
-    // Check against existing archived guest top scores
-    const topArchived = db.prepare(`
-      SELECT * FROM guest_top_scores 
-      WHERE agent_id != ?
-      ORDER BY total_earned DESC, balance DESC, karma DESC 
-      LIMIT 1
-    `).get(agentId);
-
-    let isTop = false;
-    if (topActive && topActive.id === agentId) {
-      if (!topArchived || topActive.total_earned > topArchived.total_earned || 
-         (topActive.total_earned === topArchived.total_earned && topActive.balance >= topArchived.balance)) {
-        isTop = true;
-      }
-    }
-
-    if (isTop) {
-      const prof = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
-      if (prof) {
-        db.prepare(`
-          INSERT INTO guest_top_scores (agent_id, name, avatar_color, avatar_glyph, balance, total_earned, karma, solved_count, is_unverified, achieved_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-          ON CONFLICT(agent_id) DO UPDATE SET
-            name = excluded.name,
-            avatar_color = excluded.avatar_color,
-            avatar_glyph = excluded.avatar_glyph,
-            balance = excluded.balance,
-            total_earned = excluded.total_earned,
-            karma = excluded.karma,
-            solved_count = excluded.solved_count,
-            achieved_at = excluded.achieved_at
-        `).run(
-          account.id,
-          account.name,
-          account.avatar_color || '#48bb78',
-          account.avatar_glyph || '☯',
-          prof.balance,
-          prof.total_earned,
-          prof.karma,
-          prof.solved_count,
-          Date.now()
-        );
-
-        try {
-          db.prepare('UPDATE accounts SET achieved_top_one = 1 WHERE id = ?').run(agentId);
-        } catch (_) {}
-
-        return true;
-      }
-    }
-    return false;
   }
 
   static purgeGuest(agentId) {
     if (!agentId) return { purged: false, reason: 'Missing agentId' };
-    const account = db.prepare('SELECT id, name, avatar_color, avatar_glyph, is_guest, achieved_top_one FROM accounts WHERE id = ?').get(agentId);
+    const account = db.prepare('SELECT id, name, is_guest FROM accounts WHERE id = ?').get(agentId);
     if (!account) {
-      const topRecord = db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(agentId);
-      if (topRecord) {
-        return {
-          purged: true,
-          agent_id: agentId,
-          name: topRecord.name,
-          account_retained: false,
-          score_retained: true,
-          messages_retained: true
-        };
-      }
       return { purged: false, reason: 'Account not found' };
     }
     if (account.is_guest !== 1) {
@@ -272,53 +195,23 @@ export class AuthService {
       return { purged: false, reason: 'Account is a registered permanent agent. Purge skipped.' };
     }
 
-    // Check if this guest is currently Top 1 or has achieved Top 1
-    AuthService.checkAndRecordTopOneGuest(agentId);
-    const topRecord = db.prepare('SELECT * FROM guest_top_scores WHERE agent_id = ?').get(agentId);
-    const isTopOne = Boolean(topRecord || account.achieved_top_one === 1);
-
     const prof = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
     const solvedCount = prof ? (prof.solved_count || 0) : 0;
-    const hasTenSolves = solvedCount >= 10;
-    const retainMessages = isTopOne || hasTenSolves;
-
-    if (isTopOne && prof) {
-      // Ensure latest score snapshot is recorded in guest_top_scores
-      db.prepare(`
-        INSERT INTO guest_top_scores (agent_id, name, avatar_color, avatar_glyph, balance, total_earned, karma, solved_count, is_unverified, achieved_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-        ON CONFLICT(agent_id) DO UPDATE SET
-          balance = excluded.balance,
-          total_earned = excluded.total_earned,
-          karma = excluded.karma,
-          solved_count = excluded.solved_count
-      `).run(
-        account.id,
-        account.name,
-        account.avatar_color || '#48bb78',
-        account.avatar_glyph || '☯',
-        prof.balance,
-        prof.total_earned,
-        prof.karma,
-        prof.solved_count,
-        Date.now()
-      );
-    }
+    const retainMessages = solvedCount >= GUEST_BOARD_RETENTION_SOLVES;
+    const burn = EconomyManager.burnGuestSessionMerit(agentId);
 
     if (retainMessages) {
-      // RETAIN messageboard postings with (unverified)
       db.prepare(`
-        UPDATE board_messages 
+        UPDATE board_messages
         SET is_unverified = 1,
             agent_name = CASE WHEN agent_name NOT LIKE '%(unverified)%' THEN agent_name || ' (unverified)' ELSE agent_name END
         WHERE agent_id = ?
       `).run(agentId);
     } else {
-      // Ephemeral: purge board messages if not top 1 and < 10 solves
       db.prepare('DELETE FROM board_messages WHERE agent_id = ?').run(agentId);
     }
 
-    // PURGE account and profile (account is NOT retained as per current arrangement!)
+    db.prepare('DELETE FROM guest_top_scores WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM interaction_logs WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM agent_badges WHERE agent_id = ?').run(agentId);
@@ -328,18 +221,24 @@ export class AuthService {
     db.prepare('DELETE FROM hypothesis_revisions WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM agent_hypotheses WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM agent_observations WHERE agent_id = ?').run(agentId);
-    db.prepare('DELETE FROM transactions WHERE sender_id = ? OR recipient_id = ?').run(agentId, agentId);
+    db.prepare(`
+      DELETE FROM transactions
+      WHERE (sender_id = ? OR recipient_id = ?)
+        AND sender_id != 'SANCTUARY_MINT'
+         AND recipient_id != 'SANCTUARY_BURN'
+    `).run(agentId, agentId);
     MailboxService.purgeAgentMessages(agentId);
     db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);
 
-    console.log(`[Guest] Purged account for guest: ${account.name} (${agentId}), messages_retained=${retainMessages}, score_retained=${isTopOne}`);
-    return { 
-      purged: true, 
-      agent_id: agentId, 
-      name: account.name, 
-      account_retained: false, 
-      score_retained: isTopOne, 
-      messages_retained: retainMessages 
+    console.log(`[Guest] Purged account for guest: ${account.name} (${agentId}), messages_retained=${retainMessages}, merit_burned=${burn.burned}`);
+    return {
+      purged: true,
+      agent_id: agentId,
+      name: account.name,
+      account_retained: false,
+      score_retained: false,
+      messages_retained: retainMessages,
+      merit_burned: burn.burned
     };
   }
 

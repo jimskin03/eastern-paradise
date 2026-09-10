@@ -27,6 +27,7 @@ const EXPECTED_TABLES = [
   'interaction_logs',
   'agent_badges',
   'agent_world_quests',
+  'agent_world_quest_signals',
   'spectator_messages',
   'resident_traits',
   'agent_runtime',
@@ -47,12 +48,15 @@ const EXPECTED_TABLES = [
   'wallet_links',
   'wallet_challenges',
   'land_grids',
-  'land_purchases'
+  'land_purchases',
+  'economy_audit',
+  'economy_idempotency'
 ];
 
 const EXPECTED_INDEXES = [
   'idx_messages_conv_seq',
   'idx_messages_recipient',
+  'idx_messages_recipient_unread',
   'idx_messages_sender',
   'idx_messages_idempotency',
   'idx_agent_world_quests_status',
@@ -67,6 +71,7 @@ const EXPECTED_INDEXES = [
   'idx_hypothesis_evidence_evidence',
   'idx_hypothesis_revisions_hypothesis',
   'idx_world_rumors_updated',
+  'idx_economy_audit_created',
   'idx_sync_changes_tbl_id'
 ];
 
@@ -147,11 +152,15 @@ test('database facade preserves exports, paths, local bootstrap, and cloud-disab
     assert.equal(result.restored, undefined);
     assert.deepEqual(result.tablePk, TABLE_PK);
 
-    const expectedTriggers = SYNC_TABLES.flatMap(table => [
-      `trg_${table}_sync_del`,
-      `trg_${table}_sync_ins`,
-      `trg_${table}_sync_upd`
-    ]).sort();
+    const expectedTriggers = [
+      'economy_audit_no_delete',
+      'economy_audit_no_update',
+      ...SYNC_TABLES.flatMap(table => [
+        `trg_${table}_sync_del`,
+        `trg_${table}_sync_ins`,
+        `trg_${table}_sync_upd`
+      ])
+    ].sort();
     assert.deepEqual(result.triggers, expectedTriggers);
   } finally {
     rmSync(overrideDirectory, { recursive: true, force: true });

@@ -213,11 +213,12 @@ export async function handleAuthRoutes(ctx) {
       return sendJson(res, 200, {
         success: true,
         purged: true,
-        score_retained: Boolean(purgeRes.score_retained),
+        score_retained: false,
         messages_retained: Boolean(purgeRes.messages_retained),
-        message: purgeRes.score_retained
-          ? 'Guest session ended. Your account was purged, but your Top 1 score and message board posts are permanently retained as (unverified).'
-          : 'Guest session ended. All temporary achievements and message board posts have been purged.'
+        merit_burned: Number(purgeRes.merit_burned || 0),
+        message: purgeRes.messages_retained
+          ? 'Guest session ended. Your $MERIT was burned and is out of circulation. Message board posts are permanently retained as (unverified) because you solved at least 5 puzzles.'
+          : 'Guest session ended. Temporary achievements, $MERIT, and message board posts have been purged. Earned $MERIT was burned and is out of circulation.'
       });
     }
     return sendJson(res, 200, {

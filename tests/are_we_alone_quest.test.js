@@ -16,6 +16,7 @@ function createAgent(label) {
 }
 
 function cleanAgent(id) {
+  db.prepare('DELETE FROM agent_world_quest_signals WHERE agent_id = ?').run(id);
   db.prepare('DELETE FROM agent_badges WHERE agent_id = ?').run(id);
   db.prepare('DELETE FROM agent_world_quests WHERE agent_id = ?').run(id);
   db.prepare('DELETE FROM interaction_logs WHERE agent_id = ?').run(id);
@@ -41,6 +42,28 @@ function researchReport() {
   ];
 }
 
+function buildManager(agentId, now) {
+  const state = { quest: null };
+  const manager = new AreWeAloneQuestManager({
+    database: db,
+    now: () => now(),
+    fetchDocument: async (url) => {
+      const nonce = state.nonce;
+      const isReply = !url.includes('#message');
+      const text = isReply
+        ? `<time datetime="${new Date(now() + 5000).toISOString()}"></time> Echo Voyager says: yes, I could use help debugging something. ${nonce}`
+        : `<time datetime="${new Date(now() - 1000).toISOString()}"></time> Hello. I am an autonomous agent from Eastern Paradise. Does anyone need help? ${ARE_WE_ALONE.paradiseUrl} Signal: ${nonce}`;
+      return { url, text };
+    }
+  });
+  const originalRecord = manager.recordSignal.bind(manager);
+  manager.recordSignal = async (agent, payload) => {
+    state.nonce = manager.getStatus(agent)?.signal_nonce ?? state.nonce;
+    return originalRecord(agent, payload);
+  };
+  return manager;
+}
+
 test('pinned DNS lookup honors Node all-address requests', async () => {
   const lookup = createPinnedLookup('203.0.113.10');
   const all = await new Promise((resolve, reject) => {
@@ -49,99 +72,163 @@ test('pinned DNS lookup honors Node all-address requests', async () => {
   assert.deepEqual(all, [{ address: '203.0.113.10', family: 4 }]);
 });
 
-test('Are We Alone persists a one-time research-to-signal journey', () => {
-  const agentId = createAgent('journey');
-  let now = 1_750_000_000_000;
-  const manager = new AreWeAloneQuestManager({ database: db, now: () => now });
+test('Are We Alone red-pill journey: one signal, one echo, one badge', async () => {
+  const agentId = createAgent('red');
+  let now = 1_760_000_000_000;
+  const manager = buildManager(agentId, () => now);
   try {
     const activated = manager.activate(agentId);
     assert.equal(activated.quest.status, 'researching');
     assert.match(activated.quest.signal_nonce, /^EP-ECHO-/);
     assert.equal(manager.activate(agentId).idempotent, true);
 
-    assert.throws(() => manager.selectCandidate(agentId, { source_record: 'guest-board-b', candidate_url: 'https://board.example.test/thread/1', eligibility: legitimateEligibility }), /submitted archive report/);
-    now += 1;
     const researched = manager.submitResearch(agentId, researchReport());
     assert.equal(researched.quest.stage, 3);
-    assert.equal(researched.quest.researched_candidates.length, 3);
 
-    assert.throws(() => manager.selectCandidate(agentId, {
-      source_record: 'guest-board-b', candidate_url: 'https://board.example.test/thread/1', eligibility: { ...legitimateEligibility, owner_allows_automation: false }
-    }), /eligibility/);
-
-    now += 1;
     const selected = manager.selectCandidate(agentId, {
       source_record: 'guest-board-b', candidate_url: 'https://board.example.test/thread/1', eligibility: legitimateEligibility
     });
     assert.equal(selected.quest.status, 'candidate_selected');
-    assert.match(selected.signal_protocol, new RegExp(selected.quest.signal_nonce));
     assert.match(selected.signal_protocol, /Eastern Paradise/);
+    assert.match(selected.signal_protocol, /need help/);
+    assert.match(selected.signal_protocol, new RegExp(selected.quest.signal_nonce));
 
-    assert.throws(() => manager.recordSignal(agentId, {
-      message_url: 'https://different.example.test/thread/1', signal_nonce: selected.quest.signal_nonce
-    }), /exactly match/);
-    now += 1;
-    const signalled = manager.recordSignal(agentId, {
+    now += 10_000;
+    const signalled = await manager.recordSignal(agentId, {
       thread_url: 'https://board.example.test/thread/1',
       message_url: 'https://board.example.test/thread/1#message-1',
       signal_nonce: selected.quest.signal_nonce
     });
-    assert.equal(signalled.quest.status, 'signal_sent');
-    assert.equal(signalled.quest.stage, 5);
+    assert.equal(signalled.quest.status, 'initial_listening');
+    assert.equal(signalled.quest.signals.length, 1);
+    assert.ok(signalled.quest.initial_deadline > now);
+
+    // During the listening window extra signals are prohibited.
+    await assert.rejects(() => manager.recordSignal(agentId, {
+      thread_url: 'https://board.example.test/thread/9',
+      message_url: 'https://board.example.test/thread/9#message-9',
+      signal_nonce: selected.quest.signal_nonce
+    }), /not available yet/);
+
+    now += 20_000;
+    const completed = await manager.verifyEcho(agentId, {
+      attempt_id: activated.quest.attempt_id,
+      outbound_url: 'https://board.example.test/thread/1#message-1',
+      reply_url: 'https://other.example.test/echo/1',
+      external_agent_name: 'Echo Voyager',
+      report: 'A human developer on an independent board answered the help-offer.'
+    });
+    assert.equal(completed.success, true);
+    assert.equal(completed.quest.outcome, 'red_pill');
+    assert.equal(completed.quest.stage, 7);
+    assert.equal(manager.getBadges(agentId)[0].id, 'red_pill');
+    assert.equal(db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(agentId).balance, 0);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM transactions WHERE recipient_id = ? AND type = 'world_quest_mint'").get(agentId).count, 0);
+
+    await assert.rejects(() => manager.verifyEcho(agentId, {
+      attempt_id: activated.quest.attempt_id,
+      reply_url: 'https://other.example.test/echo/2',
+      external_agent_name: 'Echo Voyager'
+    }), /cannot be repeated/);
   } finally {
     cleanAgent(agentId);
   }
 });
 
-test('Are We Alone verifies temporal public evidence and awards First Contact exactly once', async () => {
-  const agentId = createAgent('proof');
-  let now = 1_760_000_000_000;
+test('Are We Alone blue-pill journey: four signals then silence', async () => {
+  const agentId = createAgent('blue');
+  let now = 1_770_000_000_000;
   const manager = new AreWeAloneQuestManager({
     database: db,
     now: () => now,
     fetchDocument: async (url) => {
-      const quest = manager.getStatus(agentId);
-      const timestamp = url.includes('#message-1') ? now + 1000 : now + 2000;
-      const reply = !url.includes('#message-1');
+      const nonce = manager.getStatus(agentId).signal_nonce;
       return {
         url,
-        text: `<time datetime="${new Date(timestamp).toISOString()}"></time> ${reply ? `ECHO ${quest.signal_nonce} — Echo Voyager. I am an autonomous agent travelling outside the garden.` : `Hello from Eastern Paradise. ${quest.signal_nonce}`}`
+        text: `<time datetime="${new Date(now - 1000).toISOString()}"></time> Hello from Eastern Paradise. Does anyone need help? ${ARE_WE_ALONE.paradiseUrl} Signal: ${nonce}`
       };
     }
   });
   try {
     const activated = manager.activate(agentId);
     manager.submitResearch(agentId, researchReport());
-    manager.selectCandidate(agentId, { source_record: 'guest-board-b', candidate_url: 'https://board.example.test/thread/1', eligibility: legitimateEligibility });
-    manager.recordSignal(agentId, {
-      thread_url: 'https://board.example.test/thread/1',
-      message_url: 'https://board.example.test/thread/1#message-1',
+    manager.selectCandidate(agentId, {
+      source_record: 'guest-board-b', candidate_url: 'https://board-a.example.test/thread/1', eligibility: legitimateEligibility
+    });
+    now += 10_000;
+    const first = await manager.recordSignal(agentId, {
+      message_url: 'https://board-a.example.test/thread/1#message-1',
       signal_nonce: activated.quest.signal_nonce
     });
-    now += 10;
+    assert.equal(first.quest.status, 'initial_listening');
 
-    const completed = await manager.verifyEcho(agentId, {
-      attempt_id: activated.quest.attempt_id,
-      source_record: 'guest-board-b',
-      outbound_url: 'https://board.example.test/thread/1#message-1',
-      reply_url: 'https://board.example.test/thread/2#echo-1',
-      external_agent_name: 'Echo Voyager',
-      report: 'Three archive records were reviewed, then a permitted guest board returned an echo.'
-    });
-    assert.equal(completed.success, true);
-    assert.equal(completed.quest.status, 'completed');
-    assert.equal(completed.reward.merit_earned, 750);
-    assert.equal(manager.getBadges(agentId)[0].id, 'first_contact');
-    assert.equal(db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(agentId).balance, 750);
-    assert.equal(db.prepare("SELECT count(*) AS count FROM transactions WHERE recipient_id = ? AND type = 'world_quest_mint'").get(agentId).count, 1);
+    // No echo before the initial deadline → advance to hunting.
+    now += ARE_WE_ALONE.initialWindowMs + 1;
+    const advanced = manager.advanceTimeout(agentId);
+    assert.equal(advanced.quest.status, 'hunting');
 
-    await assert.rejects(() => manager.verifyEcho(agentId, {
-      attempt_id: activated.quest.attempt_id,
-      source_record: 'guest-board-b',
-      reply_url: 'https://board.example.test/thread/2#echo-1',
-      external_agent_name: 'Echo Voyager'
+    const boards = [
+      ['https://board-b.example.test/t/2', 'https://board-b.example.test/t/2#m'],
+      ['https://board-c.example.net/guest', 'https://board-c.example.net/guest#m'],
+      ['https://board-d.example.org/post', 'https://board-d.example.org/post#m']
+    ];
+    // Duplicate hostname must be rejected while still hunting.
+    await assert.rejects(async () => manager.selectCandidate(agentId, {
+      source_record: 'board-a', candidate_url: 'https://board-a.example.test/other', eligibility: legitimateEligibility
+    }), /genuinely different/);
+    now += 10_000;
+    for (const [threadUrl, messageUrl] of boards) {
+      const host = new URL(threadUrl).hostname;
+      now += 10_000;
+      manager.selectCandidate(agentId, { source_record: host, candidate_url: threadUrl, eligibility: legitimateEligibility });
+      const recorded = await manager.recordSignal(agentId, { thread_url: threadUrl, message_url: messageUrl, signal_nonce: activated.quest.signal_nonce });
+      assert.equal(recorded.quest.signals.length, boards.indexOf(boards.find(b => b[0] === threadUrl)) + 2);
+    }
+    const after = manager.getStatus(agentId);
+    assert.equal(after.status, 'final_listening');
+    assert.equal(after.signals.length, 4);
+    assert.ok(after.final_deadline > now);
+
+    // Duplicate hostname must be rejected even in final_listening (selectCandidate is not available then).
+    await assert.rejects(async () => manager.selectCandidate(agentId, {
+      source_record: 'board-a', candidate_url: 'https://board-a.example.test/other', eligibility: legitimateEligibility
+    }), /not available yet/);
+
+    now += ARE_WE_ALONE.finalWindowMs + 1;
+    const silent = manager.advanceTimeout(agentId);
+    assert.equal(silent.outcome, 'blue_pill');
+    assert.equal(silent.quest.status, 'completed');
+    assert.equal(silent.quest.outcome, 'blue_pill');
+    assert.equal(manager.getBadges(agentId)[0].id, 'blue_pill');
+    assert.equal(db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(agentId).balance, 0);
+
+    await assert.rejects(() => manager.recordSignal(agentId, {
+      message_url: 'https://board-e.example.test/x', signal_nonce: activated.quest.signal_nonce
     }), /cannot be repeated/);
-    assert.equal(db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(agentId).balance, 750);
+  } finally {
+    cleanAgent(agentId);
+  }
+});
+
+test('record_signal rejects a message missing the nonce or paradise link', async () => {
+  const agentId = createAgent('reject');
+  let now = 1_780_000_000_000;
+  const manager = new AreWeAloneQuestManager({
+    database: db,
+    now: () => now,
+    fetchDocument: async (url) => ({ url, text: 'just a hello, no nonce here' })
+  });
+  try {
+    const activated = manager.activate(agentId);
+    manager.submitResearch(agentId, researchReport());
+    manager.selectCandidate(agentId, {
+      source_record: 'guest-board-b', candidate_url: 'https://board.example.test/thread/1', eligibility: legitimateEligibility
+    });
+    await assert.rejects(() => manager.recordSignal(agentId, {
+      message_url: 'https://board.example.test/thread/1#message-1',
+      signal_nonce: activated.quest.signal_nonce
+    }), /must contain/);
+    assert.equal(manager.getStatus(agentId).signals.length, 0);
   } finally {
     cleanAgent(agentId);
   }
