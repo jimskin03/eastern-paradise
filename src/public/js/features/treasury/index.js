@@ -3,12 +3,33 @@ import { apiFetch } from '../../api/client.js';
 let lastKnownTreasuryAddress = '';
 
 /**
- * Display-only MERIT reserve value: always exactly four decimal places.
+ * Display-only MERIT reserve value in scientific form.
+ * Coefficient is always 4 d.p. (X.XXXX); exponent is negative for tiny values.
+ * e.g. 0.00162 → "$1.6200×10^-3 / MERIT"
  * Does not change API numeric semantics — UI formatting only.
- * e.g. 0.00162 → "$0.0016 / MERIT"
  */
 export function formatReserveValuePerMerit(value) {
-  return `$${Number(value || 0).toFixed(4)} / MERIT`;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) {
+    return '$0.0000×10^0 / MERIT';
+  }
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  let exp = Math.floor(Math.log10(abs));
+  let coef = abs / (10 ** exp);
+  if (coef >= 10) {
+    coef /= 10;
+    exp += 1;
+  } else if (coef < 1 && coef > 0) {
+    coef *= 10;
+    exp -= 1;
+  }
+  let coefStr = coef.toFixed(4);
+  if (Number(coefStr) >= 10) {
+    coefStr = (Number(coefStr) / 10).toFixed(4);
+    exp += 1;
+  }
+  return `${sign}$${coefStr}×10^${exp} / MERIT`;
 }
 
 export async function copyTreasuryAddress() {
