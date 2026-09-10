@@ -2,6 +2,15 @@ import { apiFetch } from '../../api/client.js';
 
 let lastKnownTreasuryAddress = '';
 
+/**
+ * Display-only MERIT reserve value: always exactly four decimal places.
+ * Does not change API numeric semantics — UI formatting only.
+ * e.g. 0.00162 → "$0.0016 / MERIT"
+ */
+export function formatReserveValuePerMerit(value) {
+  return `$${Number(value || 0).toFixed(4)} / MERIT`;
+}
+
 export async function copyTreasuryAddress() {
   const addr = lastKnownTreasuryAddress;
   const fb = document.getElementById('copyTreasuryFeedback');
@@ -89,7 +98,7 @@ export async function refreshTreasury(options = {}) {
 
     const valEl = document.getElementById('reserveValuePerMerit');
     if (valEl) {
-      valEl.textContent = `$${Number(reserve.merit?.reserve_value_per_merit || 0).toFixed(5)} / MERIT`;
+      valEl.textContent = formatReserveValuePerMerit(reserve.merit?.reserve_value_per_merit);
     }
 
     const availEl = document.getElementById('reserveAvailableLand');
