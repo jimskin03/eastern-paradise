@@ -35,6 +35,7 @@ import { createLandAssetProvider } from './blockchain/nft-service.js';
 import { OwnershipSyncService } from './blockchain/ownership-sync.js';
 import { GridRegistry as GridRegistryService } from './land/grid-registry.js';
 import { GridPurchaseService } from './land/grid-purchase.js';
+import { EvidenceService, HypothesisService, RumorRepository } from './epistemics/index.js';
 
 export {
   sendApiError,
@@ -73,6 +74,9 @@ const Treasury = new TreasuryService({
     }
   })
 });
+const Evidence = new EvidenceService({ db, eventLedger });
+const Hypotheses = new HypothesisService({ db, eventLedger });
+const Rumors = new RumorRepository({ db });
 
 const services = {
   db,
@@ -105,7 +109,10 @@ const services = {
   LandAssetProvider,
   OwnershipSync,
   GridRegistry,
-  GridPurchase
+  GridPurchase,
+  Evidence,
+  Hypotheses,
+  Rumors
 };
 
 const limits = { checkRateLimit, checkGuestCreationLimit, checkWhisperLimit };

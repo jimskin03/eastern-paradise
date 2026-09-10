@@ -21,11 +21,15 @@ import { handlePuzzleRoutes } from './routes/puzzles.routes.js';
 import { handleBeaconRoutes } from './routes/beacon.routes.js';
 import { handleWalletRoutes } from './routes/wallet.routes.js';
 import { handleLandRoutes } from './routes/land.routes.js';
+import { handleEpistemicRoutes } from './routes/epistemics.routes.js';
+import { handleHypothesisRoutes } from './routes/hypotheses.routes.js';
 
 const routeHandlers = [
   handleBeaconRoutes,
   handleWalletRoutes,
   handleLandRoutes,
+  handleEpistemicRoutes,
+  handleHypothesisRoutes,
   handleChainRoutes,
   handleProtocolRoutes,
   handleAuthRoutes,

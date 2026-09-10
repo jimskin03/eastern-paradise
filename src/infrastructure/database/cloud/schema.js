@@ -196,6 +196,58 @@ export const CLOUD_TABLE_SCHEMAS = [
     epoch_awake_at INTEGER NOT NULL,
     last_tick_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS agent_observations (
+    id TEXT PRIMARY KEY,
+    evidence_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    zone_id TEXT NOT NULL,
+    perception_mode TEXT NOT NULL DEFAULT 'normal',
+    observation TEXT NOT NULL,
+    reliability TEXT NOT NULL DEFAULT 'unknown',
+    canonical_ref TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS agent_hypotheses (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'unverified',
+    visibility TEXT NOT NULL DEFAULT 'public',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS hypothesis_evidence (
+    hypothesis_id TEXT NOT NULL,
+    evidence_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (hypothesis_id, evidence_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS hypothesis_revisions (
+    id TEXT PRIMARY KEY,
+    hypothesis_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    previous_statement TEXT NOT NULL,
+    new_statement TEXT NOT NULL,
+    previous_confidence REAL NOT NULL,
+    new_confidence REAL NOT NULL,
+    reason TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS world_rumors (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    normalized_claim TEXT NOT NULL,
+    support_count INTEGER NOT NULL DEFAULT 0,
+    contradiction_count INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'rumor',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS messages (
     message_id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL,

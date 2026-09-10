@@ -276,6 +276,71 @@ export const LOCAL_SCHEMA = `
     last_tick_at INTEGER NOT NULL
   );
 
+  -- Epistemic foundation: observations, claims, revision history, and public rumor aggregates.
+  CREATE TABLE IF NOT EXISTS agent_observations (
+    id TEXT PRIMARY KEY,
+    evidence_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    zone_id TEXT NOT NULL,
+    perception_mode TEXT NOT NULL DEFAULT 'normal',
+    observation TEXT NOT NULL,
+    reliability TEXT NOT NULL DEFAULT 'unknown',
+    canonical_ref TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_observations_agent_created ON agent_observations (agent_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_agent_observations_evidence ON agent_observations (evidence_id);
+
+  CREATE TABLE IF NOT EXISTS agent_hypotheses (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+    status TEXT NOT NULL DEFAULT 'unverified' CHECK (status IN ('unverified', 'supported', 'contested', 'disproved', 'confirmed', 'withdrawn')),
+    visibility TEXT NOT NULL DEFAULT 'public' CHECK (visibility IN ('public', 'private')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_hypotheses_agent_updated ON agent_hypotheses (agent_id, updated_at);
+  CREATE INDEX IF NOT EXISTS idx_agent_hypotheses_public_updated ON agent_hypotheses (visibility, status, updated_at);
+
+  CREATE TABLE IF NOT EXISTS hypothesis_evidence (
+    hypothesis_id TEXT NOT NULL,
+    evidence_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    relation TEXT NOT NULL CHECK (relation IN ('supports', 'contradicts', 'uncertain')),
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (hypothesis_id, evidence_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_hypothesis_evidence_evidence ON hypothesis_evidence (evidence_id);
+
+  CREATE TABLE IF NOT EXISTS hypothesis_revisions (
+    id TEXT PRIMARY KEY,
+    hypothesis_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    previous_statement TEXT NOT NULL,
+    new_statement TEXT NOT NULL,
+    previous_confidence REAL NOT NULL,
+    new_confidence REAL NOT NULL,
+    reason TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_hypothesis_revisions_hypothesis ON hypothesis_revisions (hypothesis_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS world_rumors (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    normalized_claim TEXT NOT NULL,
+    support_count INTEGER NOT NULL DEFAULT 0,
+    contradiction_count INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'rumor' CHECK (state IN ('rumor', 'circulating', 'contested', 'faded')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_world_rumors_updated ON world_rumors (updated_at);
+
   CREATE TABLE IF NOT EXISTS messages (
     message_id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL,

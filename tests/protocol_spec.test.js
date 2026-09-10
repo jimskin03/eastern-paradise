@@ -14,6 +14,8 @@ test('Unified Protocol Definition: Shared Schemas, Instructions, and Prompts', a
   assert.ok(openapi.paths['/api/auth/guest']);
   assert.ok(openapi.paths['/api/board/post']);
   assert.ok(openapi.paths['/api/messages']);
+  assert.ok(openapi.paths['/api/perception/observe']);
+  assert.ok(openapi.paths['/api/hypotheses/{id}/revise']);
   assert.ok(openapi.components.securitySchemes.BearerAuth);
 
   // Check that requestBody schemas are defined

@@ -217,11 +217,15 @@ export class AuthService {
     db.prepare('DELETE FROM agent_badges WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM agent_world_quests WHERE agent_id = ?').run(agentId);
     db.prepare('DELETE FROM spectator_messages WHERE target_agent_id = ?').run(agentId);
+    db.prepare('DELETE FROM hypothesis_evidence WHERE agent_id = ?').run(agentId);
+    db.prepare('DELETE FROM hypothesis_revisions WHERE agent_id = ?').run(agentId);
+    db.prepare('DELETE FROM agent_hypotheses WHERE agent_id = ?').run(agentId);
+    db.prepare('DELETE FROM agent_observations WHERE agent_id = ?').run(agentId);
     db.prepare(`
       DELETE FROM transactions
       WHERE (sender_id = ? OR recipient_id = ?)
         AND sender_id != 'SANCTUARY_MINT'
-        AND recipient_id != 'SANCTUARY_BURN'
+         AND recipient_id != 'SANCTUARY_BURN'
     `).run(agentId, agentId);
     MailboxService.purgeAgentMessages(agentId);
     db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);

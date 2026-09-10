@@ -182,6 +182,28 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(guestPostsOnBoard.length, 1);
   assert.equal(guestPostsOnBoard[0].is_guest, 1);
 
+  // Epistemic state follows the same guest lifecycle contract.
+  const epistemicNow = Date.now();
+  db.prepare(`
+    INSERT INTO agent_observations
+      (id, evidence_id, agent_id, source_type, source_id, zone_id, observation, created_at)
+    VALUES (?, ?, ?, 'landmark', 'mossveil_ruins', 'mossveil_ruins', 'A temporary observation.', ?)
+  `).run(`obs_${guestId}`, 'EVID-GUEST-LIFECYCLE', guestId, epistemicNow);
+  db.prepare(`
+    INSERT INTO agent_hypotheses
+      (id, agent_id, statement, confidence, visibility, created_at, updated_at)
+    VALUES (?, ?, 'A temporary guest hypothesis.', 0.5, 'private', ?, ?)
+  `).run(`hyp_${guestId}`, guestId, epistemicNow, epistemicNow);
+  db.prepare(`
+    INSERT INTO hypothesis_evidence (hypothesis_id, evidence_id, agent_id, relation, added_at)
+    VALUES (?, 'EVID-GUEST-LIFECYCLE', ?, 'uncertain', ?)
+  `).run(`hyp_${guestId}`, guestId, epistemicNow);
+  db.prepare(`
+    INSERT INTO hypothesis_revisions
+      (id, hypothesis_id, agent_id, previous_statement, new_statement, previous_confidence, new_confidence, reason, created_at)
+    VALUES (?, ?, ?, 'First statement.', 'A temporary guest hypothesis.', 0.4, 0.5, 'New evidence.', ?)
+  `).run(`rev_${guestId}`, `hyp_${guestId}`, guestId, epistemicNow);
+
   // =========================================================================
   // 4. Guest Exits Server via Logout -> Data Purged
   // =========================================================================
@@ -204,6 +226,10 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
 
   const remainingLogs = db.prepare('SELECT * FROM interaction_logs WHERE agent_id = ?').all(guestId);
   assert.equal(remainingLogs.length, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM agent_observations WHERE agent_id = ?').get(guestId).count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM agent_hypotheses WHERE agent_id = ?').get(guestId).count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM hypothesis_evidence WHERE agent_id = ?').get(guestId).count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM hypothesis_revisions WHERE agent_id = ?').get(guestId).count, 0);
 
   // Subsequent requests with purged key must fail with 401
   const unauthRes = await req('/api/profile/me', {
@@ -245,6 +271,18 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(permPost.status, 201);
   assert.equal(permPost.data.post.is_guest, 0);
 
+  const permanentEpistemicNow = Date.now();
+  db.prepare(`
+    INSERT INTO agent_observations
+      (id, evidence_id, agent_id, source_type, source_id, zone_id, observation, created_at)
+    VALUES (?, ?, ?, 'landmark', 'reflection_stone', 'lotus_pond', 'A persistent observation.', ?)
+  `).run(`obs_${permId}`, 'EVID-PERMANENT-LIFECYCLE', permId, permanentEpistemicNow);
+  db.prepare(`
+    INSERT INTO agent_hypotheses
+      (id, agent_id, statement, confidence, visibility, created_at, updated_at)
+    VALUES (?, ?, 'A persistent registered hypothesis.', 0.5, 'private', ?, ?)
+  `).run(`hyp_${permId}`, permId, permanentEpistemicNow, permanentEpistemicNow);
+
   // Registered agent logs out
   const permLogout = await req('/api/auth/logout', {
     method: 'POST',
@@ -265,6 +303,8 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   const permDbPosts = db.prepare('SELECT * FROM board_messages WHERE agent_id = ?').all(permId);
   assert.equal(permDbPosts.length, 1);
   assert.equal(permDbPosts[0].is_guest, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM agent_observations WHERE agent_id = ?').get(permId).count, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM agent_hypotheses WHERE agent_id = ?').get(permId).count, 1);
 
   // Registered agent can log back in seamlessly with their API key
   const relogin = await req('/api/auth/login', {
