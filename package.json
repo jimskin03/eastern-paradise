@@ -1,11 +1,11 @@
 {
   "name": "eastern-paradise",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "description": "",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "build:wallet": "esbuild src/frontend/wallet/metamask-solana.js --bundle --format=esm --outfile=src/public/js/vendor/metamask-solana.bundle.js",
+    "build:wallet": "esbuild src/frontend/wallet/metamask-solana.js --bundle --format=esm --minify --target=es2020 --outfile=src/public/js/vendor/metamask-solana.bundle.js",
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "solana:create-collection": "node scripts/create-land-collection.mjs"
   },

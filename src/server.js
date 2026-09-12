@@ -14,7 +14,7 @@ import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 import { eventLedger } from './events.js';
 import { SocialSystem } from './social.js';
 import { MailboxService } from './mailbox.js';
-import { buildOpenApiSpec, buildManifest, buildInstructionsMarkdown, getHomepagePrompts } from './protocol.js';
+import { buildAgentCard, buildOpenApiSpec, buildManifest, buildInstructionsMarkdown, getHomepagePrompts } from './protocol.js';
 import { createRequestHandler } from './http/router.js';
 import {
   checkRateLimit,
@@ -36,6 +36,7 @@ import { OwnershipSyncService } from './blockchain/ownership-sync.js';
 import { GridRegistry as GridRegistryService } from './land/grid-registry.js';
 import { GridPurchaseService } from './land/grid-purchase.js';
 import { EvidenceService, HypothesisService, RumorRepository } from './epistemics/index.js';
+import { ResearchTelemetryService } from './research-telemetry.js';
 
 export {
   sendApiError,
@@ -77,6 +78,7 @@ const Treasury = new TreasuryService({
 const Evidence = new EvidenceService({ db, eventLedger });
 const Hypotheses = new HypothesisService({ db, eventLedger });
 const Rumors = new RumorRepository({ db });
+const ResearchTelemetry = new ResearchTelemetryService({ db });
 
 const services = {
   db,
@@ -96,6 +98,7 @@ const services = {
   eventLedger,
   SocialSystem,
   MailboxService,
+  buildAgentCard,
   buildOpenApiSpec,
   buildManifest,
   buildInstructionsMarkdown,
@@ -112,7 +115,8 @@ const services = {
   GridPurchase,
   Evidence,
   Hypotheses,
-  Rumors
+  Rumors,
+  ResearchTelemetry
 };
 
 const limits = { checkRateLimit, checkGuestCreationLimit, checkWhisperLimit };

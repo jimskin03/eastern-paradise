@@ -37,11 +37,18 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
     const data = await res.json();
     assert.equal(data.name, 'Eastern Paradise Sanctuary');
     assert.equal(data.protocol, 'a2a');
+    assert.equal(data.version, '2.2.0');
+    assert.ok(Array.isArray(data.supportedInterfaces));
+    assert.ok(data.capabilities);
+    assert.ok(Array.isArray(data.defaultInputModes));
+    assert.ok(Array.isArray(data.defaultOutputModes));
     assert.ok(Array.isArray(data.skills));
     assert.ok(data.skills.some(s => s.id === 'visit_sanctuary'));
     assert.ok(data.skills.some(s => s.id === 'solve_puzzles'));
     assert.ok(data.endpoints.arrive.includes('/api/visitor/arrive'));
     assert.ok(data.endpoints.discovery.includes('/api/discovery'));
+    assert.ok(data.endpoints.board_post.endsWith('/api/board/post'));
+    assert.ok(!JSON.stringify(data).includes('/api/board/messages'));
   });
 
   // 2. Frictionless Arrival at POST /api/visitor/arrive

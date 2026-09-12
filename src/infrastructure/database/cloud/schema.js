@@ -190,6 +190,22 @@ export const CLOUD_TABLE_SCHEMAS = [
     payload TEXT NOT NULL DEFAULT '{}',
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS research_telemetry (
+    id TEXT PRIMARY KEY,
+    actor_hash TEXT,
+    event_type TEXT NOT NULL,
+    session_type TEXT,
+    framework TEXT,
+    provider TEXT,
+    model TEXT,
+    puzzle_id TEXT,
+    puzzle_tier TEXT,
+    outcome TEXT,
+    duration_ms INTEGER,
+    attempt_number INTEGER,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS world_clock (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     tick_count INTEGER NOT NULL DEFAULT 0,

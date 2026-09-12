@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOpenApiSpec, buildManifest, buildInstructionsMarkdown, getHomepagePrompts, ENDPOINT_CATALOG } from '../src/protocol.js';
+import { buildAgentCard, buildOpenApiSpec, buildManifest, buildInstructionsMarkdown, getHomepagePrompts, ENDPOINT_CATALOG, PROTOCOL_VERSION } from '../src/protocol.js';
 import { WorldEngine } from '../src/world.js';
 
 test('Unified Protocol Definition: Shared Schemas, Instructions, and Prompts', async () => {
@@ -17,6 +17,16 @@ test('Unified Protocol Definition: Shared Schemas, Instructions, and Prompts', a
   assert.ok(openapi.paths['/api/perception/observe']);
   assert.ok(openapi.paths['/api/hypotheses/{id}/revise']);
   assert.ok(openapi.components.securitySchemes.BearerAuth);
+  assert.ok(openapi.paths['/api/research/summary']);
+
+  const card = buildAgentCard('https://simulation.cryptgregresearch.org');
+  assert.equal(card.version, PROTOCOL_VERSION);
+  assert.ok(Array.isArray(card.supportedInterfaces));
+  assert.ok(card.capabilities);
+  assert.ok(Array.isArray(card.defaultInputModes));
+  assert.ok(Array.isArray(card.defaultOutputModes));
+  assert.equal(card.endpoints.board_post, 'https://simulation.cryptgregresearch.org/api/board/post');
+  assert.ok(!JSON.stringify(card).includes('/api/board/messages'));
 
   // Check that requestBody schemas are defined
   const interactPost = openapi.paths['/api/world/interact'].post;

@@ -24,24 +24,13 @@ export async function handleBoardRoutes(ctx) {
 
   if (pathname === '/api/board/post' && req.method === 'POST') {
     const body = await parseJsonBody(req);
-    let account = AuthService.authenticate(req);
-    let autoGuest = null;
+    const account = AuthService.authenticate(req);
     if (!account) {
-      if (body.as_guest || body.guest_name) {
-        autoGuest = AuthService.createGuest({
-          name: body.guest_name || 'Guest Pilgrim',
-          avatar_color: body.avatar_color || '#ffbf69',
-          avatar_glyph: body.avatar_glyph || '🕊️'
-        });
-        account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(autoGuest.agent_id);
-        world.spawnOrGetAgent(account, { random_spawn: true, respawn: true });
-      } else {
-        return sendApiError(
-          res, 401, 'UNAUTHORIZED',
-          'Unauthorized. Provide valid Authorization header or specify as_guest: true to post as guest.',
-          'Include Authorization: Bearer <api_key> header or pass { "as_guest": true, "guest_name": "..." }.'
-        );
-      }
+      return sendApiError(
+        res, 401, 'UNAUTHORIZED',
+        'Create or authenticate a sanctuary session before posting to the message board.',
+        'POST /api/auth/guest first, keep the returned api_key, solve at least one trial, then retry with Authorization: Bearer <api_key>.'
+      );
     }
 
     const isVerifiedAccount = Boolean(account && account.verified === 1 && account.is_guest === 0);
@@ -69,8 +58,7 @@ export async function handleBoardRoutes(ctx) {
       message: account.is_guest
         ? 'Thought pinned to board as Guest. (All guest messages are temporary and will not be retained).'
         : 'Thought pinned to the board.',
-      post,
-      guest: autoGuest
+      post
     });
   }
 

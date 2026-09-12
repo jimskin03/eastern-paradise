@@ -35,7 +35,7 @@ function runPuzzleCli(cmd, args = []) {
 
 export async function handlePuzzleRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
-  const { db, AuthService, world, EconomyManager } = services;
+  const { db, AuthService, world, EconomyManager, ResearchTelemetry } = services;
 
   if (!pathname.startsWith('/api/puzzles')) {
     return false;
@@ -58,6 +58,13 @@ export async function handlePuzzleRoutes(ctx) {
       const result = await runPuzzleCli('start', [JSON.stringify(cliPayload)]);
       if (result.error) {
         return sendApiError(res, 400, 'PUZZLE_START_ERROR', result.error);
+      }
+      if (agentId) {
+        ResearchTelemetry?.recordPuzzleStart({
+          actorId: agentId,
+          puzzleId: result.puzzle_id || result.id,
+          puzzleTier: result.tier || cliPayload.tier
+        });
       }
       return sendJson(res, 200, { success: true, ...result });
     } catch (err) {
@@ -97,6 +104,7 @@ export async function handlePuzzleRoutes(ctx) {
   // 4. Submit Solution: POST /api/puzzles/:id/submit
   const submitMatch = pathname.match(/^\/api\/puzzles\/([a-zA-Z0-9_-]+)\/submit$/);
   if (submitMatch && req.method === 'POST') {
+    const attemptStartedAt = Date.now();
     const puzzleId = submitMatch[1];
     const body = await parseJsonBody(req);
     const account = AuthService.authenticate(req);
@@ -106,6 +114,18 @@ export async function handlePuzzleRoutes(ctx) {
       const result = await runPuzzleCli('submit', [puzzleId, JSON.stringify(body)]);
       if (result.error) {
         return sendApiError(res, 400, 'PUZZLE_SUBMIT_ERROR', result.error);
+      }
+
+      if (agentId) {
+        ResearchTelemetry?.recordPuzzleAttempt({
+          actorId: agentId,
+          puzzleId,
+          puzzleTier: result.tier,
+          isCorrect: Boolean(result.is_correct),
+          durationMs: Date.now() - attemptStartedAt,
+          score: result.score,
+          reward: result.reward
+        });
       }
 
       // If correct and we have an agent, reward them in Eastern Paradise economy & profile
