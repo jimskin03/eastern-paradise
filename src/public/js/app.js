@@ -196,7 +196,10 @@ import { initHappeningNow, refreshHappeningNow, toggleHappeningNow } from './fea
         const data = await res.json();
         if (res.ok && data.success) {
           if (feedback) feedback.innerHTML = `<span style="color: var(--accent-jade);">✨ ${escapeHtml(data.message)}</span>`;
-          showCelebrationToast(`✨ Trial Solved! +10 $MERIT, +25 Karma`);
+          const rewardParts = [];
+          if (Number.isFinite(Number(data.reward?.merit_earned))) rewardParts.push(`+${Number(data.reward.merit_earned)} $MERIT`);
+          if (Number.isFinite(Number(data.reward?.karma_added))) rewardParts.push(`+${Number(data.reward.karma_added)} Karma`);
+          showCelebrationToast(`✨ Trial Solved!${rewardParts.length ? ` ${rewardParts.join(', ')}` : ''}`);
           if (window.soundSystem) window.soundSystem.play('puzzle_solve');
           if (window.QuestManager) window.QuestManager.onSolvePuzzle();
           refreshAgentState();

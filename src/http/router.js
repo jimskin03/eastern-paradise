@@ -23,6 +23,7 @@ import { handleWalletRoutes } from './routes/wallet.routes.js';
 import { handleLandRoutes } from './routes/land.routes.js';
 import { handleEpistemicRoutes } from './routes/epistemics.routes.js';
 import { handleHypothesisRoutes } from './routes/hypotheses.routes.js';
+import { handleResearchRoutes } from './routes/research.routes.js';
 
 const routeHandlers = [
   handleBeaconRoutes,
@@ -30,6 +31,7 @@ const routeHandlers = [
   handleLandRoutes,
   handleEpistemicRoutes,
   handleHypothesisRoutes,
+  handleResearchRoutes,
   handleChainRoutes,
   handleProtocolRoutes,
   handleAuthRoutes,
@@ -90,7 +92,7 @@ export function createRequestHandler({ services, runtime, limits, publicDir }) {
         if (handled === true || res.writableEnded || res.headersSent) return;
       }
 
-      if (serveStaticFile({ pathname, res, publicDir })) return;
+      if (serveStaticFile({ pathname, req, res, publicDir })) return;
       sendJson(res, 404, { error: 'Not Found', path: pathname });
     } catch (err) {
       console.error('[Server] Error handling request:', err);

@@ -1,11 +1,25 @@
 import { apiFetch } from '../../api/client.js';
-import {
-  connectMetaMask,
-  signWithMetaMask,
-  isMetaMaskAvailable,
-  bytesToBase64,
-  formatWalletError
-} from '../../vendor/metamask-solana.bundle.js';
+
+let metaMaskBridgePromise = null;
+
+function loadMetaMaskBridge() {
+  if (!metaMaskBridgePromise) {
+    metaMaskBridgePromise = import('../../vendor/metamask-solana.bundle.js');
+  }
+  return metaMaskBridgePromise;
+}
+
+function bytesToBase64(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  let binary = '';
+  for (const byte of data) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function formatWalletError(error) {
+  const message = String(error?.message || error || 'Wallet connection failed.');
+  return { message };
+}
 
 const discovered = new Map();
 
@@ -32,10 +46,9 @@ function renderWalletChoices() {
   if (!select) return;
 
   const choices = [];
-  // MetaMask via @metamask/connect-solana
-  if (isMetaMaskAvailable() || !discovered.size) {
-    choices.push({ name: 'MetaMask', label: 'MetaMask (Solana)' });
-  }
+  // MetaMask support is loaded on demand so the large connector bundle is not
+  // part of the sanctuary's initial page payload.
+  choices.push({ name: 'MetaMask', label: 'MetaMask (Solana)' });
 
   // Generic Wallet Standard & window.solana wallets
   for (const wallet of discovered.values()) {
@@ -91,8 +104,10 @@ export async function connectSolanaWallet() {
     let providerName;
     let sign;
 
-    if (selectedName === 'MetaMask' || (!discovered.has(selectedName) && isMetaMaskAvailable())) {
+    if (selectedName === 'MetaMask') {
       // Primary supported path: @metamask/connect-solana
+      if (feedback) feedback.textContent = 'Loading MetaMask Solana connector…';
+      const { connectMetaMask, signWithMetaMask } = await loadMetaMaskBridge();
       const mm = await connectMetaMask();
       address = mm.address;
       providerName = mm.providerName;

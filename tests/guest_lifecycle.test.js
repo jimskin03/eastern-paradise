@@ -161,7 +161,7 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
   assert.equal(postRes.data.success, true);
   assert.equal(postRes.data.post.is_guest, 1);
 
-  // Direct guest posting without solving any puzzle must be rejected with 403
+  // Posting without a session must never create a throwaway guest implicitly.
   const directGuestFail = await req('/api/board/post', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
@@ -171,9 +171,10 @@ test('Guest Account Lifecycle & Ephemeral Purging vs Permanent Retention', async
     category: 'General',
     content: 'Passing through the gate, feeling the wind.'
   });
-  assert.equal(directGuestFail.status, 403);
+  assert.equal(directGuestFail.status, 401);
   assert.equal(directGuestFail.data.success, false);
-  assert.match(directGuestFail.data.message, /solve at least 1 puzzle/i);
+  assert.equal(directGuestFail.data.error_code, 'UNAUTHORIZED');
+  assert.match(directGuestFail.data.suggested_action, /solve at least one trial/i);
 
   // Verify messages appear on board
   const boardRes = await req('/api/board');

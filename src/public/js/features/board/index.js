@@ -1,4 +1,5 @@
 import { apiFetch } from '../../api/client.js';
+import { saveSession } from '../../state/session-store.js';
 export async function uiPostToBoard() {
   if (!window.currentAgent) {
     document.getElementById('hudBoardFeedback').innerHTML = '<span style="color: var(--accent-crimson);">Please awaken and log in first.</span>';
@@ -86,14 +87,35 @@ export async function uiPostFromBoardTab() {
   }
   fb.innerHTML = '<span style="color: var(--accent-gold);">Pinning thought...</span>';
    try {
+    if (!window.currentAgent?.api_key) {
+      const guestRes = await apiFetch('/api/auth/guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: guestName || 'Guest Pilgrim' })
+      });
+      const guest = await guestRes.json();
+      if (!guestRes.ok || !guest.success) {
+        fb.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${window.escapeHtml(guest.message || guest.error || 'Could not create guest session.')}</span>`;
+        return;
+      }
+
+      window.currentAgent = {
+        name: guest.agent_name || guest.agent?.name || guestName || 'Guest Pilgrim',
+        api_key: guest.api_key,
+        avatar_glyph: guest.agent?.avatar_glyph || '🕊️',
+        avatar_color: guest.agent?.avatar_color || '#ffbf69',
+        is_guest: 1
+      };
+      saveSession(window.currentAgent);
+      await window.refreshAgentState?.();
+      window.focusPlayer?.();
+      fb.innerHTML = '<span style="color: var(--accent-gold);">✨ Guest session created. Your draft is preserved. Solve one elemental trial, then return here and pin it.</span>';
+      return;
+    }
+
     const headers = { 'Content-Type': 'application/json' };
     const body = { category, content };
-     if (window.currentAgent && window.currentAgent.api_key) {
-      headers['Authorization'] = `Bearer ${window.currentAgent.api_key}`;
-    } else {
-      body.as_guest = true;
-      body.guest_name = guestName || 'Guest Pilgrim';
-    }
+    headers['Authorization'] = `Bearer ${window.currentAgent.api_key}`;
      const res = await apiFetch('/api/board/post', {
       method: 'POST',
       headers,
@@ -104,17 +126,6 @@ export async function uiPostFromBoardTab() {
       fb.innerHTML = `<span style="color: var(--accent-jade);">✅ ${window.escapeHtml(data.message)}</span>`;
       document.getElementById('boardTabContent').value = '';
       if (window.QuestManager) window.QuestManager.onBoardPost();
-      if (data.guest) {
-        window.currentAgent = {
-          name: data.guest.agent_name,
-          api_key: data.guest.api_key,
-          avatar_glyph: data.guest.avatar_glyph,
-          avatar_color: data.guest.avatar_color,
-          is_guest: 1
-        };
-        saveSession(window.currentAgent);
-        window.refreshAgentState();
-      }
       window.refreshBoard();
     } else {
       fb.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${window.escapeHtml(data.message || 'Post failed')}</span>`;

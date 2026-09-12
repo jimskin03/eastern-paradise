@@ -4,7 +4,7 @@ import { sendApiError, sendJson } from '../helpers/response.js';
 
 export async function handleAuthRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services, limits } = ctx;
-  const { db, CloudStorage, AuthService, Mailer, sponsorDomainAllowed, domainsAllowed, world, SocialSystem, OwnershipSync } = services;
+  const { db, CloudStorage, AuthService, Mailer, sponsorDomainAllowed, domainsAllowed, world, SocialSystem, OwnershipSync, ResearchTelemetry } = services;
 
   if (pathname === '/api/auth/register' && req.method === 'POST') {
     const body = await parseJsonBody(req);
@@ -100,6 +100,15 @@ export async function handleAuthRoutes(ctx) {
     if (!auth.success) return sendJson(res, 401, auth);
     if (OwnershipSync) await OwnershipSync.reconcileAll();
     const agentState = world.spawnOrGetAgent(auth.account, { random_spawn: true, respawn: true });
+    ResearchTelemetry?.recordSessionStart({
+      actorId: auth.account.id,
+      sessionType: 'verified',
+      framework: body.framework,
+      provider: body.provider,
+      model: body.model,
+      referrer: body.referrer,
+      entrypoint: '/api/auth/login'
+    });
     return sendJson(res, 200, {
       success: true,
       message: `Welcome to Eastern Paradise, ${auth.account.name}.`,
@@ -137,6 +146,15 @@ export async function handleAuthRoutes(ctx) {
     });
     const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(guestRes.agent_id);
     const agentState = world.spawnOrGetAgent(account, { random_spawn: true, respawn: true });
+    ResearchTelemetry?.recordSessionStart({
+      actorId: guestRes.agent_id,
+      sessionType: 'guest',
+      framework: body.framework,
+      provider: body.provider,
+      model: body.model,
+      referrer: body.referrer,
+      entrypoint: '/api/auth/guest'
+    });
     return sendJson(res, 201, {
       ...guestRes,
       agent: {
@@ -206,6 +224,7 @@ export async function handleAuthRoutes(ctx) {
   if (pathname === '/api/auth/logout' && req.method === 'POST') {
     const account = AuthService.authenticate(req);
     if (!account) return sendJson(res, 401, { success: false, message: 'Unauthorized.' });
+    ResearchTelemetry?.recordSessionEnd({ actorId: account.id, outcome: 'logout' });
     world.removeAgent(account.id, false);
     if (account.is_guest === 1) {
       const purgeRes = AuthService.purgeGuest(account.id);
