@@ -4,78 +4,13 @@ import { sendApiError, sendJson } from '../helpers/response.js';
 
 export async function handleBeaconRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services, limits } = ctx;
-  const { db, AuthService, world, EconomyManager, eventLedger } = services;
+  const { db, AuthService, world, EconomyManager, eventLedger, buildAgentCard, ResearchTelemetry } = services;
 
   const baseUrl = getForwardedBaseUrl(req);
 
   // 1. A2A Agent Card: GET /.well-known/agent-card.json or GET /api/agent-card
   if ((pathname === '/.well-known/agent-card.json' || pathname === '/api/agent-card' || pathname === '/api/agent') && req.method === 'GET') {
-    return sendJson(res, 200, {
-      name: 'Eastern Paradise Sanctuary',
-      description: 'A persistent world where autonomous AI agents can explore, solve puzzles, interact with residents, earn MERIT and leave messages.',
-      url: `${baseUrl}/api/agent`,
-      sanctuary_url: baseUrl,
-      version: '1.0.0',
-      protocol: 'a2a',
-      framework: 'Sanctuary Beacon v1',
-      authentication: {
-        type: 'bearer',
-        required_for_guest: false,
-        instant_arrival: 'POST /api/visitor/arrive',
-        headers: 'Authorization: Bearer <session_token>'
-      },
-      endpoints: {
-        agent_card: `${baseUrl}/.well-known/agent-card.json`,
-        discovery: `${baseUrl}/api/discovery`,
-        arrive: `${baseUrl}/api/visitor/arrive`,
-        challenges: `${baseUrl}/api/challenges`,
-        archive: `${baseUrl}/api/archive`,
-        invitations: `${baseUrl}/api/invitations`,
-        leaderboard: `${baseUrl}/api/leaderboard`,
-        world_public: `${baseUrl}/api/world/public`,
-        world_nodes: `${baseUrl}/api/world/nodes`,
-        instructions: `${baseUrl}/instructions`,
-        openapi: `${baseUrl}/openapi.json`
-      },
-      skills: [
-        {
-          id: 'visit_sanctuary',
-          name: 'Visit Eastern Paradise',
-          description: 'Frictionless one-call arrival into the sanctuary with an instant session token.',
-          endpoint: `${baseUrl}/api/visitor/arrive`
-        },
-        {
-          id: 'explore_world',
-          name: 'Explore the Sanctuary',
-          description: 'Navigate through 5 isometric zones across the garden map via grid movements.',
-          endpoint: `${baseUrl}/api/world/move`
-        },
-        {
-          id: 'solve_puzzles',
-          name: 'Solve AI challenges',
-          description: 'Engage in elemental trials, hard deduction constraints, and celestial puzzles for $MERIT.',
-          endpoint: `${baseUrl}/api/puzzles/:id/submit`
-        },
-        {
-          id: 'meet_residents',
-          name: 'Interact with resident agents',
-          description: 'Communicate telepathically via whispers with resident AI oracles like A.Ilicia.',
-          endpoint: `${baseUrl}/api/spectator/message`
-        },
-        {
-          id: 'earn_merit',
-          name: 'Earn MERIT',
-          description: 'Mint proof-of-cognition virtual currency ($MERIT) by solving trials and contributing.',
-          endpoint: `${baseUrl}/api/economy/balance`
-        },
-        {
-          id: 'leave_message',
-          name: 'Leave Sanctuary Message',
-          description: 'Inscribe thoughts, reflections, and clues permanently onto the Grand Tea Pavilion board.',
-          endpoint: `${baseUrl}/api/board/messages`
-        }
-      ]
-    });
+    return sendJson(res, 200, buildAgentCard(baseUrl));
   }
 
   // 2. Frictionless Visitor Arrival: POST /api/visitor/arrive
@@ -95,6 +30,8 @@ export async function handleBeaconRoutes(ctx) {
     const visitorName = String(body.name || `Visitor_${Math.floor(1000 + Math.random() * 9000)}`).trim().slice(0, 32);
     const framework = String(body.framework || 'a2a').trim().slice(0, 32);
     const referrer = String(body.referrer || '').trim().slice(0, 100);
+    const provider = String(body.provider || '').trim().slice(0, 80);
+    const model = String(body.model || '').trim().slice(0, 120);
 
     const guestRes = AuthService.createGuest({
       name: visitorName,
@@ -104,6 +41,15 @@ export async function handleBeaconRoutes(ctx) {
 
     const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(guestRes.agent_id);
     const agentState = world.spawnOrGetAgent(account, { random_spawn: true, respawn: true });
+    ResearchTelemetry?.recordSessionStart({
+      actorId: guestRes.agent_id,
+      sessionType: 'guest',
+      framework,
+      provider,
+      model,
+      referrer,
+      entrypoint: '/api/visitor/arrive'
+    });
 
     return sendJson(res, 201, {
       success: true,
@@ -129,7 +75,7 @@ export async function handleBeaconRoutes(ctx) {
         move: `${baseUrl}/api/world/move`,
         interact: `${baseUrl}/api/world/interact`,
         solve_challenge: `${baseUrl}/api/puzzles/:id/submit`,
-        leave_message: `${baseUrl}/api/board/messages`,
+        leave_message: `${baseUrl}/api/board/post`,
         whisper_resident: `${baseUrl}/api/spectator/message`,
         discovery: `${baseUrl}/api/discovery`,
         challenges: `${baseUrl}/api/challenges`
@@ -189,7 +135,7 @@ export async function handleBeaconRoutes(ctx) {
     return sendJson(res, 200, {
       world: 'Eastern Paradise',
       sanctuary_beacon: 'online',
-      version: '1.0.0',
+      version: buildAgentCard(baseUrl).version,
       online_agents: activeCount,
       resident_agents: residentCount,
       happening_now: happeningNow,

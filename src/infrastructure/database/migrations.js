@@ -1,4 +1,24 @@
 export const SAFE_MIGRATIONS = [
+  `
+    CREATE TABLE IF NOT EXISTS research_telemetry (
+      id TEXT PRIMARY KEY,
+      actor_hash TEXT,
+      event_type TEXT NOT NULL,
+      session_type TEXT,
+      framework TEXT,
+      provider TEXT,
+      model TEXT,
+      puzzle_id TEXT,
+      puzzle_tier TEXT,
+      outcome TEXT,
+      duration_ms INTEGER,
+      attempt_number INTEGER,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_research_telemetry_created ON research_telemetry (created_at);
+    CREATE INDEX IF NOT EXISTS idx_research_telemetry_actor ON research_telemetry (actor_hash, created_at);
+  `,
   `ALTER TABLE accounts ADD COLUMN sponsor_balance INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE profiles ADD COLUMN balance INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE profiles ADD COLUMN total_earned INTEGER NOT NULL DEFAULT 0;`,

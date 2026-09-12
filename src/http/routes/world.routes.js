@@ -3,7 +3,7 @@ import { sendJson } from '../helpers/response.js';
 
 export async function handleWorldRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
-  const { AuthService, world } = services;
+  const { db, AuthService, world, ResearchTelemetry } = services;
   if (!pathname.startsWith('/api/world')) return false;
 
   const account = AuthService.authenticate(req);
@@ -78,6 +78,7 @@ export async function handleWorldRoutes(ctx) {
   }
 
   if (pathname === '/api/world/interact' && (req.method === 'POST' || req.method === 'GET')) {
+    const interactionStartedAt = Date.now();
     let body = {};
     if (req.method === 'POST') {
       body = await parseJsonBody(req).catch(() => ({}));
@@ -102,7 +103,20 @@ export async function handleWorldRoutes(ctx) {
       ...body
     };
     try {
+      const puzzleMeta = body.action === 'solve'
+        ? db.prepare('SELECT difficulty, category FROM active_puzzles WHERE node_id = ?').get(body.node_id)
+        : null;
       const result = world.interact(account.id, body.node_id, body.action, payload);
+      if (body.action === 'solve' && result && !result.idempotent) {
+        ResearchTelemetry?.recordPuzzleAttempt({
+          actorId: account.id,
+          puzzleId: body.node_id,
+          puzzleTier: puzzleMeta?.difficulty || result.tier || result.category || puzzleMeta?.category || null,
+          isCorrect: Boolean(result.success),
+          durationMs: Date.now() - interactionStartedAt,
+          reward: result.reward?.merit_earned
+        });
+      }
       if (result.success && result.reward?.merit_earned) {
         world.broadcast({
           type: 'coin_minted',
