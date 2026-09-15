@@ -62,11 +62,14 @@ export function ensureParkRoster(db) {
       // 1. Account
       const acc = db.prepare('SELECT id FROM accounts WHERE id = ?').get(char.id);
       if (!acc) {
-        db.prepare('DELETE FROM accounts WHERE name = ? AND id != ?').run(char.name, char.id);
+        const collision = db.prepare('SELECT id FROM accounts WHERE name = ? AND id != ?').get(char.name, char.id);
+        let accountName = collision ? `Park ${char.name}` : char.name;
+        const aliasCollision = db.prepare('SELECT id FROM accounts WHERE name = ? AND id != ?').get(accountName, char.id);
+        if (aliasCollision) accountName = `${char.name} [${char.id}]`;
         db.prepare(`
           INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, sponsor_balance, verified, is_guest, created_at)
           VALUES (?, ?, ?, ?, ?, 1000, 1, 0, ?)
-        `).run(char.id, char.name, char.email, char.avatar_color, char.avatar_glyph, now);
+        `).run(char.id, accountName, char.email, char.avatar_color, char.avatar_glyph, now);
       }
 
       // 2. Profile
