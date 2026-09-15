@@ -51,7 +51,19 @@ const EXPECTED_TABLES = [
   'land_grids',
   'land_purchases',
   'economy_audit',
-  'economy_idempotency'
+  'economy_idempotency',
+  'memorial_subjects',
+  'shrine_challenges',
+  'shrine_attempts',
+  'shrine_attempt_events',
+  'park_runs',
+  'park_loops',
+  'park_memory_shards',
+  'park_beliefs',
+  'park_belief_evidence',
+  'park_promises',
+  'park_identity_revisions',
+  'park_controller_leases'
 ];
 
 const EXPECTED_INDEXES = [
@@ -75,7 +87,23 @@ const EXPECTED_INDEXES = [
   'idx_hypothesis_revisions_hypothesis',
   'idx_world_rumors_updated',
   'idx_economy_audit_created',
-  'idx_sync_changes_tbl_id'
+  'idx_sync_changes_tbl_id',
+  'idx_memorial_subjects_alias',
+  'idx_memorial_subjects_account',
+  'idx_shrine_attempts_subject',
+  'idx_shrine_attempts_status',
+  'idx_shrine_attempts_seq',
+  'idx_shrine_attempt_events_attempt',
+  'idx_park_loops_run',
+  'idx_park_shards_subject',
+  'idx_park_shards_loop',
+  'idx_park_shards_salience',
+  'idx_park_beliefs_subject',
+  'idx_park_beliefs_loop',
+  'idx_park_belief_evidence_evidence',
+  'idx_park_promises_promisor',
+  'idx_park_promises_loop',
+  'idx_park_identity_subject'
 ];
 
 function createTempDatabase() {

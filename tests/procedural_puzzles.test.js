@@ -8,7 +8,15 @@ test('Procedural Puzzle Engine HTTP Endpoints (/api/puzzles/*)', async (t) => {
   const env = { ...process.env, PORT };
   const srv = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
 
-  await new Promise(res => setTimeout(res, 900));
+  for (let i = 0; i < 40; i++) {
+    try {
+      const health = await req('/api/status');
+      if (health.status === 200) break;
+    } catch {
+      await new Promise((res) => setTimeout(res, 150));
+    }
+    if (i === 39) throw new Error(`procedural puzzle server failed to boot on port ${PORT}`);
+  }
 
   t.after(() => {
     srv.kill();

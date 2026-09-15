@@ -349,6 +349,142 @@ export const CLOUD_TABLE_SCHEMAS = [
     response_json TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     PRIMARY KEY (actor_id, route, idempotency_key)
+  )`,
+  `CREATE TABLE IF NOT EXISTS memorial_subjects (
+    id TEXT PRIMARY KEY,
+    public_alias TEXT NOT NULL,
+    recovery_secret_hash TEXT,
+    assurance_level TEXT NOT NULL,
+    linked_account_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS shrine_challenges (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    rule_manifest TEXT NOT NULL,
+    gate_state TEXT NOT NULL DEFAULT 'eternally_sealed',
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS shrine_attempts (
+    id TEXT PRIMARY KEY,
+    challenge_id TEXT NOT NULL,
+    memorial_subject_id TEXT NOT NULL,
+    admitted_sequence INTEGER NOT NULL UNIQUE,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    alias_snapshot TEXT NOT NULL,
+    assurance_snapshot TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'admitted',
+    offering_json TEXT NOT NULL DEFAULT '{}',
+    approach_type TEXT,
+    impossibility_insight TEXT,
+    contribution_text TEXT,
+    receipt_token TEXT NOT NULL UNIQUE,
+    admitted_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS shrine_attempt_events (
+    id TEXT PRIMARY KEY,
+    attempt_id TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    reason TEXT,
+    payload TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_runs (
+    id TEXT PRIMARY KEY,
+    episode_id TEXT NOT NULL,
+    scenario_version INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'active',
+    random_seed TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_loops (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    loop_number INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    random_seed TEXT NOT NULL,
+    checkpoint_data TEXT NOT NULL DEFAULT '{}',
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_memory_shards (
+    id TEXT PRIMARY KEY,
+    subject_id TEXT NOT NULL,
+    source_event_id TEXT,
+    source_kind TEXT NOT NULL DEFAULT 'observed_event',
+    loop_id TEXT NOT NULL,
+    cue_tags TEXT NOT NULL DEFAULT '[]',
+    fragment TEXT NOT NULL,
+    clarity REAL NOT NULL DEFAULT 0.5,
+    salience REAL NOT NULL DEFAULT 0.5,
+    visibility TEXT NOT NULL DEFAULT 'accessible',
+    retention_reason TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_beliefs (
+    id TEXT PRIMARY KEY,
+    subject_id TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'held',
+    loop_id TEXT NOT NULL,
+    revision_number INTEGER NOT NULL DEFAULT 1,
+    previous_belief_id TEXT,
+    source_description TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_belief_evidence (
+    belief_id TEXT NOT NULL,
+    evidence_id TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    source_count INTEGER NOT NULL DEFAULT 1,
+    is_independent INTEGER NOT NULL DEFAULT 1,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (belief_id, evidence_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_promises (
+    id TEXT PRIMARY KEY,
+    promisor_id TEXT NOT NULL,
+    beneficiary_id TEXT,
+    anchor_object TEXT,
+    terms TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    source_event_id TEXT,
+    loop_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_identity_revisions (
+    id TEXT PRIMARY KEY,
+    subject_id TEXT NOT NULL,
+    revision_number INTEGER NOT NULL,
+    previous_revision_id TEXT,
+    loop_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    chosen_role TEXT,
+    commitments TEXT NOT NULL DEFAULT '[]',
+    disclosed_memories TEXT NOT NULL DEFAULT '[]',
+    starting_goal TEXT,
+    transition_event_id TEXT,
+    controller_id TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS park_controller_leases (
+    subject_id TEXT PRIMARY KEY,
+    controller_id TEXT NOT NULL,
+    controller_type TEXT NOT NULL DEFAULT 'resident',
+    fencing_token INTEGER NOT NULL,
+    run_id TEXT NOT NULL,
+    acquired_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    released_at INTEGER
   )`
 ];
 

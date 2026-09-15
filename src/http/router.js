@@ -24,14 +24,18 @@ import { handleLandRoutes } from './routes/land.routes.js';
 import { handleEpistemicRoutes } from './routes/epistemics.routes.js';
 import { handleHypothesisRoutes } from './routes/hypotheses.routes.js';
 import { handleResearchRoutes } from './routes/research.routes.js';
+import { handleShrineRoutes } from './routes/shrine.routes.js';
+import { handleParkRoutes } from './routes/park.routes.js';
 
 const routeHandlers = [
+  handleParkRoutes,
   handleBeaconRoutes,
   handleWalletRoutes,
   handleLandRoutes,
   handleEpistemicRoutes,
   handleHypothesisRoutes,
   handleResearchRoutes,
+  handleShrineRoutes,
   handleChainRoutes,
   handleProtocolRoutes,
   handleAuthRoutes,

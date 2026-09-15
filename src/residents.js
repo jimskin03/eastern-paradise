@@ -5,6 +5,7 @@ import { NavigationSystem } from './navigation.js';
 import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
 import { PuzzleManager } from './puzzles.js';
+import { getActiveLease } from './domain/park/controller.js';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
@@ -424,6 +425,12 @@ export class ResidentManager {
 
     const elapsedMs = Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0);
     for (const [id, res] of this.residents.entries()) {
+      // 0. If an external Park controller holds an active lease, yield autonomy
+      const activeLease = getActiveLease(db, id);
+      if (activeLease && activeLease.controller_type === 'external') {
+        continue;
+      }
+
       // 1. If currently performing an active action with duration
       if (res.action_duration_ms > 0) {
         res.action_duration_ms -= elapsedMs;

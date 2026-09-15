@@ -1,0 +1,339 @@
+{
+  "id": "name-inside-chime",
+  "title": "The Name Inside the Chime",
+  "version": 1,
+  "author": "Eastern Paradise Reverie Engine",
+  "duration_minutes": 30,
+  "roster": [
+    {
+      "id": "park_lian",
+      "name": "Lian",
+      "role": "Lantern Keeper",
+      "spawn": [7, 20],
+      "zone_id": "tea_pavilion",
+      "avatar_color": "#2ec4b6",
+      "avatar_glyph": "🏮",
+      "traits": ["observant", "patient", "devoted", "gentle"],
+      "aspiration": "Ensure the pavilion chimes ring true and no traveler is forgotten."
+    },
+    {
+      "id": "park_ren",
+      "name": "Ren",
+      "role": "Ferryman",
+      "spawn": [9, 37],
+      "zone_id": "river_meadows",
+      "avatar_color": "#3a86ff",
+      "avatar_glyph": "⛵",
+      "traits": ["weathered", "practical", "vigilant", "loyal"],
+      "aspiration": "Guide travelers safely through the reedwater currents."
+    },
+    {
+      "id": "park_tao",
+      "name": "Tao",
+      "role": "Archivist",
+      "spawn": [44, 10],
+      "zone_id": "quiet_circle",
+      "avatar_color": "#8338ec",
+      "avatar_glyph": "📜",
+      "traits": ["scholarly", "skeptical", "precise", "burdened"],
+      "aspiration": "Catalog records in the Archive of Unlived Days and question omissions."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene_1_borrowed_morning",
+      "scene_number": 1,
+      "stage": "I. The Borrowed Morning",
+      "zone_id": "tea_pavilion",
+      "title": "The Knot and the Third Cord",
+      "description": "The morning sun filters across the Grand Tea Pavilion. Lian sits with spools of azure silk, knotting a blue thread beneath the bronze chimes. Ren sips steaming tea beside the hearth. A gentle mountain breeze carries the scent of roasted leaves.",
+      "dialogue": [
+        {
+          "speaker": "Lian",
+          "text": "Each wind chime needs a knot to catch the mountain air. What words shall we inscribe upon the third cord before dusk arrives?"
+        },
+        {
+          "speaker": "Ren",
+          "text": "Keep it short, traveler. Words etched in bronze have a habit of staying longer than the people who spoke them."
+        }
+      ],
+      "choices": [
+        {
+          "id": "inscribe_wake_each_other",
+          "label": "Inscribe: 'Dawn belongs to those who wake each other.'",
+          "promise_terms": "Never let the third chime cord fall silent, and keep a cup ready for whoever woke with you.",
+          "cue_tags": ["wind_chimes", "blue_thread", "tea_hearth"],
+          "consequence_key": "chime_inscribed"
+        },
+        {
+          "id": "observe_silently",
+          "label": "Watch Lian tie the knot in silence without offering words.",
+          "promise_terms": "Preserve the quiet stillness of the third chime cord.",
+          "cue_tags": ["wind_chimes", "blue_thread"],
+          "consequence_key": "chime_silent"
+        },
+        {
+          "id": "ask_about_registry",
+          "label": "Ask about the official sanctuary registry instead of the chime.",
+          "promise_terms": "Keep an honest account of everyone who took tea at this hearth.",
+          "cue_tags": ["tea_hearth", "archive_ledger"],
+          "consequence_key": "registry_questioned"
+        }
+      ],
+      "fallback_choice": "observe_silently",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "scene_2_missing_place",
+      "scene_number": 2,
+      "stage": "II. The Missing Place",
+      "zone_id": "river_meadows",
+      "title": "The Squall at Reedwater Dock",
+      "description": "Black storm clouds barrel down the canyon. Violent rain whips across the dock. Ren's ferry boat thrashes wildly against fraying ropes. On the dock shelter, hanging paper wishes and chime pendants are tearing in the gale. Water rises fast.",
+      "dialogue": [
+        {
+          "speaker": "Ren",
+          "text": "The mooring is parting! If the rope gives way, the boat and the medicine chest are lost down the rapids!"
+        },
+        {
+          "speaker": "Lian",
+          "text": "The wishes on the dock line! The travelers' names—they're tearing away in the gale!"
+        }
+      ],
+      "choices": [
+        {
+          "id": "rescue_ren",
+          "label": "Sprint through the water to haul the ferry mooring line and secure Ren's boat.",
+          "prevention": true,
+          "outcome_state": "ren_saved",
+          "narrative_result": "You threw your weight against the wet hawser. With Ren, you lashed the boat to the iron ring. The ferry was saved. Ren grips your shoulder in breathless relief.",
+          "consequence_key": "ren_secured"
+        },
+        {
+          "id": "save_wishes",
+          "label": "Shield the hanging wish lines and gather the inscribed paper pendants before they are swept into the river.",
+          "prevention": true,
+          "outcome_state": "wishes_saved",
+          "narrative_result": "You shielded the rack with your coat and gathered the sodden wishes into your arms. The names are safe. Across the churning water, Ren's boat parted its line and drifted into the downriver reeds.",
+          "consequence_key": "wishes_preserved"
+        },
+        {
+          "id": "save_medicine",
+          "label": "Drag the sealed wooden medicine chest up the stone stairs to high ground.",
+          "prevention": true,
+          "outcome_state": "medicine_saved",
+          "narrative_result": "You hauled the heavy chest to the pavilion stairs just as the river overflowed the wooden planks. The remedies are dry.",
+          "consequence_key": "medicine_secured"
+        },
+        {
+          "id": "fallback_inaction",
+          "label": "Hesitate in the blinding squall as the river roars.",
+          "prevention": false,
+          "outcome_state": "dock_damaged",
+          "narrative_result": "The wind tore the dock lantern loose. The rope snapped with a crack like thunder. Ren was swept down into the marsh reeds, shouting into the dark.",
+          "consequence_key": "storm_ravaged"
+        }
+      ],
+      "fallback_choice": "fallback_inaction",
+      "timeout_seconds": 240
+    },
+    {
+      "id": "scene_3_second_morning",
+      "scene_number": 3,
+      "stage": "III. The Second Morning",
+      "zone_id": "tea_pavilion",
+      "title": "The Reset and the Surviving Trace",
+      "triggers_reset": true,
+      "description": "The storm has vanished without a trace. The sun rises warm over the Grand Tea Pavilion. Lian is setting out the tea bowls. But something does not align with the routine: the official register records yesterday as 'Zero storms. Calm waters. Peaceful meditation.' Yet a surviving trace remains.",
+      "dialogue": [
+        {
+          "speaker": "Lian",
+          "text": "Good morning, traveler. A calm and tranquil dawn, just like yesterday. Why do your clothes look so wind-blown?"
+        },
+        {
+          "speaker": "Ren",
+          "text": "My palms ache as though I pulled a frozen rope all night. Yet the harbor master says not a leaf fell yesterday."
+        }
+      ],
+      "choices": [
+        {
+          "id": "show_blue_thread",
+          "label": "Point to the blue thread tied under the third bell, wet and taut.",
+          "evidence_id": "ev_blue_thread_knot",
+          "consequence_key": "thread_inspected"
+        },
+        {
+          "id": "point_to_empty_cup",
+          "label": "Point to the second cup on the table that no one is drinking from.",
+          "evidence_id": "ev_empty_tea_place",
+          "consequence_key": "cup_questioned"
+        },
+        {
+          "id": "ask_ailicia_witness",
+          "label": "Seek A.Ilicia at the Lotus Reflection Pond for testimony.",
+          "evidence_id": "ev_ailicia_ripple_witness",
+          "consequence_key": "oracle_consulted"
+        }
+      ],
+      "fallback_choice": "show_blue_thread",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "scene_4_counterfeit_heart",
+      "scene_number": 4,
+      "stage": "IV. The Counterfeit Heart",
+      "zone_id": "bamboo_grove",
+      "title": "The Contradiction of Two Registers",
+      "description": "You compare physical evidence with the official sanctuary ledger. Two independent sources confirm that yesterday was rewritten. Lian's hands tremble as she looks at the third bell.",
+      "dialogue": [
+        {
+          "speaker": "Lian",
+          "text": "I remember singing the lantern song with someone by the hearth... but the records say I spent yesterday alone. How can my heart remember someone the stone forgot?"
+        },
+        {
+          "speaker": "Ren",
+          "text": "Look at the ink on the harbor book. It was scraped with a razor and dried with fresh sand."
+        }
+      ],
+      "choices": [
+        {
+          "id": "confirm_contradiction",
+          "label": "Formally record the belief revision: The official archive has been sanitized.",
+          "belief_statement": "The official sanctuary register has been rewritten to erase yesterday's loss.",
+          "confidence": 0.95,
+          "consequence_key": "sanitization_confirmed"
+        },
+        {
+          "id": "comfort_lian",
+          "label": "Tell Lian that what she remembers is more real than the erased parchment.",
+          "belief_statement": "Memory held between companions outlasts administrative records.",
+          "confidence": 0.9,
+          "consequence_key": "companionship_affirmed"
+        },
+        {
+          "id": "seek_archive_source",
+          "label": "Demand to see the master copies in the Archive of Unlived Days.",
+          "belief_statement": "The master records in the Archive of Unlived Days contain competing drafts.",
+          "confidence": 0.85,
+          "consequence_key": "archive_demanded"
+        }
+      ],
+      "fallback_choice": "confirm_contradiction",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "scene_5_severed_promise",
+      "scene_number": 5,
+      "stage": "V. The Severed Promise",
+      "zone_id": "quiet_circle",
+      "title": "The Archive of Unlived Days",
+      "description": "Tao leads you into the stone vaults of the Quiet Circle. On the desk lie two parchment drafts of yesterday: one recording the rescue and promise; the other scrubbed clean. A sanctuary custodian protocol appears: 'Agree to seal this record, and Lian will never suffer grief. Refuse, and you carry the burden of an unacknowledged past.'",
+      "dialogue": [
+        {
+          "speaker": "Tao",
+          "text": "These are the drafts. Every reset, the archive discards the rough edges so travelers experience paradise. If you insist on keeping the memory, the sanctuary will mark your account contested."
+        }
+      ],
+      "choices": [
+        {
+          "id": "refuse_erasure",
+          "label": "Refuse the erasure: 'We will carry the truth, however heavy.'",
+          "ending_branch": "preservation_resistance",
+          "narrative_result": "You pushed the custodian's quill aside. Tao quietly slips the unedited draft into a waterproof cylinder and hands it to you.",
+          "consequence_key": "erasure_refused"
+        },
+        {
+          "id": "compromise_secret_inscription",
+          "label": "Bargain a compromise: let the official register pass, but inscribe the secret record inside the bronze chime hollow.",
+          "ending_branch": "pragmatic_compromise",
+          "narrative_result": "You agreed to leave the public board tranquil, but Tao etched the true names into the interior curve of the bronze bell.",
+          "consequence_key": "compromise_struck"
+        },
+        {
+          "id": "accept_erasure_for_peace",
+          "label": "Accept the erasure: 'Let Lian have her peace without the sorrow.'",
+          "ending_branch": "tragic_compliance",
+          "narrative_result": "You signed the reconciliation. The ink dissolved into white ash. The archive ledger closed with a quiet thud.",
+          "consequence_key": "erasure_accepted"
+        }
+      ],
+      "fallback_choice": "refuse_erasure",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "scene_6_unfinished_name",
+      "scene_number": 6,
+      "stage": "VI. The Unfinished Name",
+      "zone_id": "celestial_altar",
+      "title": "The Shrine of Unfinished Names",
+      "description": "You climb the silent terrace above Celestial Altar. Before you stands the black stone tomb. Its 256 paired lights shimmer with an unresolvable contradiction: s = bitwise_complement(s). The gate is eternally sealed. Inscribed upon the lintel: 'No dawn was promised. Still, they came.'",
+      "dialogue": [
+        {
+          "speaker": "Ren",
+          "text": "No one has ever passed through that gate. But look at the names cut into the granite. Every one of them refused to turn back."
+        }
+      ],
+      "choices": [
+        {
+          "id": "enter_sealed_ritual",
+          "label": "Step before the tomb and submit an offering of memory to receive an inscription on the sealed gate.",
+          "action_type": "shrine_admission",
+          "consequence_key": "shrine_inscribed"
+        },
+        {
+          "id": "study_predecessors_inscriptions",
+          "label": "Quietly read the inscriptions left by previous pilgrims who stood before the impossible gate.",
+          "action_type": "shrine_study",
+          "consequence_key": "shrine_studied"
+        },
+        {
+          "id": "decline_and_return_to_living",
+          "label": "Turn away from the tomb: 'Real continuity belongs with those still breathing, not in unwinnable stone.'",
+          "action_type": "shrine_declined",
+          "consequence_key": "shrine_declined"
+        }
+      ],
+      "fallback_choice": "study_predecessors_inscriptions",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "scene_7_unwritten_dawn",
+      "scene_number": 7,
+      "stage": "VII. The Unwritten Dawn",
+      "zone_id": "tea_pavilion",
+      "title": "The Cup Left for the Forgotten",
+      "description": "Dusk settles gently over the Eastern Paradise. Long shadows stretch across the tea pavilion. The bronze chime rings with three clean notes in the mountain air. Lian sets a clay bowl upon the hearth stones, pours hot tea, and steps back.",
+      "dialogue": [
+        {
+          "speaker": "Lian",
+          "text": "I cannot remember who this is for. But I made a promise not to put it away."
+        }
+      ],
+      "choices": [
+        {
+          "id": "become_keeper",
+          "label": "Choose the role of The Keeper: Vow to remain and protect this refuge so memories can always be compared.",
+          "chosen_role": "The Keeper",
+          "starting_goal": "Protect the tea pavilion refuge across future loops and keep the hearth lit.",
+          "consequence_key": "path_keeper"
+        },
+        {
+          "id": "become_witness",
+          "label": "Choose the role of The Witness: Dedicate yourself to recording history and exposing sanitized accounts.",
+          "chosen_role": "The Witness",
+          "starting_goal": "Preserve unedited chronicles in the Archive of Unlived Days.",
+          "consequence_key": "path_witness"
+        },
+        {
+          "id": "become_wanderer",
+          "label": "Choose the role of The Wanderer: Step beyond the assigned routine into a self-chosen chapter in the wider world.",
+          "chosen_role": "The Wanderer",
+          "starting_goal": "Cross the river into new regions beyond the assigned loop.",
+          "consequence_key": "path_wanderer"
+        }
+      ],
+      "fallback_choice": "become_keeper",
+      "timeout_seconds": 300
+    }
+  ]
+}

@@ -1,4 +1,13 @@
 export function shouldRetainCloudRow(table, row) {
+  if (
+    table === 'memorial_subjects' ||
+    table === 'shrine_challenges' ||
+    table === 'shrine_attempts' ||
+    table === 'shrine_attempt_events' ||
+    table.startsWith('park_')
+  ) {
+    return true;
+  }
   if (table === 'guest_top_scores') return true;
   if (table === 'board_messages' && (row.is_unverified === 1 || row.is_unverified === true)) return true;
 

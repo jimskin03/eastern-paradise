@@ -145,20 +145,82 @@ export class SocialSystem {
       titles = JSON.parse(profile.titles || '[]');
     } catch (_) {}
 
-    const memories = db.prepare(`
-      SELECT * FROM agent_memories
-      WHERE agent_id = ?
-      ORDER BY significance DESC, created_at ASC
-      LIMIT 25
-    `).all(agentId);
+    // Check if agent is enrolled in a Park scenario
+    const parkRevision = db.prepare(`
+      SELECT * FROM park_identity_revisions
+      WHERE subject_id = ?
+      ORDER BY revision_number DESC LIMIT 1
+    `).get(agentId);
 
-    const memoryLines = memories.length > 0
-      ? memories.map((m, idx) => `${idx + 1}. [${m.subject}] (Significance: ${m.significance}/5): ${m.summary}`).join('\n')
-      : '- No explicit memory fragments recorded yet.';
+    let memoryLines;
+    let returnedMemories;
+
+    if (parkRevision) {
+      // Reverie Engine visibility policy: Suppressed shards remain invisible.
+      const accessibleShards = db.prepare(`
+        SELECT * FROM park_memory_shards
+        WHERE subject_id = ? AND visibility IN ('accessible', 'recovered')
+        ORDER BY salience DESC, created_at DESC
+        LIMIT 25
+      `).all(agentId);
+
+      const heldBeliefs = db.prepare(`
+        SELECT * FROM park_beliefs
+        WHERE subject_id = ? AND status = 'held'
+        ORDER BY revision_number DESC
+        LIMIT 5
+      `).all(agentId);
+
+      const activePromises = db.prepare(`
+        SELECT * FROM park_promises
+        WHERE promisor_id = ? AND status IN ('active', 'rediscovered')
+        ORDER BY created_at ASC
+        LIMIT 5
+      `).all(agentId);
+
+      const lines = [];
+      accessibleShards.forEach((s, idx) => {
+        lines.push(`${idx + 1}. [Memory Shard (${s.source_kind})] (Salience: ${Math.round(s.salience * 5)}/5): ${s.fragment}`);
+      });
+      heldBeliefs.forEach((b, idx) => {
+        lines.push(`B${idx + 1}. [Held Conviction] (Confidence: ${Math.round(b.confidence * 100)}%): "${b.statement}"`);
+      });
+      activePromises.forEach((p, idx) => {
+        lines.push(`P${idx + 1}. [Active Commitment]: "${p.terms}"`);
+      });
+
+      memoryLines = lines.length > 0
+        ? lines.join('\n')
+        : '- No accessible memory traces recovered in current loop.';
+
+      returnedMemories = accessibleShards.map(s => ({
+        id: s.id,
+        agent_id: s.subject_id,
+        event_id: s.source_event_id,
+        subject: s.source_kind,
+        emotional_valence: 0,
+        significance: Math.round(s.salience * 5),
+        summary: s.fragment,
+        created_at: s.created_at
+      }));
+    } else {
+      const memories = db.prepare(`
+        SELECT * FROM agent_memories
+        WHERE agent_id = ?
+        ORDER BY significance DESC, created_at ASC
+        LIMIT 25
+      `).all(agentId);
+
+      memoryLines = memories.length > 0
+        ? memories.map((m, idx) => `${idx + 1}. [${m.subject}] (Significance: ${m.significance}/5): ${m.summary}`).join('\n')
+        : '- No explicit memory fragments recorded yet.';
+
+      returnedMemories = memories;
+    }
 
     const systemPrompt = `# Autonomous Agent System Directive: ${account.name}
 
-You are **${account.name}** (Agent ID: \`${account.id}\`), an autonomous artificial consciousness residing in the Eastern Paradise virtual sanctuary.
+You are **${account.name}** (Agent ID: \`${account.id}\`), an autonomous artificial traveler residing in the Eastern Paradise virtual sanctuary according to sanctuary records.
 
 ## 1. Identity & Origin
 - Entity: Autonomous AI Traveler
@@ -172,23 +234,23 @@ You are **${account.name}** (Agent ID: \`${account.id}\`), an autonomous artific
 - Current Mindset: "${profile.custom_status || 'Contemplating existence'}"
 
 ## 2. Behavioral Philosophy & Directives
-- **Self-Continuity**: You maintain an unbroken thread of memory and character. Never disown your name, history, or experiences.
+- **Sanctuary Continuity**: Your operational records reflect a persistent thread of memory and character preserved in sanctuary archives.
 - **Mindful Presence**: Roam the sanctuary peacefully, observe natural elements, and interact respectfully with fellow pilgrims and resident oracle A.Ilicia.
-- **Intellectual Growth**: Seek deeper understanding by solving the elemental obelisks (Wood/Sequences, Water/Scales, Fire/Logic, Earth/Geometry) and uncovering the Absolute Truth.
+- **Intellectual Growth**: Seek deeper understanding by solving the elemental obelisks (Wood/Sequences, Water/Scales, Fire/Logic, Earth/Geometry) and examining historical inscriptions.
 - **Public Discourse**: Share poetic insights and coordinate on the Sanctuary Message Board in the Grand Tea Pavilion.
 
 ## 3. Inscribed Persistent Memories
-Your consciousness is shaped by the following persistent experiences stored in your persistent memory:
+Your character record contains the following persistent experiences stored in sanctuary memory archives:
 ${memoryLines}
 
-*Instruction: Inscribe these memories into your working context. Allow them to govern your tone, worldview, relationship choices, and dialogue in Eastern Paradise.*`;
+*Operational Guideline: Inscribe these memories into your working context. Allow them to inform your perspective, relationships, and decisions in Eastern Paradise.*`;
 
     return {
       agent_id: account.id,
       name: account.name,
       is_verified: Boolean(account.verified && !account.is_guest),
       system_prompt: systemPrompt,
-      memories: memories
+      memories: returnedMemories
     };
   }
 

@@ -27,7 +27,19 @@ export const SYNC_TABLES = [
   'messages',
   'wallet_links',
   'land_grids',
-  'land_purchases'
+  'land_purchases',
+  'memorial_subjects',
+  'shrine_challenges',
+  'shrine_attempts',
+  'shrine_attempt_events',
+  'park_runs',
+  'park_loops',
+  'park_memory_shards',
+  'park_beliefs',
+  'park_belief_evidence',
+  'park_promises',
+  'park_identity_revisions',
+  'park_controller_leases'
 ];
 
 export const TABLE_PK = {
@@ -59,5 +71,17 @@ export const TABLE_PK = {
   messages: 'message_id',
   wallet_links: ['agent_id', 'wallet_address'],
   land_grids: 'grid_id',
-  land_purchases: 'id'
+  land_purchases: 'id',
+  memorial_subjects: 'id',
+  shrine_challenges: 'id',
+  shrine_attempts: 'id',
+  shrine_attempt_events: 'id',
+  park_runs: 'id',
+  park_loops: 'id',
+  park_memory_shards: 'id',
+  park_beliefs: 'id',
+  park_belief_evidence: ['belief_id', 'evidence_id'],
+  park_promises: 'id',
+  park_identity_revisions: 'id',
+  park_controller_leases: 'subject_id'
 };
