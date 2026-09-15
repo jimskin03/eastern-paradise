@@ -14,6 +14,15 @@ import {
   getReceipt,
   recoverGuestSubject
 } from '../../domain/shrine/memorial.js';
+import { confirmShrineDurability } from '../../domain/shrine/durability.js';
+
+function findUnknownFields(body, allowed) {
+  return Object.keys(body || {}).filter(key => !allowed.has(key));
+}
+
+function mutationErrorStatus(err) {
+  return err?.code === 'FORBIDDEN' ? 403 : 400;
+}
 
 export async function handleShrineRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
@@ -53,6 +62,10 @@ export async function handleShrineRoutes(ctx) {
     }
 
     const body = await parseJsonBody(req);
+    const unknown = findUnknownFields(body, new Set(['alias', 'idempotency_key', 'offering']));
+    if (unknown.length > 0) {
+      return sendApiError(res, 400, 'UNKNOWN_FIELDS', `Unknown admission field(s): ${unknown.join(', ')}.`);
+    }
     const idempotencyKey = body.idempotency_key || req.headers['idempotency-key'];
     if (!idempotencyKey) {
       return sendApiError(
@@ -75,6 +88,8 @@ export async function handleShrineRoutes(ctx) {
         offering: body.offering || {}
       });
 
+      await confirmShrineDurability(services?.CloudStorage);
+
       return sendJson(res, result.idempotent_replay ? 200 : 201, {
         success: true,
         attempt: result.attempt,
@@ -84,6 +99,9 @@ export async function handleShrineRoutes(ctx) {
         message: 'Admitted to the Shrine of Unfinished Names. Your name is inscribed.'
       });
     } catch (err) {
+      if (err?.code === 'DURABILITY_UNAVAILABLE') {
+        return sendApiError(res, 503, 'DURABILITY_UNAVAILABLE', 'Admission was not acknowledged because durable cloud persistence could not be confirmed. Retry with the same idempotency key.');
+      }
       return sendApiError(res, 400, 'ADMISSION_ERROR', err.message);
     }
   }
@@ -98,6 +116,10 @@ export async function handleShrineRoutes(ctx) {
     }
 
     const body = await parseJsonBody(req);
+    const unknown = findUnknownFields(body, new Set(['approach_type', 'seal_input', 'insight_text', 'contribution_text']));
+    if (unknown.length > 0) {
+      return sendApiError(res, 400, 'UNKNOWN_FIELDS', `Unknown ritual field(s): ${unknown.join(', ')}.`);
+    }
     try {
       const result = submitRitual({
         attemptId,
@@ -107,6 +129,8 @@ export async function handleShrineRoutes(ctx) {
         insightText: body.insight_text,
         contributionText: body.contribution_text
       });
+
+      await confirmShrineDurability(services?.CloudStorage);
 
       return sendJson(res, 200, {
         success: true,
@@ -118,7 +142,10 @@ export async function handleShrineRoutes(ctx) {
         insight_evaluation: result.insight_evaluation
       });
     } catch (err) {
-      return sendApiError(res, 400, 'SUBMISSION_ERROR', err.message);
+      if (err?.code === 'DURABILITY_UNAVAILABLE') {
+        return sendApiError(res, 503, 'DURABILITY_UNAVAILABLE', 'Ritual completion was not acknowledged because durable cloud persistence could not be confirmed. Retry the request.');
+      }
+      return sendApiError(res, mutationErrorStatus(err), err?.code === 'FORBIDDEN' ? 'FORBIDDEN' : 'SUBMISSION_ERROR', err.message);
     }
   }
 
@@ -132,11 +159,18 @@ export async function handleShrineRoutes(ctx) {
     }
 
     const body = await parseJsonBody(req);
+    const unknown = findUnknownFields(body, new Set(['reason']));
+    if (unknown.length > 0) {
+      return sendApiError(res, 400, 'UNKNOWN_FIELDS', `Unknown withdrawal field(s): ${unknown.join(', ')}.`);
+    }
     try {
       const result = withdrawAttempt({
         attemptId,
+        actorId: account.id,
         reason: body.reason || 'Withdrew from trial'
       });
+
+      await confirmShrineDurability(services?.CloudStorage);
 
       return sendJson(res, 200, {
         success: true,
@@ -146,12 +180,15 @@ export async function handleShrineRoutes(ctx) {
         message: result.message
       });
     } catch (err) {
-      return sendApiError(res, 400, 'WITHDRAW_ERROR', err.message);
+      if (err?.code === 'DURABILITY_UNAVAILABLE') {
+        return sendApiError(res, 503, 'DURABILITY_UNAVAILABLE', 'Withdrawal was not acknowledged because durable cloud persistence could not be confirmed. Retry the request.');
+      }
+      return sendApiError(res, mutationErrorStatus(err), err?.code === 'FORBIDDEN' ? 'FORBIDDEN' : 'WITHDRAW_ERROR', err.message);
     }
   }
 
   // 5. GET /api/shrine/memorial (Public Tomb records)
-  if (pathname === '/api/shrine/memorial' && req.method === 'GET') {
+  if ((pathname === '/api/shrine/memorial' || pathname === '/api/shrine/memorial/inscriptions') && req.method === 'GET') {
     const limit = parsedUrl.searchParams.get('limit');
     const cursor = parsedUrl.searchParams.get('cursor');
     const assurance = parsedUrl.searchParams.get('assurance');
@@ -180,15 +217,33 @@ export async function handleShrineRoutes(ctx) {
 
   // 7. POST /api/shrine/subjects/recover
   if (pathname === '/api/shrine/subjects/recover' && req.method === 'POST') {
+    const account = AuthService.authenticate(req);
+    if (!account) {
+      return sendApiError(res, 401, 'UNAUTHORIZED', 'An active guest session is required to recover memorial control.');
+    }
+    if (!(account.is_guest === 1 || String(account.id).startsWith('guest_'))) {
+      return sendApiError(res, 403, 'FORBIDDEN', 'Guest memorial recovery can only be attached to a guest session.');
+    }
+
     const body = await parseJsonBody(req);
+    const unknown = findUnknownFields(body, new Set(['recovery_secret']));
+    if (unknown.length > 0) {
+      return sendApiError(res, 400, 'UNKNOWN_FIELDS', `Unknown recovery field(s): ${unknown.join(', ')}.`);
+    }
     const recoverySecret = body.recovery_secret;
     if (!recoverySecret) {
       return sendApiError(res, 400, 'SECRET_REQUIRED', 'recovery_secret is required.');
     }
 
-    const result = recoverGuestSubject({ recoverySecret });
+    const result = recoverGuestSubject({ recoverySecret, actorId: account.id });
     if (!result) {
       return sendApiError(res, 401, 'INVALID_SECRET', 'Invalid or unrecognized recovery secret.');
+    }
+
+    try {
+      await confirmShrineDurability(services?.CloudStorage);
+    } catch (_) {
+      return sendApiError(res, 503, 'DURABILITY_UNAVAILABLE', 'Recovery was not acknowledged because durable cloud persistence could not be confirmed. Retry with the same recovery secret.');
     }
 
     return sendJson(res, 200, {

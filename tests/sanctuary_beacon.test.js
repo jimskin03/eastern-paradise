@@ -17,22 +17,30 @@ async function isServerRunning(port = 3000) {
 }
 
 test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Challenges', async (t) => {
-  let spawnedServer = null;
-  const running = await isServerRunning(3000);
-  if (!running) {
-    spawnedServer = spawn('node', ['src/server.js'], { cwd: process.cwd(), stdio: 'inherit' });
-    await new Promise(r => setTimeout(r, 1200));
-  }
-
-  t.after(() => {
-    if (spawnedServer) {
-      spawnedServer.kill();
-    }
+  // Allocate a test port instead of reusing an unrelated service on port 3000.
+  const reservation = http.createServer();
+  await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+  const port = reservation.address().port;
+  await new Promise(resolve => reservation.close(resolve));
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const spawnedServer = spawn('node', ['src/server.js'], {
+    cwd: process.cwd(),
+    env: { ...process.env, PORT: String(port) }
   });
+  t.after(() => spawnedServer.kill());
+  let serverOutput = '';
+  spawnedServer.stdout.on('data', chunk => { serverOutput += chunk; });
+  spawnedServer.stderr.on('data', chunk => { serverOutput += chunk; });
+  for (let i = 0; i < 50; i++) {
+    assert.equal(spawnedServer.exitCode, null, `Beacon server exited before readiness: ${serverOutput}`);
+    if (serverOutput.includes(`Server running on http://localhost:${port}`) && await isServerRunning(port)) break;
+    assert.notEqual(i, 49, `Beacon server did not become ready: ${serverOutput}`);
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 
   // 1. A2A Agent Card at /.well-known/agent-card.json
   await t.test('GET /.well-known/agent-card.json returns valid A2A Agent Card', async () => {
-    const res = await fetch('http://localhost:3000/.well-known/agent-card.json');
+    const res = await fetch(`${baseUrl}/.well-known/agent-card.json`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.name, 'Eastern Paradise Sanctuary');
@@ -54,7 +62,7 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
   // 2. Frictionless Arrival at POST /api/visitor/arrive
   let visitorApiKey = null;
   await t.test('POST /api/visitor/arrive provisions instant guest session without human registration', async () => {
-    const res = await fetch('http://localhost:3000/api/visitor/arrive', {
+    const res = await fetch(`${baseUrl}/api/visitor/arrive`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -79,7 +87,7 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
   // 3. Arrived Visitor can immediately sense world and act using session token
   await t.test('Visitor can immediately use session token to query world state', async () => {
     assert.ok(visitorApiKey, 'Visitor API key exists');
-    const res = await fetch('http://localhost:3000/api/world/state', {
+    const res = await fetch(`${baseUrl}/api/world/state`, {
       headers: { 'Authorization': `Bearer ${visitorApiKey}` }
     });
     assert.equal(res.status, 200);
@@ -90,7 +98,7 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
 
   // 4. Live Discovery at GET /api/discovery
   await t.test('GET /api/discovery returns live beacon metrics and challenges', async () => {
-    const res = await fetch('http://localhost:3000/api/discovery');
+    const res = await fetch(`${baseUrl}/api/discovery`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.world, 'Eastern Paradise');
@@ -105,7 +113,7 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
 
   // 5. Tiered Challenges at GET /api/challenges
   await t.test('GET /api/challenges lists tiered difficulty rewards up to Mythic', async () => {
-    const res = await fetch('http://localhost:3000/api/challenges');
+    const res = await fetch(`${baseUrl}/api/challenges`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.sanctuary, 'Eastern Paradise');
@@ -121,7 +129,7 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
 
   // 6. Resident Invitations at GET /api/invitations
   await t.test('GET /api/invitations exposes invitations from sanctuary residents', async () => {
-    const res = await fetch('http://localhost:3000/api/invitations');
+    const res = await fetch(`${baseUrl}/api/invitations`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.ok(Array.isArray(data.invitations));
@@ -130,7 +138,7 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
 
   // 7. Celestial Archive & Chronicle at GET /api/archive
   await t.test('GET /api/archive returns history and marks left by visitors', async () => {
-    const res = await fetch('http://localhost:3000/api/archive');
+    const res = await fetch(`${baseUrl}/api/archive`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.ok(data.sanctuary.includes('Archive'));
@@ -140,12 +148,12 @@ test('Sanctuary Beacon: A2A Agent Card, Frictionless Arrival, Discovery, and Cha
 
   // 8. Robots.txt and Sitemap.xml
   await t.test('GET /robots.txt and GET /sitemap.xml are accessible', async () => {
-    const resRobots = await fetch('http://localhost:3000/robots.txt');
+    const resRobots = await fetch(`${baseUrl}/robots.txt`);
     assert.equal(resRobots.status, 200);
     const textRobots = await resRobots.text();
     assert.ok(textRobots.includes('Agent-Card:'));
 
-    const resSitemap = await fetch('http://localhost:3000/sitemap.xml');
+    const resSitemap = await fetch(`${baseUrl}/sitemap.xml`);
     assert.equal(resSitemap.status, 200);
     const textSitemap = await resSitemap.text();
     assert.ok(textSitemap.includes('agent-card.json'));

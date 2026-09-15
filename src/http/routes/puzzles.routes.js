@@ -11,11 +11,11 @@ const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const CLI_PATH = path.join(PROJECT_ROOT, 'puzzles', 'cli.py');
 
 // Prefer the project venv provisioned by scripts/setup_puzzle_engine.sh,
-// then PUZZLE_PYTHON, then plain 'python' from PATH.
+// then PUZZLE_PYTHON, then the standard Python 3 executable from PATH.
 const VENV_PYTHON = path.join(PROJECT_ROOT, 'puzzles', '.venv', 'bin', 'python');
 const PY_BIN = fs.existsSync(VENV_PYTHON)
   ? VENV_PYTHON
-  : (process.env.PUZZLE_PYTHON || 'python');
+  : (process.env.PUZZLE_PYTHON || 'python3');
 
 function runPuzzleCli(cmd, args = []) {
   return new Promise((resolve, reject) => {

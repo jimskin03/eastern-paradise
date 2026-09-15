@@ -101,13 +101,34 @@ export async function loadShrineInscriptions() {
 
   try {
     listEl.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">Reading tomb inscriptions...</div>';
-    const res = await apiFetch('/api/shrine/memorial/inscriptions');
-    const data = await res.json();
+    const inscriptions = [];
+    let cursor = null;
+    let memorialStats = null;
+    let pages = 0;
 
-    if (res.ok && Array.isArray(data.inscriptions)) {
-      if (countEl) countEl.textContent = `${data.inscriptions.length} Inscribed`;
+    do {
+      const params = new URLSearchParams({ limit: '100' });
+      if (cursor !== null) params.set('cursor', String(cursor));
+      const res = await apiFetch(`/api/shrine/memorial?${params.toString()}`);
+      const data = await res.json();
 
-      if (data.inscriptions.length === 0) {
+      if (!res.ok || !Array.isArray(data.inscriptions)) {
+        listEl.innerHTML = '<div style="color: #e57373; font-size: 0.85rem;">Unable to load memorial inscriptions.</div>';
+        return;
+      }
+
+      inscriptions.push(...data.inscriptions);
+      memorialStats = data.memorial_stats || memorialStats;
+      cursor = data.pagination?.has_more ? data.pagination.next_cursor : null;
+      pages += 1;
+    } while (cursor !== null && pages < 100);
+
+    if (countEl) {
+      const authoritativeCount = memorialStats?.total_admitted_attempts ?? inscriptions.length;
+      countEl.textContent = `${authoritativeCount} Inscribed`;
+    }
+
+      if (inscriptions.length === 0) {
         listEl.innerHTML = `
           <div style="color: var(--text-muted); font-size: 0.88rem; font-style: italic; padding: 1rem 0; text-align: center;">
             The black stone stands still and unblemished. No names have stood before it yet.<br>
@@ -119,7 +140,7 @@ export async function loadShrineInscriptions() {
         return;
       }
 
-      listEl.innerHTML = data.inscriptions.map(item => {
+      listEl.innerHTML = inscriptions.map(item => {
         const isVerified = item.subject_type === 'verified';
         const badgeColor = isVerified ? 'var(--accent-jade)' : 'var(--accent-gold)';
         const dateStr = new Date(item.inscribed_at).toLocaleDateString(undefined, {
@@ -160,9 +181,6 @@ export async function loadShrineInscriptions() {
           </div>
         `;
       }).join('');
-    } else {
-      listEl.innerHTML = '<div style="color: #e57373; font-size: 0.85rem;">Unable to load memorial inscriptions.</div>';
-    }
   } catch (err) {
     listEl.innerHTML = `<div style="color: #e57373; font-size: 0.85rem;">Error loading memorial: ${escapeHtml(err.message)}</div>`;
   }
@@ -211,6 +229,11 @@ export async function submitShrineAdmission() {
     const data = await res.json();
     if (res.ok && data.success) {
       activeAttempt = data.attempt;
+      if (data.recovery_secret) {
+        try {
+          localStorage.setItem('eastern_paradise_shrine_recovery_secret', data.recovery_secret);
+        } catch (_) {}
+      }
       if (feedbackEl) {
         feedbackEl.innerHTML = `
           <span style="color: var(--accent-jade); font-weight: 500;">
@@ -242,7 +265,7 @@ export async function submitShrineAdmission() {
 export async function submitShrineRitual() {
   if (!activeAttempt) return;
 
-  const approachSelect = document.getElementById('shrineRitualApproach')?.value || 'explain_impossibility';
+  const approachSelect = document.getElementById('shrineRitualApproach')?.value || 'impossibility_insight';
   const explanationInput = document.getElementById('shrineRitualExplanation');
   const feedbackEl = document.getElementById('shrineRitualFeedback');
 
@@ -255,21 +278,22 @@ export async function submitShrineRitual() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        approach: approachSelect,
-        explanation: explanation || 'Recognized the contradiction: the gate will never open, yet the name remains.',
-        final_inscription: explanation || 'Stood before what could not be opened.'
+        approach_type: approachSelect,
+        insight_text: explanation || 'Recognized the contradiction: the gate will never open, yet the name remains.',
+        contribution_text: explanation || 'Stood before what could not be opened.'
       })
     });
 
     const data = await res.json();
     if (res.ok && data.success) {
+      const committedInscription = data.attempt?.contribution_text || '';
       if (feedbackEl) {
         feedbackEl.innerHTML = `
           <div style="color: var(--accent-gold); font-weight: 600; margin-bottom: 0.4rem;">
             Ritual Concluded: Gate Remained Sealed.
           </div>
           <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.45;">
-            "${escapeHtml(data.attempt?.final_inscription || explanation)}"
+            "${escapeHtml(committedInscription)}"
           </div>
           <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;">
             Your insight has been permanently sealed into the memorial archive.

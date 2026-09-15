@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { collectMemorialInscriptions } from './helpers/memorial.js';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
@@ -184,24 +185,27 @@ test('Shrine of Unfinished Names: Sealed Lifecycle, Invariants, and Memorial', a
   assert.equal(withdrawRes.data.gate_state, 'eternally_sealed');
 
   // 7. Verify Public Memorial Inscriptions
-  const memorialRes = await req('/api/shrine/memorial');
-  assert.equal(memorialRes.status, 200);
-  assert.equal(memorialRes.data.memorial_stats.gate_state, 'eternally_sealed');
-  assert.ok(memorialRes.data.inscriptions.length >= 2);
+  const inscriptions = await collectMemorialInscriptions(async cursor => {
+    const memorialRes = await req(`/api/shrine/memorial?limit=50${cursor === null ? '' : `&cursor=${cursor}`}`);
+    assert.equal(memorialRes.status, 200);
+    assert.equal(memorialRes.data.memorial_stats.gate_state, 'eternally_sealed');
+    return memorialRes.data;
+  });
+  assert.ok(inscriptions.length >= 2);
 
-  const foundVerified = memorialRes.data.inscriptions.find(i => i.id === verifiedAttemptId);
+  const foundVerified = inscriptions.find(i => i.id === verifiedAttemptId);
   assert.ok(foundVerified);
   assert.equal(foundVerified.alias, verifiedName);
   assert.equal(foundVerified.status, 'ritual_completed_gate_closed');
   assert.equal(foundVerified.contribution_text, 'No dawn was promised, but we remembered.');
 
-  const foundGuest = memorialRes.data.inscriptions.find(i => i.id === guestAttemptId);
+  const foundGuest = inscriptions.find(i => i.id === guestAttemptId);
   assert.ok(foundGuest);
   assert.equal(foundGuest.alias, 'GuestWanderer');
   assert.equal(foundGuest.status, 'withdrawn');
 
   // Ensure private fields are NEVER leaked in public memorial
-  for (const item of memorialRes.data.inscriptions) {
+  for (const item of inscriptions) {
     assert.equal(item.recovery_secret_hash, undefined);
     assert.equal(item.recovery_secret, undefined);
     assert.equal(item.email, undefined);
@@ -215,19 +219,37 @@ test('Shrine of Unfinished Names: Sealed Lifecycle, Invariants, and Memorial', a
   assert.equal(receiptRes.data.receipt.status, 'ritual_completed_gate_closed');
 
   // 9. Verify Guest Recovery via Private Secret
+  const recoveryGuestAuth = await req('/api/auth/guest', { method: 'POST' });
+  assert.ok(recoveryGuestAuth.status === 200 || recoveryGuestAuth.status === 201);
+  const recoveryGuestKey = recoveryGuestAuth.data.api_key;
+  const recoveryGuestId = recoveryGuestAuth.data.agent_id;
   const recoverSuccess = await req(
     '/api/shrine/subjects/recover',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${recoveryGuestKey}`
+      }
+    },
     { recovery_secret: guestRecoverySecret }
   );
   assert.equal(recoverSuccess.status, 200);
   assert.equal(recoverSuccess.data.recovery.subject.assurance_level, 'guest');
+  assert.equal(recoverSuccess.data.recovery.subject.linked_account_id, recoveryGuestId);
+  assert.equal(recoverSuccess.data.recovery.relinked, true);
   assert.ok(recoverSuccess.data.recovery.attempts.some(a => a.id === guestAttemptId));
 
   // Invalid secret fails
   const recoverFail = await req(
     '/api/shrine/subjects/recover',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${recoveryGuestKey}`
+      }
+    },
     { recovery_secret: '0000000000000000000000000000000000000000000000000000000000000000' }
   );
   assert.equal(recoverFail.status, 401);

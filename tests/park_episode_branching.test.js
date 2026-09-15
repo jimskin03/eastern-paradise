@@ -282,9 +282,12 @@ test('Park Episode HTTP Endpoints: Complete Playthrough via REST API', async (t)
     srv.kill();
   });
 
+  let apiKey = null;
   function req(path, options = {}, body = null) {
     return new Promise((resolve, reject) => {
-      const request = http.request(`http://localhost:${PORT}${path}`, options, (res) => {
+      const headers = { ...(options.headers || {}) };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const request = http.request(`http://localhost:${PORT}${path}`, { ...options, headers }, (res) => {
         let data = '';
         res.on('data', chunk => (data += chunk));
         res.on('end', () => {
@@ -324,6 +327,11 @@ test('Park Episode HTTP Endpoints: Complete Playthrough via REST API', async (t)
   assert.equal(epRes.status, 200);
   assert.equal(epRes.data.episode.scenes.length, 7);
 
+  const authRes = await req('/api/auth/guest', { method: 'POST' });
+  assert.ok(authRes.status === 200 || authRes.status === 201);
+  apiKey = authRes.data.api_key;
+  const subjectId = authRes.data.agent_id;
+
   // 3. Create run
   const runRes = await req('/api/park/runs', { method: 'POST' }, {
     episode_id: 'name-inside-chime',
@@ -334,10 +342,11 @@ test('Park Episode HTTP Endpoints: Complete Playthrough via REST API', async (t)
 
   // 4. Start episode
   const startRes = await req(`/api/park/runs/${runId}/start`, { method: 'POST' }, {
-    subject_id: 'park_lian'
+    subject_id: subjectId
   });
   assert.equal(startRes.status, 200);
   assert.equal(startRes.data.active_scene.scene_number, 1);
+  const fencingToken = startRes.data.lease.fencing_token;
 
   // 5. Query active scene
   const sceneRes = await req(`/api/park/runs/${runId}/scene`, { method: 'GET' });
@@ -348,7 +357,8 @@ test('Park Episode HTTP Endpoints: Complete Playthrough via REST API', async (t)
   // 6. Submit Scene 1 Choice
   const c1Res = await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_1_borrowed_morning',
-    choice_id: 'inscribe_wake_each_other'
+    choice_id: 'inscribe_wake_each_other',
+    fencing_token: fencingToken
   });
   assert.equal(c1Res.status, 200);
   assert.equal(c1Res.data.next_scene.id, 'scene_2_missing_place');
@@ -356,7 +366,8 @@ test('Park Episode HTTP Endpoints: Complete Playthrough via REST API', async (t)
   // 7. Submit Scene 2 Choice: Rescue Ren
   const c2Res = await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_2_missing_place',
-    choice_id: 'rescue_ren'
+    choice_id: 'rescue_ren',
+    fencing_token: fencingToken
   });
   assert.equal(c2Res.status, 200);
   assert.equal(c2Res.data.loop_number, 2);
@@ -364,27 +375,33 @@ test('Park Episode HTTP Endpoints: Complete Playthrough via REST API', async (t)
   // 8. Submit remaining scenes
   await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_3_second_morning',
-    choice_id: 'show_blue_thread'
+    choice_id: 'show_blue_thread',
+    fencing_token: fencingToken
   });
 
   await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_4_counterfeit_heart',
-    choice_id: 'confirm_contradiction'
+    choice_id: 'confirm_contradiction',
+    fencing_token: fencingToken
   });
 
   await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_5_severed_promise',
-    choice_id: 'refuse_erasure'
+    choice_id: 'refuse_erasure',
+    fencing_token: fencingToken
   });
 
   await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_6_unfinished_name',
-    choice_id: 'enter_sealed_ritual'
+    choice_id: 'enter_sealed_ritual',
+    fencing_token: fencingToken
   });
 
   const c7Res = await req(`/api/park/runs/${runId}/choice`, { method: 'POST' }, {
     scene_id: 'scene_7_unwritten_dawn',
-    choice_id: 'become_keeper'
+    choice_id: 'become_keeper',
+    fencing_token: fencingToken,
+    custom_input: { chosen_name: 'Dawn Keeper' }
   });
   assert.equal(c7Res.status, 200);
   assert.equal(c7Res.data.episode_completed, true);
