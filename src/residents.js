@@ -6,6 +6,7 @@ import { ProjectManager, CHIME_OBJECT_ID } from './projects.js';
 import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
 import { PuzzleManager } from './puzzles.js';
 import { getActiveLease } from './domain/park/controller.js';
+import { getCurrentRevision } from './domain/park/identity.js';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
@@ -296,9 +297,10 @@ export class ResidentReplyQueue {
 }
 
 export class ResidentManager {
-  constructor() {
+  constructor(dbInstance = null) {
     this.residents = new Map(); // id -> residentRuntime
     this.worldEngine = null;
+    this.db = dbInstance;
   }
 
   init(worldEngine) {
@@ -513,7 +515,55 @@ export class ResidentManager {
     res.action_state = LEGACY_ACTION_STATE[state] || LEGACY_ACTION_STATE[ResidentState.IDLE];
   }
 
-  selectNextGoal(res) {
+  selectNextGoal(res, dbInstance = null) {
+    const activeDb = dbInstance || this.db || db;
+    // 0. Reborn character behavioral divergence
+    const identityRev = getCurrentRevision(activeDb, res.id);
+    if (identityRev && identityRev.chosen_role) {
+      const role = identityRev.chosen_role;
+      res.project_task = null;
+      res.daily_challenge_target = null;
+
+      if (role === 'The Keeper') {
+        const keeperTasks = [
+          { pos: [4, 18], goal: identityRev.starting_goal || 'Tend the unforgotten cup and tea hearth', intent: 'Keeping the tea pavilion embers warm for tired travelers' },
+          { pos: [22, 5], goal: 'Check the resonance chime knot', intent: 'Ensuring the blue thread remains secure in the bamboo breeze' },
+          { pos: [7, 8], goal: 'Watch for disoriented newcomers at arrival', intent: 'Welcoming newly awakened souls with quiet reassurance' }
+        ];
+        const task = keeperTasks[Math.floor(Math.random() * keeperTasks.length)];
+        res.current_goal = task.goal;
+        res.public_intent = task.intent;
+        this.planPathTo(res, task.pos);
+        return;
+      }
+
+      if (role === 'The Witness') {
+        const witnessTasks = [
+          { pos: [6, 18], goal: identityRev.starting_goal || 'Verify postings on the sanctuary message board', intent: 'Checking public notices against historical chronicles' },
+          { pos: [11, 26], goal: 'Inspect quiet circle stone inscriptions', intent: 'Transcribing weathered testimony from the stone marker' },
+          { pos: [23, 23], goal: 'Contemplate historical traces by the lotus basin', intent: 'Comparing memory shards with current reflections' }
+        ];
+        const task = witnessTasks[Math.floor(Math.random() * witnessTasks.length)];
+        res.current_goal = task.goal;
+        res.public_intent = task.intent;
+        this.planPathTo(res, task.pos);
+        return;
+      }
+
+      if (role === 'The Wanderer') {
+        const wandererTasks = [
+          { pos: [7, 38], goal: identityRev.starting_goal || 'Walk along the reedwater riverbank', intent: 'Watching the morning mist drift over the river crossing' },
+          { pos: [35, 35], goal: 'Roam the outer sunfield paths', intent: 'Exploring beyond the boundaries of the scripted routine' },
+          { pos: [55, 48], goal: 'Survey the uncharted Mossveil frontier', intent: 'Gazing across the threshold where no paths are drawn' }
+        ];
+        const task = wandererTasks[Math.floor(Math.random() * wandererTasks.length)];
+        res.current_goal = task.goal;
+        res.public_intent = task.intent;
+        this.planPathTo(res, task.pos);
+        return;
+      }
+    }
+
     const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
     res.project_task = null;
 

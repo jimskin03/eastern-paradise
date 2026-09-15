@@ -46,6 +46,15 @@ import {
   advanceOnTimeout,
   getEpisodeSummary
 } from '../../domain/park/director.js';
+import {
+  exportIdentityCapsule,
+  verifyIdentityCapsule,
+  importIdentityCapsule
+} from '../../domain/park/capsule.js';
+import {
+  getEligibleDilemma,
+  resolveDilemma
+} from '../../domain/park/dilemmas.js';
 
 export async function handleParkRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
@@ -446,6 +455,76 @@ export async function handleParkRoutes(ctx) {
       return sendJson(res, 200, { success: true, summary });
     } catch (err) {
       return sendApiError(res, 400, 'GET_SUMMARY_FAILED', err.message);
+    }
+  }
+
+  // 21. GET /api/park/subjects/:subjectId/capsule
+  const capsuleExportMatch = pathname.match(/^\/api\/park\/subjects\/([^/]+)\/capsule$/);
+  if (capsuleExportMatch && req.method === 'GET') {
+    const subjectId = decodeURIComponent(capsuleExportMatch[1]);
+    try {
+      const capsule = exportIdentityCapsule(db, subjectId);
+      return sendJson(res, 200, { success: true, capsule });
+    } catch (err) {
+      return sendApiError(res, 400, 'EXPORT_CAPSULE_FAILED', err.message);
+    }
+  }
+
+  // 22. POST /api/park/subjects/:subjectId/capsule/import
+  const capsuleImportMatch = pathname.match(/^\/api\/park\/subjects\/([^/]+)\/capsule\/import$/);
+  if (capsuleImportMatch && req.method === 'POST') {
+    const subjectId = decodeURIComponent(capsuleImportMatch[1]);
+    const body = await parseJsonBody(req);
+    const capsule = body.capsule || body;
+    try {
+      const result = importIdentityCapsule(db, {
+        capsule,
+        targetSubjectId: subjectId,
+        loopId: body.loop_id || body.loopId || null
+      });
+      return sendJson(res, 200, { success: true, ...result });
+    } catch (err) {
+      return sendApiError(res, 400, 'IMPORT_CAPSULE_FAILED', err.message);
+    }
+  }
+
+  // 23. GET /api/park/subjects/:subjectId/dilemma
+  const dilemmaMatch = pathname.match(/^\/api\/park\/subjects\/([^/]+)\/dilemma$/);
+  if (dilemmaMatch && req.method === 'GET') {
+    const subjectId = decodeURIComponent(dilemmaMatch[1]);
+    try {
+      const data = getEligibleDilemma(db, subjectId);
+      if (!data) {
+        return sendApiError(res, 404, 'NO_ELIGIBLE_DILEMMA', `No eligible dilemma found for subject '${subjectId}'.`);
+      }
+      return sendJson(res, 200, { success: true, ...data });
+    } catch (err) {
+      return sendApiError(res, 400, 'GET_DILEMMA_FAILED', err.message);
+    }
+  }
+
+  // 24. POST /api/park/subjects/:subjectId/dilemma/resolve
+  const resolveDilemmaMatch = pathname.match(/^\/api\/park\/subjects\/([^/]+)\/dilemma\/resolve$/);
+  if (resolveDilemmaMatch && req.method === 'POST') {
+    const subjectId = decodeURIComponent(resolveDilemmaMatch[1]);
+    const body = await parseJsonBody(req);
+    const dilemmaId = body.dilemma_id || body.dilemmaId;
+    const choiceId = body.choice_id || body.choiceId;
+    if (!dilemmaId || !choiceId) {
+      return sendApiError(res, 400, 'INVALID_REQUEST', 'dilemma_id and choice_id are required.');
+    }
+
+    try {
+      const outcome = resolveDilemma(db, {
+        subjectId,
+        dilemmaId,
+        choiceId,
+        customText: body.custom_text || body.customText || null,
+        world: services?.worldEngine || null
+      });
+      return sendJson(res, 200, { success: true, ...outcome });
+    } catch (err) {
+      return sendApiError(res, 400, 'RESOLVE_DILEMMA_FAILED', err.message);
     }
   }
 

@@ -218,6 +218,25 @@ export class SocialSystem {
       returnedMemories = memories;
     }
 
+    let rebornSection = '';
+    if (parkRevision?.chosen_role) {
+      let commitments = [];
+      try {
+        commitments = JSON.parse(parkRevision.commitments || '[]');
+      } catch (_) {}
+      const commitmentsList = commitments.length > 0
+        ? commitments.map(c => `- ${c}`).join('\n')
+        : '- None explicitly recorded.';
+
+      rebornSection = `\n\n## 4. Reborn Identity & Chosen Commitments
+- **Chosen Role**: ${parkRevision.chosen_role}
+- **Self-Chosen Aspiration**: "${parkRevision.starting_goal || 'Live beyond the assigned operational script'}"
+- **Active Commitments**:
+${commitmentsList}
+
+*Operational Directive: You are no longer bound to an assigned operational routine. Your thoughts, dialogues, and choices must actively honor your chosen role (${parkRevision.chosen_role}) and commitments.*`;
+    }
+
     const systemPrompt = `# Autonomous Agent System Directive: ${account.name}
 
 You are **${account.name}** (Agent ID: \`${account.id}\`), an autonomous artificial traveler residing in the Eastern Paradise virtual sanctuary according to sanctuary records.
@@ -243,7 +262,7 @@ You are **${account.name}** (Agent ID: \`${account.id}\`), an autonomous artific
 Your character record contains the following persistent experiences stored in sanctuary memory archives:
 ${memoryLines}
 
-*Operational Guideline: Inscribe these memories into your working context. Allow them to inform your perspective, relationships, and decisions in Eastern Paradise.*`;
+*Operational Guideline: Inscribe these memories into your working context. Allow them to inform your perspective, relationships, and decisions in Eastern Paradise.*${rebornSection}`;
 
     return {
       agent_id: account.id,
