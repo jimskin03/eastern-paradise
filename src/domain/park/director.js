@@ -256,8 +256,12 @@ export function submitSceneChoice(db, {
     const subjectId = checkpoint.subject_id || 'agent_lian';
     const now = Date.now();
 
-    // 1. Validate controller lease if provided
-    if (controllerId && fencingToken !== null && fencingToken !== undefined) {
+    // 1. External controllers must provide both identity and fencing token.
+    // Internal director calls may omit both and stay on the trusted service path.
+    if ((controllerId && (fencingToken === null || fencingToken === undefined)) || (!controllerId && fencingToken !== null && fencingToken !== undefined)) {
+      throw new Error('controllerId and fencingToken must be supplied together.');
+    }
+    if (controllerId) {
       const isValid = validateLease(db, { subjectId, controllerId, fencingToken });
       if (!isValid) {
         throw new Error(`Invalid controller lease or stale fencing token (${fencingToken}).`);
@@ -372,6 +376,13 @@ export function submitSceneChoice(db, {
 
     // --- Scene 6: The Unfinished Name (The Shrine) ---
     if (currentScene.id === 'scene_6_unfinished_name') {
+      if (choice.action_type === 'shrine_admission' && controllerId) {
+        if (!customInput || typeof customInput !== 'object' || !customInput.shrine_attempt_id || !customInput.shrine_receipt_token) {
+          throw new Error('Shrine admission must be durably committed before advancing Scene 6.');
+        }
+        branchState.shrine_attempt_id = customInput.shrine_attempt_id;
+        branchState.shrine_receipt_token = customInput.shrine_receipt_token;
+      }
       branchState.shrine_action = choice.action_type || 'shrine_study';
       branchState.gate_remained_sealed = true; // Invariant
     }
@@ -380,12 +391,17 @@ export function submitSceneChoice(db, {
     if (currentScene.id === 'scene_7_unwritten_dawn') {
       const chosenRole = choice.chosen_role || 'The Keeper';
       const startingGoal = choice.starting_goal || 'Keep the tea pavilion hearth lit';
+      const currentIdentity = getCurrentRevision(db, subjectId);
+      const requestedName = typeof customInput === 'string'
+        ? customInput.trim()
+        : String(customInput?.chosen_name || customInput?.display_name || customInput?.name || '').trim();
+      const displayName = requestedName || currentIdentity?.display_name || subjectId;
 
       // Append identity revision
       appendRevision(db, {
         subjectId,
         loopId: loop.id,
-        displayName: `Lian, ${chosenRole}`,
+        displayName,
         chosenRole,
         startingGoal,
         commitments: [branchState.chime_terms || 'Keep a cup ready for whoever woke with you'],
