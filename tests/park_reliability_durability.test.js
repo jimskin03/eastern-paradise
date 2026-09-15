@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { collectMemorialInscriptions } from './helpers/memorial.js';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
@@ -88,7 +89,7 @@ test('Durability Drill 1: Transaction boundary rollback on failure leaves zero p
   assert.equal(leaseAfter.controller_id, 'controller_alpha');
 });
 
-test('Durability Drill 2: Memorial permanence across guest account purge and local storage resets', () => {
+test('Durability Drill 2: Memorial permanence across guest account purge and local storage resets', async () => {
   ensureShrineChallengeRecord();
   const now = Date.now();
   const guestId = `guest_durability_${Date.now()}`;
@@ -117,6 +118,7 @@ test('Durability Drill 2: Memorial permanence across guest account purge and loc
   // Complete ritual
   submitRitual({
     attemptId: admission.attempt.id,
+    actorId: guestId,
     approachType: 'impossibility_insight',
     insightText: 'No bit equals its complement under binary logic.',
     contributionText: 'Stood before the impossible seal.'
@@ -127,7 +129,7 @@ test('Durability Drill 2: Memorial permanence across guest account purge and loc
   globalDb.prepare('DELETE FROM profiles WHERE agent_id = ?').run(guestId);
 
   // Verify that memorial inscription and attempt permanently survived!
-  const { inscriptions } = getMemorialInscriptions();
+  const inscriptions = await collectMemorialInscriptions(cursor => getMemorialInscriptions({ cursor }));
   const entry = inscriptions.find(i => i.id === admission.attempt.id);
   assert.ok(entry, 'Guest inscription must survive guest account purge');
   assert.equal(entry.alias, 'Guest Seeker');
@@ -178,7 +180,7 @@ test('Durability Drill 3: Idempotent retry returns identical attempt and receipt
   assert.equal(call2.receipt_token, call1.receipt_token);
 
   // Verify database contains exactly 1 attempt record
-  const rows = globalDb.prepare('SELECT * FROM shrine_attempts WHERE idempotency_key = ?').all(idempotencyKey);
+  const rows = globalDb.prepare('SELECT * FROM shrine_attempts WHERE id = ?').all(call1.attempt.id);
   assert.equal(rows.length, 1);
 });
 

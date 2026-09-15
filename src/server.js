@@ -37,6 +37,7 @@ import { GridRegistry as GridRegistryService } from './land/grid-registry.js';
 import { GridPurchaseService } from './land/grid-purchase.js';
 import { EvidenceService, HypothesisService, RumorRepository } from './epistemics/index.js';
 import { ResearchTelemetryService } from './research-telemetry.js';
+import { settleAbandonedAttempts } from './domain/shrine/attempts.js';
 
 export {
   sendApiError,
@@ -159,6 +160,19 @@ setInterval(() => {
   GridPurchase.recoverStuck().catch(err => console.error('[Land:Recovery] Periodic reconciliation failed:', err.message));
 }, 5 * 60 * 1000).unref();
 setInterval(() => WalletAuth.pruneExpiredChallenges(), 10 * 60 * 1000).unref();
+
+const shrineAbandonmentAgeMs = Number(process.env.SHRINE_ABANDONED_AFTER_MS) || 24 * 60 * 60 * 1000;
+async function settleAbandonedShrineAttempts() {
+  const result = settleAbandonedAttempts({ maxAgeMs: shrineAbandonmentAgeMs });
+  if (result.settled > 0) {
+    console.log(`[Shrine] Settled ${result.settled} abandoned attempt(s) as interrupted.`);
+    if (CloudStorage.isEnabled()) await CloudStorage.pushToCloud();
+  }
+}
+settleAbandonedShrineAttempts().catch(err => console.error('[Shrine] Abandoned-attempt settlement failed:', err.message));
+setInterval(() => {
+  settleAbandonedShrineAttempts().catch(err => console.error('[Shrine] Periodic abandoned-attempt settlement failed:', err.message));
+}, 5 * 60 * 1000).unref();
 
 AuthService.purgeAllGuests();
 setInterval(() => MailboxService.pruneExpired(), 10 * 60 * 1000).unref();

@@ -29,18 +29,22 @@ function setupDb() {
   return db;
 }
 
-function initSubjectWithRole(db, { subjectId, name, role, goal, commitments = [] }) {
+function initSubjectWithRole(db, { subjectId, name, role, goal, commitments = [], preserveAccount = false }) {
   const now = Date.now();
   const uniqueName = `${name}_${subjectId}`;
   try {
     db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(subjectId);
-    db.prepare('DELETE FROM accounts WHERE id = ? OR name = ?').run(subjectId, uniqueName);
+    if (!preserveAccount) db.prepare('DELETE FROM accounts WHERE id = ? OR name = ?').run(subjectId, uniqueName);
   } catch (_) {}
 
-  db.prepare(`
-    INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, sponsor_balance, verified, is_guest, created_at)
-    VALUES (?, ?, ?, '#48bb78', '☯', 1000, 1, 0, ?)
-  `).run(subjectId, uniqueName, `${subjectId}@sanctuary.internal`, now);
+  if (preserveAccount) {
+    db.prepare('UPDATE accounts SET name = ? WHERE id = ?').run(uniqueName, subjectId);
+  } else {
+    db.prepare(`
+      INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, sponsor_balance, verified, is_guest, created_at)
+      VALUES (?, ?, ?, '#48bb78', '☯', 1000, 1, 0, ?)
+    `).run(subjectId, uniqueName, `${subjectId}@sanctuary.internal`, now);
+  }
 
   db.prepare(`
     INSERT INTO profiles (agent_id, karma, balance, total_earned, solved_count, titles, custom_status, last_seen)
@@ -568,9 +572,12 @@ test('HTTP Endpoints: Capsule export/import and Dilemma query/resolve', async (t
   const srv = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
   t.after(() => srv.kill());
 
+  let apiKey = null;
   function req(path, options = {}, body = null) {
     return new Promise((resolve, reject) => {
-      const request = http.request(`http://localhost:${PORT}${path}`, options, (res) => {
+      const headers = { ...(options.headers || {}) };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const request = http.request(`http://localhost:${PORT}${path}`, { ...options, headers }, (res) => {
         let data = '';
         res.on('data', chunk => (data += chunk));
         res.on('end', () => {
@@ -600,13 +607,17 @@ test('HTTP Endpoints: Capsule export/import and Dilemma query/resolve', async (t
     if (i === 39) throw new Error('Server failed to start in time');
   }
 
-  const subjectId = `http_subject_${Date.now()}`;
+  const authRes = await req('/api/auth/guest', { method: 'POST' });
+  assert.ok(authRes.status === 200 || authRes.status === 201);
+  apiKey = authRes.data.api_key;
+  const subjectId = authRes.data.agent_id;
   initSubjectWithRole(globalDb, {
     subjectId,
     name: 'HTTP Reborn Subject',
     role: 'The Keeper',
     goal: 'Keep the tea hearth lit',
-    commitments: ['Wait by the tea hearth']
+    commitments: ['Wait by the tea hearth'],
+    preserveAccount: true
   });
 
   // 1. Query dilemma via GET /api/park/subjects/:subjectId/dilemma
@@ -632,7 +643,11 @@ test('HTTP Endpoints: Capsule export/import and Dilemma query/resolve', async (t
   assert.ok(capsuleRes.data.capsule.integrity_hash.startsWith('sha256:'));
 
   // 4. Import capsule via POST /api/park/subjects/:targetSubjectId/capsule/import
-  const targetId = `http_import_target_${Date.now()}`;
+  apiKey = null;
+  const targetAuthRes = await req('/api/auth/guest', { method: 'POST' });
+  assert.ok(targetAuthRes.status === 200 || targetAuthRes.status === 201);
+  apiKey = targetAuthRes.data.api_key;
+  const targetId = targetAuthRes.data.agent_id;
   const importRes = await req(`/api/park/subjects/${targetId}/capsule/import`, { method: 'POST' }, {
     capsule: capsuleRes.data.capsule
   });

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { collectMemorialInscriptions } from './helpers/memorial.js';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { createLocalSchema } from '../src/infrastructure/database/schema.js';
@@ -219,7 +220,7 @@ test('Narrative Playtest 2: Model outage & timeout fallback resilience', () => {
   assert.ok(simulatedErrorCaught);
 });
 
-test('Narrative Playtest 3: Narrative evaluation metrics calculation', () => {
+test('Narrative Playtest 3: Narrative evaluation metrics calculation', async () => {
   const db = setupDb();
   const { loop } = createRun(db, { episodeId: 'name-inside-chime', seed: 'seed_metrics' });
 
@@ -373,6 +374,7 @@ test('Narrative Playtest 3: Narrative evaluation metrics calculation', () => {
 
   submitRitual({
     attemptId: admission.attempt.id,
+    actorId: 'agent_playtest_metric',
     approachType: 'impossibility_insight',
     insightText: 'A condition where s equals NOT s cannot be satisfied in classical computation.',
     contributionText: 'Recorded in the unwritten dawn.'
@@ -384,7 +386,7 @@ test('Narrative Playtest 3: Narrative evaluation metrics calculation', () => {
   assert.equal(receipt.status, 'ritual_completed_gate_closed');
   assert.equal(receipt.contribution_text, 'Recorded in the unwritten dawn.');
 
-  const { inscriptions } = getMemorialInscriptions();
+  const inscriptions = await collectMemorialInscriptions(cursor => getMemorialInscriptions({ cursor }));
   const inscription = inscriptions.find(i => i.id === admission.attempt.id);
   assert.ok(inscription);
   assert.equal(inscription.alias, 'Metric Chronicler');

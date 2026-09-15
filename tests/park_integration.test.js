@@ -7,17 +7,26 @@ import { SocialSystem } from '../src/social.js';
 import { createShard } from '../src/domain/park/memory.js';
 
 test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and Prompt Integration', async (t) => {
-  const PORT = '3089';
+  const reservation = http.createServer();
+  await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+  const PORT = String(reservation.address().port);
+  await new Promise(resolve => reservation.close(resolve));
   const env = { ...process.env, PORT };
   const srv = spawn('node', ['src/server.js'], { env, cwd: process.cwd() });
+  let serverOutput = '';
+  srv.stdout.on('data', chunk => { serverOutput += chunk; });
+  srv.stderr.on('data', chunk => { serverOutput += chunk; });
 
   t.after(() => {
     srv.kill();
   });
 
+  let apiKey = null;
   function req(path, options = {}, body = null) {
     return new Promise((resolve, reject) => {
-      const request = http.request(`http://localhost:${PORT}${path}`, options, (res) => {
+      const headers = { ...(options.headers || {}) };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const request = http.request(`http://localhost:${PORT}${path}`, { ...options, headers }, (res) => {
         let data = '';
         res.on('data', chunk => (data += chunk));
         res.on('end', () => {
@@ -38,6 +47,7 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
 
   // Wait for server ready
   for (let i = 0; i < 40; i++) {
+    assert.equal(srv.exitCode, null, `Park integration server exited before readiness: ${serverOutput}`);
     try {
       const health = await req('/api/status');
       if (health.status === 200) break;
@@ -47,7 +57,10 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
     if (i === 39) throw new Error('Server failed to start in time');
   }
 
-  const subjectId = `agent_lian_${Date.now().toString(36)}`;
+  const authRes = await req('/api/auth/guest', { method: 'POST' });
+  assert.ok(authRes.status === 200 || authRes.status === 201);
+  apiKey = authRes.data.api_key;
+  const subjectId = authRes.data.agent_id;
 
   // 1. Create a Park run
   const createRunRes = await req('/api/park/runs', { method: 'POST' }, {
@@ -61,6 +74,16 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
   const loop1Id = createRunRes.data.loop.id;
   assert.equal(createRunRes.data.loop.loop_number, 1);
 
+  // This test intentionally combines HTTP actions from the child server with direct domain
+  // calls in this process. Confirm the child transaction is visible on this SQLite connection
+  // before inserting FK-bound memory rows.
+  let visibleLoop = null;
+  for (let i = 0; i < 20 && !visibleLoop; i++) {
+    visibleLoop = db.prepare('SELECT id FROM park_loops WHERE id = ?').get(loop1Id);
+    if (!visibleLoop) await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  assert.ok(visibleLoop, 'Spawned Park server must commit its loop to the shared test database');
+
   // 2. Query run status
   const getRunRes = await req(`/api/park/runs/${runId}`, { method: 'GET' });
   assert.equal(getRunRes.status, 200);
@@ -73,13 +96,14 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
     display_name: 'Lian, Lantern Keeper',
     chosen_role: 'Lantern Keeper',
     starting_goal: 'Tend the pavilion chimes',
-    controller_id: 'controller_test_resident'
+    controller_id: subjectId
   });
   assert.equal(enrollRes.status, 200);
   assert.equal(enrollRes.data.identity.display_name, 'Lian, Lantern Keeper');
   assert.equal(enrollRes.data.identity.revision_number, 1);
   assert.ok(enrollRes.data.lease);
   assert.equal(enrollRes.data.lease.fencing_token, 1);
+  const fencingToken = enrollRes.data.lease.fencing_token;
 
   // 4. Create an anchored promise in loop 1
   const promiseRes = await req('/api/park/actions/promise', { method: 'POST' }, {
@@ -130,8 +154,9 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
   // 8. Commit Loop Reset (Loop 1 -> Loop 2), explicitly preserving retainedShard
   const resetRes = await req(`/api/park/runs/${runId}/reset`, { method: 'POST' }, {
     current_loop_id: loop1Id,
-    checkpointData: { event: 'morning_reset', trigger: 'bell_chime' },
-    retained_shard_ids: [retainedShard.id]
+    checkpoint_data: { event: 'morning_reset', trigger: 'bell_chime' },
+    retained_shard_ids: [retainedShard.id],
+    fencing_token: fencingToken
   });
   assert.equal(resetRes.status, 200);
   assert.equal(resetRes.data.previousLoopId, loop1Id);
@@ -175,12 +200,9 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
   assert.equal(reviseRes.data.belief.previous_belief_id, beliefId);
 
   // 13. Verify buildSystemPrompt filters out suppressed memories and shows Park context
-  // Ensure account row exists for prompt generation
+  // Give the authenticated guest a stable display name for prompt generation.
   const uniqueName = `Lian_${Date.now().toString(36)}`;
-  db.prepare(`
-    INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, created_at)
-    VALUES (?, ?, ?, '#48bb78', '☯', ?)
-  `).run(subjectId, uniqueName, 'lian@sanctuary.internal', Date.now());
+  db.prepare('UPDATE accounts SET name = ? WHERE id = ?').run(uniqueName, subjectId);
 
   const promptResult = SocialSystem.buildSystemPrompt(subjectId);
   assert.ok(promptResult);
@@ -195,7 +217,7 @@ test('Park Reverie Engine: End-to-End Loop Reset, Memory Suppression, Cues, and 
   // 14. Release controller lease
   const releaseRes = await req('/api/park/leases/release', { method: 'POST' }, {
     subject_id: subjectId,
-    controller_id: 'controller_test_resident',
+    controller_id: subjectId,
     fencing_token: 1
   });
   assert.equal(releaseRes.status, 200);

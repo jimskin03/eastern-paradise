@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { collectMemorialInscriptions } from './helpers/memorial.js';
 import assert from 'node:assert/strict';
 import { db } from '../src/db.js';
 import { AuthService } from '../src/auth.js';
@@ -7,7 +8,7 @@ import { getMemorialInscriptions, recoverGuestSubject } from '../src/domain/shri
 import { wipeNonAiliciaLogs } from '../src/infrastructure/database/cloud/maintenance.js';
 import { shouldRetainCloudRow } from '../src/infrastructure/database/cloud/filters.js';
 
-test('Shrine Permanence: Inscriptions Survive Guest Session Purge & Cloud Maintenance', () => {
+test('Shrine Permanence: Inscriptions Survive Guest Session Purge & Cloud Maintenance', async () => {
   // 1. Create a guest session
   const guest = AuthService.createGuest({ name: 'EphemeralPilgrim' });
   const guestId = guest.agent_id;
@@ -57,8 +58,8 @@ test('Shrine Permanence: Inscriptions Survive Guest Session Purge & Cloud Mainte
   assert.equal(countAfter, countBefore, 'wipeNonAiliciaLogs must not delete any shrine attempts');
 
   // 7. Verify Inscription still present in public memorial list
-  const memorial = getMemorialInscriptions({ limit: 100 });
-  assert.ok(memorial.inscriptions.some(i => i.id === admission.attempt.id));
+  const inscriptions = await collectMemorialInscriptions(cursor => getMemorialInscriptions({ limit: 100, cursor }));
+  assert.ok(inscriptions.some(i => i.id === admission.attempt.id));
 
   // 8. Cloud Filter Exemption: Test that cloud filters retain shrine records even with guest flags
   assert.equal(shouldRetainCloudRow('memorial_subjects', { id: 'subj_1', linked_account_id: guestId, is_guest: 1 }), true);

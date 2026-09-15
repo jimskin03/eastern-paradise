@@ -34,6 +34,10 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # The free Render filesystem is ephemeral. Never acknowledge a shrine mutation as
+      # permanent unless its authoritative cloud copy has been confirmed first.
+      - key: REQUIRE_DURABLE_SHRINE
+        value: "1"
       # ---- Solana land settlement ----
       # Network is devnet by default and MAINNET IS DELIBERATELY DISABLED (loadSolanaConfig
       # throws unless SOLANA_ALLOW_MAINNET=true). To go live on mainnet, set BOTH in the Render
