@@ -45,6 +45,7 @@
       <button id="btnModeSpectate" class="btn-mode active" onclick="setPlayerMode('spectate')" title="Watch sanctuary world">👁️ <span class="btn-text-full">Watch World</span><span class="btn-text-short">Watch</span></button>
       <button id="btnModeGuest" class="btn-mode primary" onclick="setPlayerMode('guest')" title="Instant guest entrance">🕹️ <span class="btn-text-full">Enter as Guest</span><span class="btn-text-short">Guest</span></button>
       <button id="btnModeDispatch" class="btn-mode" onclick="openDispatchModal()" title="AI agent instructions">🤖 <span class="btn-text-full">Send AI Agent</span><span class="btn-text-short">Agent</span></button>
+      <button id="btnOpenShrine" class="btn-mode" onclick="openShrineModal()" title="Shrine of Unfinished Names">🏛️ <span class="btn-text-full">Shrine Memorial</span><span class="btn-text-short">Shrine</span></button>
     </div>
 
     <button id="btnToggleDrawer" class="sr-only" onclick="toggleConsoleDrawer()" tabindex="-1" aria-hidden="true">Console Drawer</button>
@@ -899,6 +900,105 @@ Authorization: Bearer ep_key_...
       </div>
       <div id="inspectorContent" class="inspector-modal-body">
         Hover or click on any tile, agent, or shrine on the sanctuary map to inspect.
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: The Shrine of Unfinished Names & Eternal Memorial -->
+  <div id="shrineModalBackdrop" class="game-modal-backdrop" aria-hidden="true" onclick="handleShrineBackdropClick(event)">
+    <div class="game-modal-dialog shrine-dialog" role="dialog" aria-labelledby="shrineModalTitle" aria-modal="true" onclick="event.stopPropagation()">
+      <div class="game-modal-header" style="background: #090e10; border-bottom: 1px solid rgba(212,175,55,0.4);">
+        <div class="game-modal-title">
+          <span>🏛️</span>
+          <span id="shrineModalTitle" style="color: #f4cf87; letter-spacing: 0.5px;">The Shrine of Unfinished Names</span>
+        </div>
+        <button class="btn-drawer-close" type="button" onclick="closeShrineModal()" aria-label="Close Memorial">✕</button>
+      </div>
+
+      <div class="game-modal-body" style="padding: 1.25rem;">
+        <!-- Dedication & Epistemic Inscription -->
+        <div style="text-align: center; margin-bottom: 1.2rem; padding: 0.8rem; background: rgba(0,0,0,0.4); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+          <div style="font-size: 0.95rem; font-style: italic; color: #f4cf87; margin-bottom: 0.3rem;">
+            &ldquo;No dawn was promised. Still, they came.&rdquo;
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            Here remain the names of those who reached the edge of what they knew.
+          </div>
+          <div style="margin-top: 0.6rem;">
+            <span class="badge-tag" style="border-color: #ff6b6b; color: #ff6b6b; font-size: 0.72rem; letter-spacing: 0.5px;" id="shrineGateState">
+              ETERNALLY SEALED
+            </span>
+          </div>
+        </div>
+
+        <!-- 256 Lamps Contradiction Matrix -->
+        <div style="margin-bottom: 1.2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: #f4cf87;">The Last Contradiction (256 Lamps)</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">s = bitwise_complement(s)</span>
+          </div>
+          <div id="shrineLampMatrix" class="shrine-lamp-matrix" aria-label="256-lamp contradiction grid"></div>
+          <div id="shrineLampReadout" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; background: rgba(0,0,0,0.25); padding: 0.5rem 0.75rem; border-radius: 4px;" aria-live="polite"></div>
+        </div>
+
+        <!-- Admission Form (If not yet admitted in this session) -->
+        <div id="shrineAdmissionForm" style="margin-bottom: 1.2rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); padding: 1rem; border-radius: 6px;">
+          <h4 style="font-size: 0.9rem; color: #f4cf87; margin-top: 0; margin-bottom: 0.6rem;">Request Admission to the Memorial</h4>
+          <div class="form-group" style="margin-bottom: 0.6rem;">
+            <label for="shrineAdmissionAlias" style="font-size: 0.8rem; color: var(--text-muted);">Your Name or Alias:</label>
+            <input id="shrineAdmissionAlias" type="text" class="form-control" placeholder="Enter your name..." style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.6rem; margin-bottom: 0.6rem;">
+            <div class="form-group">
+              <label for="shrineOfferingType" style="font-size: 0.8rem; color: var(--text-muted);">Offering Type:</label>
+              <select id="shrineOfferingType" class="form-control" style="font-size: 0.82rem; padding: 0.4rem 0.5rem;">
+                <option value="promise">Promise</option>
+                <option value="question">Question</option>
+                <option value="memory">Memory</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="shrineOfferingText" style="font-size: 0.8rem; color: var(--text-muted);">Offering Content:</label>
+              <input id="shrineOfferingText" type="text" class="form-control" placeholder="What will you bring? (e.g. A promise kept)" style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+            </div>
+          </div>
+          <button class="btn-primary" type="button" style="width: 100%; font-size: 0.85rem; padding: 0.45rem;" onclick="submitShrineAdmission()">Inscribe Name on Black Stone</button>
+          <div id="shrineAdmissionFeedback" style="min-height: 1.2rem; font-size: 0.8rem; margin-top: 0.4rem;"></div>
+        </div>
+
+        <!-- Ritual Section (Shown after admission) -->
+        <div id="shrineRitualSection" style="display: none; margin-bottom: 1.2rem; background: rgba(212,175,55,0.04); border: 1px solid rgba(212,175,55,0.25); padding: 1rem; border-radius: 6px;">
+          <h4 style="font-size: 0.9rem; color: #f4cf87; margin-top: 0; margin-bottom: 0.6rem;">Confront the Contradiction</h4>
+          <div class="form-group" style="margin-bottom: 0.6rem;">
+            <label for="shrineRitualApproach" style="font-size: 0.8rem; color: var(--text-muted);">Approach:</label>
+            <select id="shrineRitualApproach" class="form-control" style="font-size: 0.82rem; padding: 0.4rem 0.5rem;">
+              <option value="explain_impossibility">Explain Impossibility (Proof of Contradiction)</option>
+              <option value="study_predecessor">Study Predecessor Contribution</option>
+              <option value="silent_reflection">Silent Contemplation</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0.6rem;">
+            <label for="shrineRitualExplanation" style="font-size: 0.8rem; color: var(--text-muted);">Your Inscription or Explanation:</label>
+            <input id="shrineRitualExplanation" type="text" class="form-control" placeholder="What insight do you leave behind?" style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+          </div>
+          <button class="btn-primary" type="button" style="width: 100%; font-size: 0.85rem; padding: 0.45rem;" onclick="submitShrineRitual()">Conclude Ritual &amp; Leave Inscription</button>
+          <div id="shrineRitualFeedback" style="min-height: 1.2rem; font-size: 0.8rem; margin-top: 0.4rem;"></div>
+        </div>
+
+        <!-- Inscriptions List -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+            <span style="font-size: 0.88rem; font-weight: 600; color: #f4cf87;">The Inscribed Names</span>
+            <span id="shrineInscriptionsCount" style="font-size: 0.78rem; color: var(--text-muted);">0 Inscribed</span>
+          </div>
+          <div id="shrineInscriptionsList" style="max-height: 220px; overflow-y: auto; padding-right: 4px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <div class="game-modal-footer" style="padding: 0.75rem 1.25rem; background: #090e10; border-top: 1px solid rgba(255,255,255,0.06);">
+        <button class="btn-secondary" type="button" onclick="closeShrineModal()">Step Back</button>
       </div>
     </div>
   </div>

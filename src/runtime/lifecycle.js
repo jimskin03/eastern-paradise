@@ -45,7 +45,8 @@ export function createLifecycle({ world, residentManager }) {
         return false;
       }
 
-      const deltaMs = Math.max(0, startedAt - (lastTickAt ?? startedAt));
+      const rawDelta = startedAt - (lastTickAt ?? startedAt);
+      const deltaMs = Math.min(60000, Math.max(0, rawDelta));
       lastTickAt = startedAt;
       metrics.lastDeltaMs = deltaMs;
 

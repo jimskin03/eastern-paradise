@@ -14,6 +14,7 @@ import { refreshInhabitants } from './features/inhabitants/index.js';
 import { connectSolanaWallet, disconnectSolanaWallet, refreshSolanaWallet } from './features/wallet/index.js';
 import { refreshLand, purchaseLandGrid, editLandPlot } from './features/land/index.js';
 import { initHappeningNow, refreshHappeningNow, toggleHappeningNow } from './features/activity/index.js';
+import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShrineAdmission, submitShrineRitual } from './features/shrine/index.js';
 
     // Console navigation now lives in features/navigation.
     // In-game Puzzle Modal
@@ -21,6 +22,10 @@ import { initHappeningNow, refreshHappeningNow, toggleHappeningNow } from './fea
     let activeModalChallengeId = null;
 
     async function openPuzzleModal(nodeId, defaultAction = 'inspect') {
+      if (nodeId === 'shrine_unfinished_names' || nodeId === 'celestial_memorial') {
+        openShrineModal();
+        return;
+      }
       activeModalNodeId = nodeId;
       activeModalChallengeId = null;
       const modal = document.getElementById('puzzleModalBackdrop');
@@ -560,6 +565,11 @@ installGlobals({
   escapeHtml,
   refreshHappeningNow,
   toggleHappeningNow,
+  openShrineModal,
+  closeShrineModal,
+  handleShrineBackdropClick,
+  submitShrineAdmission,
+  submitShrineRitual,
 }, {
   getCurrentAgent: () => currentAgent,
   setCurrentAgent: (value) => { currentAgent = value; }
