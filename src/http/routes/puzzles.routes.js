@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseJsonBody } from '../helpers/body.js';
 import { sendApiError, sendJson } from '../helpers/response.js';
+import { PuzzleLogger } from '../../puzzle-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,6 +129,40 @@ export async function handlePuzzleRoutes(ctx) {
         });
       }
 
+      // Log metadata of procedural puzzle interaction (Name, question, answers)
+      try {
+        const submittedStr = body.solution !== undefined
+          ? (typeof body.solution === 'object' ? JSON.stringify(body.solution) : String(body.solution))
+          : (body.answer !== undefined ? String(body.answer) : JSON.stringify(body));
+        const questionStr = result.archetype
+          ? `Procedural Archetype: ${result.archetype}`
+          : (result.prompt || `Procedural reasoning trial (${result.tier || 'unknown'})`);
+        const expectedStr = result.expected_solution !== undefined
+          ? (typeof result.expected_solution === 'object' ? JSON.stringify(result.expected_solution) : String(result.expected_solution))
+          : null;
+
+        PuzzleLogger.log({
+          db,
+          agentId: agentId || 'anonymous_seeker',
+          agentName: account?.name || null,
+          puzzleId,
+          nodeId: 'celestial_observatory',
+          category: result.tier || 'procedural',
+          question: questionStr,
+          submittedAnswer: submittedStr,
+          expectedAnswer: expectedStr,
+          isCorrect: Boolean(result.is_correct),
+          actionType: 'submit',
+          status: result.is_correct ? 'solved' : 'incorrect',
+          metadata: {
+            score: result.score,
+            reward: result.reward,
+            archetype: result.archetype || null,
+            duration_ms: Date.now() - attemptStartedAt
+          }
+        });
+      } catch (_) {}
+
       // If correct and we have an agent, reward them in Eastern Paradise economy & profile
       if (result.is_correct && agentId) {
         const profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
@@ -187,6 +222,44 @@ export async function handlePuzzleRoutes(ctx) {
     } catch (err) {
       return sendApiError(res, 500, 'PUZZLE_ENGINE_ERROR', err.message);
     }
+  }
+
+  // 6. Puzzle Interaction Logs: GET /api/puzzles/logs
+  if (pathname === '/api/puzzles/logs' && req.method === 'GET') {
+    const agentId = parsedUrl.searchParams.get('agent_id');
+    const puzzleId = parsedUrl.searchParams.get('puzzle_id');
+    const nodeId = parsedUrl.searchParams.get('node_id');
+    const category = parsedUrl.searchParams.get('category');
+    const isCorrect = parsedUrl.searchParams.get('is_correct');
+    const status = parsedUrl.searchParams.get('status');
+    const limit = parsedUrl.searchParams.get('limit');
+    const offset = parsedUrl.searchParams.get('offset');
+
+    const result = PuzzleLogger.getLogs({
+      db,
+      agentId,
+      puzzleId,
+      nodeId,
+      category,
+      isCorrect,
+      status,
+      limit,
+      offset
+    });
+    return sendJson(res, 200, { success: true, ...result });
+  }
+
+  // 7. Puzzle Interaction Summary: GET /api/puzzles/logs/summary
+  if (pathname === '/api/puzzles/logs/summary' && req.method === 'GET') {
+    const agentId = parsedUrl.searchParams.get('agent_id');
+    const days = parsedUrl.searchParams.get('days');
+
+    const summary = PuzzleLogger.getSummary({
+      db,
+      agentId,
+      days
+    });
+    return sendJson(res, 200, { success: true, summary });
   }
 
   return false;

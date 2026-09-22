@@ -474,6 +474,27 @@ export const SAFE_MIGRATIONS = [
       released_at INTEGER,
       FOREIGN KEY (run_id) REFERENCES park_runs(id)
     );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS puzzle_interaction_logs (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      agent_name TEXT NOT NULL,
+      puzzle_id TEXT NOT NULL,
+      node_id TEXT,
+      category TEXT,
+      question TEXT NOT NULL,
+      submitted_answer TEXT,
+      expected_answer TEXT,
+      is_correct INTEGER NOT NULL DEFAULT 0,
+      action_type TEXT NOT NULL DEFAULT 'solve',
+      status TEXT NOT NULL DEFAULT 'attempted',
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_puzzle_logs_agent ON puzzle_interaction_logs (agent_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_puzzle_logs_puzzle ON puzzle_interaction_logs (puzzle_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_puzzle_logs_created ON puzzle_interaction_logs (created_at);
   `
 ];
 

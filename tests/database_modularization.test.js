@@ -63,7 +63,8 @@ const EXPECTED_TABLES = [
   'park_belief_evidence',
   'park_promises',
   'park_identity_revisions',
-  'park_controller_leases'
+  'park_controller_leases',
+  'puzzle_interaction_logs'
 ];
 
 const EXPECTED_INDEXES = [
@@ -103,7 +104,10 @@ const EXPECTED_INDEXES = [
   'idx_park_belief_evidence_evidence',
   'idx_park_promises_promisor',
   'idx_park_promises_loop',
-  'idx_park_identity_subject'
+  'idx_park_identity_subject',
+  'idx_puzzle_logs_agent',
+  'idx_puzzle_logs_puzzle',
+  'idx_puzzle_logs_created'
 ];
 
 function createTempDatabase() {

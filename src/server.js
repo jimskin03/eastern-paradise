@@ -38,6 +38,7 @@ import { GridPurchaseService } from './land/grid-purchase.js';
 import { EvidenceService, HypothesisService, RumorRepository } from './epistemics/index.js';
 import { ResearchTelemetryService } from './research-telemetry.js';
 import { settleAbandonedAttempts } from './domain/shrine/attempts.js';
+import { PuzzleLogger } from './puzzle-logger.js';
 
 export {
   sendApiError,
@@ -117,7 +118,8 @@ const services = {
   Evidence,
   Hypotheses,
   Rumors,
-  ResearchTelemetry
+  ResearchTelemetry,
+  PuzzleLogger
 };
 
 const limits = { checkRateLimit, checkGuestCreationLimit, checkWhisperLimit };

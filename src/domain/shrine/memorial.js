@@ -11,7 +11,7 @@ import { GATE_STATE_SEALED } from './ritual.js';
  * @param {string} [options.assurance=null]
  * @returns {object}
  */
-export function getMemorialInscriptions({ limit = 50, cursor = null, assurance = null } = {}) {
+export function getMemorialInscriptions({ limit = 50, cursor = null, assurance = null, order = 'desc' } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
 
   let query = `
@@ -33,8 +33,10 @@ export function getMemorialInscriptions({ limit = 50, cursor = null, assurance =
   `;
   const params = [];
 
+  const sortOrder = String(order).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
   if (cursor !== null && cursor !== undefined) {
-    query += ' AND a.admitted_sequence > ?';
+    query += sortOrder === 'DESC' ? ' AND a.admitted_sequence < ?' : ' AND a.admitted_sequence > ?';
     params.push(Number(cursor));
   }
 
@@ -43,7 +45,7 @@ export function getMemorialInscriptions({ limit = 50, cursor = null, assurance =
     params.push(assurance);
   }
 
-  query += ' ORDER BY a.admitted_sequence ASC LIMIT ?';
+  query += ` ORDER BY a.admitted_sequence ${sortOrder} LIMIT ?`;
   params.push(safeLimit + 1);
 
   const rows = db.prepare(query).all(...params);

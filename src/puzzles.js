@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import { EconomyManager } from './economy.js';
 import { SocialSystem } from './social.js';
+import { PuzzleLogger } from './puzzle-logger.js';
 import crypto from 'node:crypto';
 
 // -----------------------------------------------------------------------------
@@ -545,6 +546,28 @@ export class PuzzleManager {
     }
 
     if (submittedAnswer === undefined || submittedAnswer === null || String(submittedAnswer).trim() === '') {
+      try {
+        PuzzleLogger.log({
+          db,
+          agentId,
+          agentName: options.agent_name || options.agentName,
+          puzzleId: puzzle.puzzle_id || nodeId,
+          nodeId,
+          category: puzzle.category,
+          question: puzzle.prompt,
+          submittedAnswer: null,
+          expectedAnswer: puzzle.answer,
+          isCorrect: false,
+          status: 'missing_answer',
+          metadata: {
+            hint: puzzle.hint,
+            challenge_id: challengeId,
+            request_id: requestId,
+            error_code: 'MISSING_ANSWER'
+          }
+        });
+      } catch (_) {}
+
       return {
         success: false,
         error: 'missing_answer',
@@ -585,6 +608,29 @@ export class PuzzleManager {
     });
 
     if (!isCorrect) {
+      try {
+        PuzzleLogger.log({
+          db,
+          agentId,
+          agentName: options.agent_name || options.agentName,
+          puzzleId: puzzle.puzzle_id || nodeId,
+          nodeId,
+          category: puzzle.category,
+          question: puzzle.prompt,
+          submittedAnswer: String(submittedAnswer),
+          expectedAnswer: puzzle.answer,
+          isCorrect: false,
+          status: 'incorrect',
+          metadata: {
+            hint: puzzle.hint,
+            challenge_id: challengeId,
+            request_id: requestId,
+            accepted_answers: acceptedAnswers,
+            error_code: 'INCORRECT_ANSWER'
+          }
+        });
+      } catch (_) {}
+
       return {
         success: false,
         error: 'incorrect_answer',
@@ -743,7 +789,34 @@ export class PuzzleManager {
       recentSolves.set(`req:${agentId}:${requestId}`, { result: finalResult, timestamp: Date.now() });
     }
 
+    try {
+      PuzzleLogger.log({
+        db,
+        agentId,
+        agentName: options.agent_name || options.agentName,
+        puzzleId: puzzle.puzzle_id || nodeId,
+        nodeId,
+        category: puzzle.category,
+        question: puzzle.prompt,
+        submittedAnswer: String(submittedAnswer),
+        expectedAnswer: puzzle.answer,
+        isCorrect: true,
+        status: 'solved',
+        metadata: {
+          karma_reward: puzzle.karma_reward,
+          merit_earned: economyResult.merit_earned,
+          sponsor_dividend: economyResult.sponsor_dividend,
+          title_award: puzzle.title_award,
+          truth_axiom: puzzle.truth_axiom || null,
+          challenge_id: challengeId,
+          request_id: requestId
+        }
+      });
+    } catch (_) {}
+
     return finalResult;
   }
 }
+
+export { PuzzleLogger } from './puzzle-logger.js';
 

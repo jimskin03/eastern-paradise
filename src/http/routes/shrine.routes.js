@@ -192,8 +192,9 @@ export async function handleShrineRoutes(ctx) {
     const limit = parsedUrl.searchParams.get('limit');
     const cursor = parsedUrl.searchParams.get('cursor');
     const assurance = parsedUrl.searchParams.get('assurance');
+    const order = parsedUrl.searchParams.get('order');
 
-    const result = getMemorialInscriptions({ limit, cursor, assurance });
+    const result = getMemorialInscriptions({ limit, cursor, assurance, order });
     return sendJson(res, 200, {
       success: true,
       ...result

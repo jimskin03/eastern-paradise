@@ -78,6 +78,22 @@ export const CLOUD_TABLE_SCHEMAS = [
     result TEXT NOT NULL,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS puzzle_interaction_logs (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    puzzle_id TEXT NOT NULL,
+    node_id TEXT,
+    category TEXT,
+    question TEXT NOT NULL,
+    submitted_answer TEXT,
+    expected_answer TEXT,
+    is_correct INTEGER NOT NULL DEFAULT 0,
+    action_type TEXT NOT NULL DEFAULT 'solve',
+    status TEXT NOT NULL DEFAULT 'attempted',
+    metadata TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS agent_badges (
     agent_id TEXT NOT NULL,
     badge_id TEXT NOT NULL,

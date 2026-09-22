@@ -244,7 +244,8 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
         const requestId = payload?.request_id ?? payload?.requestId;
         const result = PuzzleManager.solvePuzzle(agentId, targetNode.id, submittedAnswer, {
           challenge_id: challengeId,
-          request_id: requestId
+          request_id: requestId,
+          agent_name: agent.name
         });
         if (result.success && !result.idempotent) {
           if (result.category === 'the truth' || result.truth_axiom) {
