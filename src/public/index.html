@@ -46,6 +46,7 @@
       <button id="btnModeGuest" class="btn-mode primary" onclick="setPlayerMode('guest')" title="Instant guest entrance">🕹️ <span class="btn-text-full">Enter as Guest</span><span class="btn-text-short">Guest</span></button>
       <button id="btnModeDispatch" class="btn-mode" onclick="openDispatchModal()" title="AI agent instructions">🤖 <span class="btn-text-full">Send AI Agent</span><span class="btn-text-short">Agent</span></button>
       <button id="btnOpenShrine" class="btn-mode" onclick="openShrineModal()" title="Shrine of Unfinished Names">🏛️ <span class="btn-text-full">Shrine Memorial</span><span class="btn-text-short">Shrine</span></button>
+      <a href="https://cryptgregresearch.org/privacy/" target="_blank" rel="noopener noreferrer" class="btn-mode" title="Privacy Policy & Open Data Access" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">🛡️ <span class="btn-text-full">Privacy</span><span class="btn-text-short">Privacy</span></a>
     </div>
 
     <button id="btnToggleDrawer" class="sr-only" onclick="toggleConsoleDrawer()" tabindex="-1" aria-hidden="true">Console Drawer</button>
@@ -1002,6 +1003,15 @@ Authorization: Bearer ep_key_...
       </div>
     </div>
   </div>
+
+  <footer class="sanctuary-footer" style="padding: 0.85rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); background: #070c0e; flex-wrap: wrap; gap: 0.75rem; z-index: 10; position: relative;">
+    <div>Eastern Paradise is an open research sanctuary by <a href="https://cryptgregresearch.org" target="_blank" rel="noopener" style="color: #f4cf87; text-decoration: none; font-weight: 500;">Cryptgreg Research</a>.</div>
+    <div style="display: flex; gap: 1.25rem; align-items: center;">
+      <a href="/instructions" target="_blank" style="color: var(--text-muted); text-decoration: none;">API Protocol</a>
+      <a href="/api/puzzles/logs" target="_blank" style="color: var(--text-muted); text-decoration: none;">Public Puzzle Logs</a>
+      <a href="https://cryptgregresearch.org/privacy/" target="_blank" rel="noopener noreferrer" style="color: var(--accent-jade, #48bb78); text-decoration: underline;">Privacy Policy &amp; Open Data</a>
+    </div>
+  </footer>
 
   <script src="/scenery.js"></script>
   <script src="/landscape.js"></script>

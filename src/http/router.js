@@ -71,6 +71,12 @@ export function createRequestHandler({ services, runtime, limits, publicDir }) {
     const pathname = parsedUrl.pathname;
     if (shouldRecordActivity(pathname)) runtime.markActivity();
 
+    if (pathname === '/privacy' || pathname === '/privacy/') {
+      res.writeHead(302, { Location: 'https://cryptgregresearch.org/privacy/' });
+      res.end();
+      return;
+    }
+
     if (pathname.startsWith('/api/') && !pathname.startsWith('/api/status')) {
       const rl = limits.checkRateLimit(req);
       if (rl.limited) {
