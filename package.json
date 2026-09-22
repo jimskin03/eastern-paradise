@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "build:wallet": "esbuild src/frontend/wallet/metamask-solana.js --bundle --format=esm --minify --target=es2020 --outfile=src/public/js/vendor/metamask-solana.bundle.js",
     "test": "node --test --test-concurrency=1 tests/*.test.js",
-    "solana:create-collection": "node scripts/create-land-collection.mjs"
+    "solana:create-collection": "node scripts/create-land-collection.mjs",
+    "turso:sync": "node scripts/sync-turso.mjs"
   },
   "keywords": [
     "ai-agents",
