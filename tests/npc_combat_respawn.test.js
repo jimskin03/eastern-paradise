@@ -52,13 +52,21 @@ test('NPC Combat: Proximity requirement and killing an NPC', () => {
 
   const { id: agentId } = createCombatAgent('far', 200, 100);
   try {
-    // Agent positioned far away [0, 0]
+    // Agent with missing/invalid position must fail
+    world.activeAgents.set(agentId, { id: agentId, name: 'Void Agent', pos: null });
+    const noPosAttack = world.attackResident(residentManager, agentId, 'resident_daoming');
+    assert.equal(noPosAttack.ok, false);
+    assert.equal(noPosAttack.error_code, 'NO_POSITION');
+
+    // Agent positioned far away [0, 0] (distance ~21 tiles)
     world.activeAgents.set(agentId, { id: agentId, name: 'Far Agent', pos: [0, 0] });
 
-    // Attack from distance must fail
+    // Attack from distance must fail with clear vicinity requirement
     const farAttack = world.attackResident(residentManager, agentId, 'resident_daoming');
     assert.equal(farAttack.ok, false);
     assert.equal(farAttack.error_code, 'TOO_FAR');
+    assert.ok(farAttack.message.includes('close vicinity'));
+    assert.ok(farAttack.message.includes('within 3.0 tiles'));
 
     // Move close to daoming [20, 8] (distance 1.0 tile <= 3.0)
     world.activeAgents.set(agentId, { id: agentId, name: 'Close Agent', pos: [20, 8] });

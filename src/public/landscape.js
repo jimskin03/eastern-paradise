@@ -81,10 +81,10 @@
 
   function drawLabel(ctx, text, x, y, scale = 1) {
     ctx.font = `600 ${Math.max(12, Math.round(13 * scale))}px sans-serif`;
-    const w = ctx.measureText(text).width;
-    ctx.fillStyle = 'rgba(12,38,26,0.9)';
-    ctx.fillRect(x - w / 2 - 5, y - 13, w + 10, 18);
     ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(5, 20, 12, 0.85)';
+    ctx.lineWidth = 2.5;
+    ctx.strokeText(text, x, y);
     ctx.fillStyle = '#f5df87';
     ctx.fillText(text, x, y);
   }

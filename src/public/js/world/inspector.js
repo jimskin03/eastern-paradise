@@ -350,6 +350,27 @@ function renderResidentProfileCard(panel, resident, localAgent) {
     residentClass = 'offline';
   }
 
+  const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+  let myAgent = null;
+  if (session && typeof agents !== 'undefined' && agents) {
+    myAgent = agents.get(session.id) || agents.get(session.agent_id);
+    if (!myAgent) {
+      for (const a of agents.values()) {
+        if (a.id === session.id || a.name === session.name) {
+          myAgent = a;
+          break;
+        }
+      }
+    }
+  }
+
+  let distToResident = null;
+  let inCloseVicinity = false;
+  if (myAgent && myAgent.pos && resident.pos) {
+    distToResident = Math.hypot(resident.pos[0] - myAgent.pos[0], resident.pos[1] - myAgent.pos[1]);
+    inCloseVicinity = distToResident <= 3.0;
+  }
+
   panel.innerHTML = `
     <div class="avatar-profile-card" style="border-color: ${isFallen ? '#f43f5e' : '#d69e2e'};">
       <div class="avatar-header-row">
@@ -474,14 +495,36 @@ function renderResidentProfileCard(panel, resident, localAgent) {
         <div style="background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.35); border-radius: 6px; padding: 0.6rem; margin-bottom: 0.6rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
             <div style="font-size: 0.78rem; font-weight: 700; color: #f43f5e;">⚔️ Strike Resident</div>
-            <button id="btnStrike_${escapeHtml(resident.id)}" class="btn-sound" onclick="confirmAndStrikeResident('${escapeHtml(resident.id)}', '${escapeHtml(resident.name)}')" style="background: rgba(225, 29, 72, 0.25); border: 1px solid #f43f5e; color: #fda4af; font-size: 0.75rem; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 4px;">
-              ⚔️ Slay NPC
+            ${inCloseVicinity ? `
+              <span style="font-size: 0.7rem; color: #4ade80; background: rgba(74,222,128,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(74,222,128,0.3); font-weight: 600;">
+                🎯 In Close Vicinity (${distToResident.toFixed(1)}t)
+              </span>
+            ` : `
+              <span style="font-size: 0.7rem; color: #fbbf24; background: rgba(251,191,36,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(251,191,36,0.3); font-weight: 600;">
+                ${distToResident !== null ? `📍 ${distToResident.toFixed(1)} tiles away` : '📍 Enter world to strike'}
+              </span>
+            `}
+          </div>
+          
+          <div style="font-size: 0.68rem; color: #94a3b8; line-height: 1.35; margin-bottom: 0.45rem;">
+            ${inCloseVicinity 
+              ? 'Agent is in close vicinity (within 3.0 tiles) and ready to engage in combat.' 
+              : `⚠️ <strong>Close vicinity required:</strong> Agent must be within 3.0 tiles of ${escapeHtml(resident.name)} to strike.`}
+            Slaying inflicts <strong style="color: #f43f5e;">-50 $MERIT</strong> &amp; <strong style="color: #f43f5e;">-50 Karma</strong>.
+          </div>
+
+          <div style="display: flex; gap: 0.45rem; align-items: center;">
+            ${!inCloseVicinity && resident.pos ? `
+              <button type="button" class="btn-primary" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.6rem;" onclick="uiWalkTo([${resident.pos[0]}, ${resident.pos[1]}], '${escapeHtml(resident.name).replace(/'/g, "\\'")}')">
+                🚶 Walk to ${escapeHtml(resident.name)}
+              </button>
+            ` : ''}
+            <button id="btnStrike_${escapeHtml(resident.id)}" class="btn-sound" onclick="confirmAndStrikeResident('${escapeHtml(resident.id)}', '${escapeHtml(resident.name)}')" 
+              ${!inCloseVicinity ? 'disabled style="background: rgba(71, 85, 105, 0.25); border: 1px solid #475569; color: #94a3b8; font-size: 0.75rem; padding: 0.35rem 0.65rem; border-radius: 4px; cursor: not-allowed;" title="You must walk into close vicinity (within 3.0 tiles) first"' : 'style="flex: 1; background: rgba(225, 29, 72, 0.3); border: 1px solid #f43f5e; color: #fda4af; font-size: 0.75rem; padding: 0.35rem 0.65rem; cursor: pointer; border-radius: 4px; font-weight: 600;"'}>
+              ⚔️ ${inCloseVicinity ? 'Slay NPC (In Range)' : 'Slay NPC (Too Far)'}
             </button>
           </div>
-          <div style="font-size: 0.68rem; color: #94a3b8; line-height: 1.35;">
-            Warning: Slaying inflicts <strong style="color: #f43f5e;">-50 $MERIT</strong> &amp; <strong style="color: #f43f5e;">-50 Karma</strong>. Negative Karma triggers a 3-hour sentence to the Dark Sanctuary!
-          </div>
-          <div id="strikeFeedback_${escapeHtml(resident.id)}" style="font-size: 0.72rem; margin-top: 0.35rem; display: none;"></div>
+          <div id="strikeFeedback_${escapeHtml(resident.id)}" style="font-size: 0.72rem; margin-top: 0.45rem; display: none;"></div>
         </div>
       `}
 
@@ -1468,6 +1511,34 @@ async function confirmAndStrikeResident(residentId, residentName) {
 
   const btn = document.getElementById(`btnStrike_${residentId}`);
   const feedback = document.getElementById(`strikeFeedback_${residentId}`);
+
+  // Immediate close vicinity check
+  let myAgent = null;
+  if (session && typeof agents !== 'undefined' && agents) {
+    myAgent = agents.get(session.id) || agents.get(session.agent_id);
+    if (!myAgent) {
+      for (const a of agents.values()) {
+        if (a.id === session.id || a.name === session.name) {
+          myAgent = a;
+          break;
+        }
+      }
+    }
+  }
+
+  const targetAgent = typeof agents !== 'undefined' && agents ? agents.get(residentId) : null;
+  if (myAgent && myAgent.pos && targetAgent && targetAgent.pos) {
+    const dist = Math.hypot(targetAgent.pos[0] - myAgent.pos[0], targetAgent.pos[1] - myAgent.pos[1]);
+    if (dist > 3.0) {
+      if (feedback) {
+        feedback.style.display = 'block';
+        feedback.style.color = '#f43f5e';
+        feedback.textContent = `Too far from ${residentName} (${dist.toFixed(1)} tiles away). Agent must be in close vicinity (within 3.0 tiles) to strike!`;
+      }
+      return;
+    }
+  }
+
   if (btn) btn.disabled = true;
   if (feedback) {
     feedback.style.display = 'block';
@@ -1488,7 +1559,7 @@ async function confirmAndStrikeResident(residentId, residentName) {
     if (!res.ok || !data.ok) {
       if (feedback) {
         feedback.style.color = '#f43f5e';
-        feedback.textContent = data.error || 'Failed to strike target.';
+        feedback.textContent = data.message || data.error || 'Failed to strike target.';
       }
       return;
     }

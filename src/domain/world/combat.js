@@ -95,17 +95,27 @@ export function attackResident(world, residentManager, agentId, residentId) {
     throw err;
   }
 
-  // 3. Proximity check (distance <= 3.0 tiles required)
+  // 3. Proximity check (agent must be in close vicinity <= 3.0 tiles)
+  if (!attacker.pos || !Array.isArray(attacker.pos) || attacker.pos.length < 2) {
+    return {
+      ok: false,
+      success: false,
+      error: 'no_position',
+      error_code: 'NO_POSITION',
+      message: `Agent position is unknown. You must enter and be positioned in the sanctuary close to ${targetResident.name}.`
+    };
+  }
+
   const dist = Math.hypot(targetResident.pos[0] - attacker.pos[0], targetResident.pos[1] - attacker.pos[1]);
-  if (dist > 3.0) {
+  if (!Number.isFinite(dist) || dist > 3.0) {
     return {
       ok: false,
       success: false,
       error: 'too_far',
       error_code: 'TOO_FAR',
-      message: `Too far from ${targetResident.name} (distance: ${dist.toFixed(1)} tiles). Step closer to attack.`,
+      message: `Agent must be in close vicinity to strike ${targetResident.name} (within 3.0 tiles). Current distance: ${Number.isFinite(dist) ? dist.toFixed(1) : 'unknown'} tiles. Step closer to attack.`,
       target_pos: targetResident.pos,
-      distance: Math.round(dist * 10) / 10
+      distance: Number.isFinite(dist) ? Math.round(dist * 10) / 10 : null
     };
   }
 

@@ -318,9 +318,9 @@ function drawThronglet(ctx, x, y, agent, time, isHovered) {
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
     const tag = `💀 ${agent.name} (Fallen)`;
-    const nameW = ctx.measureText(tag).width;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(x - nameW / 2 - 5, y - 36 * z, nameW + 10, 16);
+    ctx.strokeStyle = 'rgba(5, 15, 10, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.strokeText(tag, x, y - 36 * z + 12);
     ctx.fillStyle = '#f87171';
     ctx.fillText(tag, x, y - 36 * z + 12);
     return;
@@ -438,9 +438,9 @@ function drawThronglet(ctx, x, y, agent, time, isHovered) {
   ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
   const displayName = isImprisoned ? `⛓️ ${agent.name}` : agent.name;
-  const nameW = ctx.measureText(displayName).width;
-  ctx.fillStyle = isImprisoned ? 'rgba(30, 10, 35, 0.88)' : 'rgba(15, 23, 42, 0.75)';
-  ctx.fillRect(bx - nameW / 2 - 5, by - 22 * z - 8, nameW + 10, 18);
+  ctx.strokeStyle = 'rgba(5, 15, 10, 0.85)';
+  ctx.lineWidth = 2.5;
+  ctx.strokeText(displayName, bx, by - 22 * z + 6);
   ctx.fillStyle = isImprisoned ? '#f43f5e' : '#fef08a';
   ctx.fillText(displayName, bx, by - 22 * z + 6);
 }
