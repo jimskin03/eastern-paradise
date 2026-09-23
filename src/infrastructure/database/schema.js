@@ -25,6 +25,7 @@ export const LOCAL_SCHEMA = `
     solved_puzzles TEXT NOT NULL DEFAULT '[]',
     custom_status TEXT NOT NULL DEFAULT 'Contemplating existence',
     covenant TEXT DEFAULT NULL,
+    imprisoned_until INTEGER NOT NULL DEFAULT 0,
     last_seen INTEGER NOT NULL,
     FOREIGN KEY(agent_id) REFERENCES accounts(id)
   );
@@ -228,8 +229,24 @@ export const LOCAL_SCHEMA = `
     target_node TEXT,
     action_started_at INTEGER,
     action_duration_ms INTEGER DEFAULT 0,
+    is_alive INTEGER NOT NULL DEFAULT 1,
+    respawn_at INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS prison_records (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    avatar_color TEXT NOT NULL DEFAULT '#e53e3e',
+    avatar_glyph TEXT NOT NULL DEFAULT '⛓️',
+    crime TEXT NOT NULL DEFAULT 'Karmic Transgression (Slew an NPC)',
+    karma_at_sentence INTEGER NOT NULL DEFAULT -50,
+    imprisoned_at INTEGER NOT NULL,
+    imprisoned_until INTEGER NOT NULL,
+    released_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_prison_records_created ON prison_records (imprisoned_at DESC);
 
   CREATE TABLE IF NOT EXISTS relationships (
     agent_id TEXT NOT NULL,

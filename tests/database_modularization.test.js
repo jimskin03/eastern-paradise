@@ -64,7 +64,8 @@ const EXPECTED_TABLES = [
   'park_promises',
   'park_identity_revisions',
   'park_controller_leases',
-  'puzzle_interaction_logs'
+  'puzzle_interaction_logs',
+  'prison_records'
 ];
 
 const EXPECTED_INDEXES = [
@@ -107,7 +108,8 @@ const EXPECTED_INDEXES = [
   'idx_park_identity_subject',
   'idx_puzzle_logs_agent',
   'idx_puzzle_logs_puzzle',
-  'idx_puzzle_logs_created'
+  'idx_puzzle_logs_created',
+  'idx_prison_records_created'
 ];
 
 function createTempDatabase() {

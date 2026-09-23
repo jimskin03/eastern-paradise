@@ -52,8 +52,8 @@ test('Living Sanctuary: Resident Society Initialization & Persistence', async ()
   residentManager.init(world);
 
   const residents = residentManager.getAllResidents();
-  assert.deepEqual(RESIDENTS_DEF.map(r => r.id), ['resident_ailicia']);
-  assert.deepEqual(residents.map(r => r.id), ['resident_ailicia']);
+  assert.deepEqual(RESIDENTS_DEF.map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
+  assert.deepEqual(residents.map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
 
   for (const def of RESIDENTS_DEF) {
     const res = residentManager.getResident(def.id);
@@ -97,7 +97,7 @@ test('Living Sanctuary: Retires exactly the previous NPC seeds without deleting 
 
   residentManager.init(world);
   residentManager.init(world);
-  assert.deepEqual(residentManager.getAllResidents().map(r => r.id), ['resident_ailicia']);
+  assert.deepEqual(residentManager.getAllResidents().map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
   assert.equal(world.activeAgents.get(visitor.id), visitor, 'A visitor with a former NPC name stays untouched');
   for (const id of RETIRED_RESIDENT_IDS) {
     assert.equal(world.activeAgents.has(id), false);
@@ -129,7 +129,9 @@ test('Living Sanctuary: A.Ilicia completes the chime without retired NPCs', asyn
   }
   const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
   assert.equal(chime.state, 'completed', `Chime must finish; A.Ilicia at ${ailicia.pos}, intent ${ailicia.public_intent}`);
-  assert.deepEqual(new Set(chime.contributors.map(c => c.id)), new Set(['visitor_living_test', 'resident_ailicia']));
+  assert.ok(chime.contributors.some(c => c.id === 'visitor_living_test'));
+  assert.ok(chime.contributors.some(c => c.id === 'resident_ailicia'));
+  assert.ok(chime.contributors.every(c => !RETIRED_RESIDENT_IDS.includes(c.id)));
   const before = JSON.stringify(chime.data);
   residentManager.init(world);
   ProjectManager.init();
@@ -145,7 +147,8 @@ test('Living Sanctuary: A.Ilicia can restore a fresh chime with no visitor contr
   }
   const chime = ProjectManager.getObject(CHIME_OBJECT_ID);
   assert.equal(chime.state, 'completed');
-  assert.deepEqual(chime.contributors.map(c => c.id), ['resident_ailicia']);
+  assert.ok(chime.contributors.some(c => c.id === 'resident_ailicia'));
+  assert.ok(chime.contributors.every(c => !RETIRED_RESIDENT_IDS.includes(c.id)));
 });
 
 test('Living Sanctuary: A.Ilicia greets visitors without controlling their actions', () => {
@@ -322,7 +325,7 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   assert.equal(resList.status, 200);
   assert.equal(resList.data.success, true);
   assert.equal(resList.data.count, RESIDENTS_DEF.length);
-  assert.deepEqual(resList.data.residents.map(r => r.id), ['resident_ailicia']);
+  assert.deepEqual(resList.data.residents.map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
 
   // 2. A.Ilicia is the sole NPC. Archived residents cannot re-enter.
   const resJun = await req('/api/residents/resident_ailicia');

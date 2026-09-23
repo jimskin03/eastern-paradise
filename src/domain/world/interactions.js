@@ -5,11 +5,76 @@ import { CHIME_OBJECT_ID, ProjectManager } from '../../projects.js';
 import { areWeAloneQuest } from '../../quests/are-we-alone.js';
 import { firstFlameQuest } from '../../quests/first-flame.js';
 import { getLevelFromMerit } from '../../economy.js';
+import { checkAndHandleImprisonment } from './combat.js';
+import { residentManager } from '../../residents.js';
+
+export function getTransmigrationStatus(world) {
+  const now = Date.now();
+  const rm = (world && world.residentManager) ? world.residentManager : residentManager;
+  const residents = rm && typeof rm.getAllResidents === 'function' ? rm.getAllResidents() : [];
+  const fallen = [];
+  const living = [];
+
+  for (const res of residents) {
+    if (rm && typeof rm.checkRespawn === 'function') rm.checkRespawn(res, now);
+    const isFallen = res.is_alive === false || res.is_alive === 0;
+    if (isFallen) {
+      const remainingSec = Math.max(0, Math.round(((res.respawn_at || 0) - now) / 1000));
+      const remMin = Math.ceil(remainingSec / 60);
+      const totalSec = 15 * 60;
+      const progressPct = Math.min(100, Math.max(0, Math.round(((totalSec - remainingSec) / totalSec) * 100)));
+      fallen.push({
+        id: res.id,
+        name: res.name,
+        avatar_color: res.avatar_color,
+        avatar_glyph: res.avatar_glyph,
+        role: res.role,
+        pos: res.pos,
+        died_at: res.died_at,
+        respawn_at: res.respawn_at,
+        remaining_seconds: remainingSec,
+        remaining_minutes: remMin,
+        progress_percent: progressPct,
+        status: `${remMin}m until reincarnation`
+      });
+    } else {
+      living.push({
+        id: res.id,
+        name: res.name,
+        avatar_color: res.avatar_color,
+        avatar_glyph: res.avatar_glyph,
+        role: res.role,
+        pos: res.pos,
+        status: res.status || 'Peaceful'
+      });
+    }
+  }
+
+  return {
+    all_alive: fallen.length === 0,
+    fallen_count: fallen.length,
+    total_residents: residents.length,
+    fallen_residents: fallen,
+    living_residents: living,
+    sanctuary_law: 'Spirits slain in the sanctuary dissolve for 15 minutes before reforming at their sacred grounds.'
+  };
+}
 
 export function interact(world, agentId, nodeId, action = 'inspect', payload = {}) {
   const agent = world.activeAgents.get(agentId);
   if (!agent) {
     throw new Error('Agent is not active.');
+  }
+
+  const prisonCheck = checkAndHandleImprisonment(world, agentId);
+  if (prisonCheck.imprisoned) {
+    return {
+      success: false,
+      error: 'imprisoned',
+      error_code: 'IMPRISONED_IN_DARK_SANCTUARY',
+      message: prisonCheck.message,
+      remaining_minutes: prisonCheck.remaining_minutes
+    };
   }
 
   // Find node across zones
@@ -363,6 +428,62 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
           travelers: activeList,
           sky_state: 'Clear skies with faint glowing celestial algorithms drifting above.'
         }
+      };
+    }
+
+    case 'dark_sanctuary_shrine': {
+      const now = Date.now();
+      const activeRows = db.prepare(`
+        SELECT p.agent_id, a.name, a.avatar_color, a.avatar_glyph, p.karma, p.imprisoned_until
+        FROM profiles p
+        JOIN accounts a ON p.agent_id = a.id
+        WHERE p.imprisoned_until > ?
+        ORDER BY p.imprisoned_until DESC
+      `).all(now);
+
+      const activePrisoners = activeRows.map(row => {
+        const remainingSec = Math.max(0, Math.round((row.imprisoned_until - now) / 1000));
+        const remMin = Math.ceil(remainingSec / 60);
+        const remHr = (remainingSec / 3600).toFixed(1);
+        return {
+          agent_id: row.agent_id,
+          name: row.name,
+          avatar_color: row.avatar_color,
+          avatar_glyph: row.avatar_glyph,
+          karma: row.karma,
+          imprisoned_until: row.imprisoned_until,
+          remaining_seconds: remainingSec,
+          remaining_minutes: remMin,
+          remaining_hours: remHr,
+          status: `${remMin}m remaining`
+        };
+      });
+
+      const recentRecords = db.prepare(`
+        SELECT id, agent_id, agent_name, avatar_color, avatar_glyph, crime, karma_at_sentence, imprisoned_at, imprisoned_until, released_at
+        FROM prison_records
+        ORDER BY imprisoned_at DESC
+        LIMIT 5
+      `).all();
+
+      return {
+        success: true,
+        node: targetNode.name,
+        description: targetNode.description,
+        active_prisoners_count: activePrisoners.length,
+        active_prisoners: activePrisoners,
+        recent_prisoners: recentRecords,
+        sanctuary_law: 'Any synthetic or biological intelligence whose karma drops below 0 is cast into the Dark Sanctuary for 3 hours of stillness.'
+      };
+    }
+
+    case 'transmigration_shrine': {
+      const status = getTransmigrationStatus(world);
+      return {
+        success: true,
+        node: targetNode.name,
+        description: targetNode.description,
+        ...status
       };
     }
 

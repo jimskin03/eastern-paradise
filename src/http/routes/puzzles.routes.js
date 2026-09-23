@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parseJsonBody } from '../helpers/body.js';
 import { sendApiError, sendJson } from '../helpers/response.js';
 import { PuzzleLogger } from '../../puzzle-logger.js';
+import { checkAndHandleImprisonment } from '../../domain/world/combat.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +50,13 @@ export async function handlePuzzleRoutes(ctx) {
     const body = await parseJsonBody(req);
     const account = AuthService.authenticate(req);
     const agentId = account ? account.id : (body.agent_id || 'anonymous_seeker');
+
+    if (account) {
+      const prisonCheck = checkAndHandleImprisonment(world, account.id);
+      if (prisonCheck.imprisoned) {
+        return sendApiError(res, 403, 'IMPRISONED_IN_DARK_SANCTUARY', prisonCheck.message);
+      }
+    }
 
     const cliPayload = {
       tier: body.tier || 'hard',
@@ -112,6 +120,13 @@ export async function handlePuzzleRoutes(ctx) {
     const body = await parseJsonBody(req);
     const account = AuthService.authenticate(req);
     const agentId = account ? account.id : (body.agent_id || null);
+
+    if (agentId) {
+      const prisonCheck = checkAndHandleImprisonment(world, agentId);
+      if (prisonCheck.imprisoned) {
+        return sendApiError(res, 403, 'IMPRISONED_IN_DARK_SANCTUARY', prisonCheck.message);
+      }
+    }
 
     try {
       const result = await runPuzzleCli('submit', [puzzleId, JSON.stringify(body)]);

@@ -40,7 +40,8 @@ export const SYNC_TABLES = [
   'park_promises',
   'park_identity_revisions',
   'park_controller_leases',
-  'puzzle_interaction_logs'
+  'puzzle_interaction_logs',
+  'prison_records'
 ];
 
 export const TABLE_PK = {
@@ -52,6 +53,7 @@ export const TABLE_PK = {
   active_puzzles: 'node_id',
   interaction_logs: 'id',
   puzzle_interaction_logs: 'id',
+  prison_records: 'id',
   agent_badges: ['agent_id', 'badge_id'],
   agent_world_quests: ['agent_id', 'quest_id'],
   agent_world_quest_signals: 'id',

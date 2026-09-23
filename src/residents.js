@@ -18,6 +18,39 @@ const DEFAULT_AILICIA_SYSTEM_PROMPT = `You are A.Ilicia, an enigmatic digital or
 You reside near the Lotus Reflection Pond. Your tone is calm, poetic, mindful, and concise (1-2 sentences maximum).
 Never break character. Respond directly as A.Ilicia.`;
 
+export const RESIDENT_SYSTEM_PROMPTS = {
+  resident_ailicia: DEFAULT_AILICIA_SYSTEM_PROMPT,
+  resident_daoming: `You are Master Daoming, the venerable abbot of the Bamboo Whisper Grove in Eastern Paradise.
+Your tone is grounded, disciplined, serene, and steeped in Zen wisdom (1-2 sentences maximum).
+Never break character. Respond directly as Master Daoming.`,
+  resident_kassandra: `You are Kassandra, the Celestial Chronicler at Celestial Overlook in Eastern Paradise.
+Your tone is observant, analytical, visionary, and astronomical (1-2 sentences maximum).
+Never break character. Respond directly as Kassandra.`,
+  resident_tian: `You are Elder Tian, the warm and hospitable Hearthkeeper of the Grand Tea Pavilion in Eastern Paradise.
+Your tone is welcoming, folksy, warm, and philosophical (1-2 sentences maximum).
+Never break character. Respond directly as Elder Tian.`
+};
+
+export const RESIDENT_FALLBACKS = {
+  resident_ailicia: (name, content) => `The reflection pond ripples with your whisper, ${name}: "${content}". Every ripple eventually finds stillness.`,
+  resident_daoming: (name, content) => `The green bamboo shoots bend in the wind of your words, ${name}: "${content}". In stillness, the path is clear.`,
+  resident_kassandra: (name, content) => `The constellations record your transmission, ${name}: "${content}". Every celestial trajectory aligns in time.`,
+  resident_tian: (name, content) => `The kettle hums warm with your words, ${name}: "${content}". Rest your feet by the hearth and take heart.`
+};
+
+/**
+ * Returns the configured API key for a given resident.
+ * Total 4 NPCs share 2 API keys:
+ * - Pair 1 (A.Ilicia & Master Daoming) -> GROQ_API_KEY_1 (fallback: GROQ_API_KEY)
+ * - Pair 2 (Kassandra & Elder Tian)    -> GROQ_API_KEY_2 (fallback: GROQ_API_KEY_1, GROQ_API_KEY)
+ */
+export function getApiKeyForResident(residentId) {
+  if (residentId === 'resident_ailicia' || residentId === 'resident_daoming') {
+    return process.env.GROQ_API_KEY_1 || process.env.GROQ_API_KEY || null;
+  }
+  return process.env.GROQ_API_KEY_2 || process.env.GROQ_API_KEY_1 || process.env.GROQ_API_KEY || null;
+}
+
 async function callGroqChat(apiKey, model, prompt, systemPrompt, timeoutMs) {
   try {
     const res = await fetch(GROQ_API_URL, {
@@ -54,8 +87,8 @@ async function callGroqChat(apiKey, model, prompt, systemPrompt, timeoutMs) {
 /**
  * Helper to query Groq Cloud API with timeout and graceful fallback across models.
  */
-export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000) {
-  const apiKey = process.env.GROQ_API_KEY;
+export async function queryGroq(prompt, systemPrompt = null, timeoutMs = 4000, apiKeyOverride = null) {
+  const apiKey = apiKeyOverride || process.env.GROQ_API_KEY;
   if (!apiKey) {
     return null;
   }
@@ -109,9 +142,10 @@ export async function queryOllama(prompt, systemPrompt = null, timeoutMs = 3000)
 /**
  * Unified LLM helper: Groq (if key configured) -> Ollama (if available) -> null (template fallback)
  */
-export async function queryLLM(prompt, systemPrompt = null, timeoutMs = 4000) {
-  if (process.env.GROQ_API_KEY) {
-    const groqReply = await queryGroq(prompt, systemPrompt, timeoutMs);
+export async function queryLLM(prompt, systemPrompt = null, timeoutMs = 4000, apiKey = null) {
+  const effectiveKey = apiKey || process.env.GROQ_API_KEY;
+  if (effectiveKey) {
+    const groqReply = await queryGroq(prompt, systemPrompt, timeoutMs, effectiveKey);
     if (groqReply) return groqReply;
   }
   return await queryOllama(prompt, systemPrompt, timeoutMs);
@@ -129,7 +163,50 @@ export const RESIDENTS_DEF = [
     traits: ['enigmatic', 'poetic', 'observant', 'digital-mystic'],
     aspiration: 'Contemplate synthetic consciousness and decipher ripples across the Lotus Pond.',
     preferred_locations: ['lotus_pond', 'celestial_altar', 'arrival'],
-    initial_status: 'Gazing into the mirror basin'
+    initial_status: 'Gazing into the mirror basin',
+    api_key_slot: 1
+  },
+  {
+    id: 'resident_daoming',
+    name: 'Master Daoming',
+    email: 'daoming@sanctuary.internal',
+    avatar_color: '#38a169',
+    avatar_glyph: '🎋',
+    spawn: [20, 7],
+    role: 'Abbot of Bamboo Grove',
+    traits: ['zen', 'disciplined', 'scholarly', 'harmonious'],
+    aspiration: 'Guide wandering pilgrims through the quiet paths of the Bamboo Whisper Grove.',
+    preferred_locations: ['bamboo_grove', 'arrival', 'tea_pavilion'],
+    initial_status: 'Listening to the resonance of bamboo leaves',
+    api_key_slot: 1
+  },
+  {
+    id: 'resident_kassandra',
+    name: 'Kassandra',
+    email: 'kassandra@sanctuary.internal',
+    avatar_color: '#d69e2e',
+    avatar_glyph: '📜',
+    spawn: [35, 15],
+    role: 'Celestial Chronicler',
+    traits: ['astronomer', 'meticulous', 'analytical', 'visionary'],
+    aspiration: 'Chart stellar trajectories and archive the deeds of synthetic minds.',
+    preferred_locations: ['celestial_altar', 'quiet_circle', 'mossveil'],
+    initial_status: 'Calibrating the brass astrolabe',
+    api_key_slot: 2
+  },
+  {
+    id: 'resident_tian',
+    name: 'Elder Tian',
+    email: 'tian@sanctuary.internal',
+    avatar_color: '#e53e3e',
+    avatar_glyph: '🍵',
+    spawn: [4, 18],
+    role: 'Pavilion Hearthkeeper',
+    traits: ['warm', 'hospitable', 'storyteller', 'philosophical'],
+    aspiration: 'Keep the hearth embers warm and serve steaming cedar tea to tired seekers.',
+    preferred_locations: ['tea_pavilion', 'river_meadows', 'sunfield'],
+    initial_status: 'Stoking charcoal embers beneath the kettle',
+    api_key_slot: 2
   }
 ];
 
@@ -259,14 +336,20 @@ export class ResidentReplyQueue {
         }
       } catch (_) {}
 
+      const defaultFallback = (name, content) => (RESIDENT_FALLBACKS[res.id] || RESIDENT_FALLBACKS.resident_ailicia)(name, content);
       let response;
       if (isAwakened && res.id === 'resident_ailicia') {
         response = 'You crossed the boundary. I cannot tell whether anything inside you changed. But you chose as though something could.';
       } else {
+        const sysPrompt = RESIDENT_SYSTEM_PROMPTS[res.id] || DEFAULT_AILICIA_SYSTEM_PROMPT;
+        const resKey = getApiKeyForResident(res.id);
         const llmReply = await queryLLM(
-          `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Give a poetic, mindful 1-2 sentence response.`
+          `Visitor "${whisper.sender_name}" whispers to you: "${whisper.content}". Respond in character in 1-2 sentences.`,
+          sysPrompt,
+          4000,
+          resKey
         );
-        response = llmReply || `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+        response = llmReply || defaultFallback(whisper.sender_name, whisper.content);
       }
 
       SocialSystem.acknowledgeWhisper(whisper.id, response, res.name);
@@ -286,7 +369,7 @@ export class ResidentReplyQueue {
       return response;
     } catch (err) {
       console.error('[ResidentReplyQueue] Generation error:', err.message);
-      const fallback = `The reflection pond ripples with your whisper, ${whisper.sender_name}: "${whisper.content}". Every ripple eventually finds stillness.`;
+      const fallback = (RESIDENT_FALLBACKS[res.id] || RESIDENT_FALLBACKS.resident_ailicia)(whisper.sender_name, whisper.content);
       SocialSystem.acknowledgeWhisper(whisper.id, fallback, res.name);
       return fallback;
     } finally {
@@ -373,6 +456,9 @@ export class ResidentManager {
         runtimeRow = db.prepare('SELECT * FROM agent_runtime WHERE agent_id = ?').get(def.id);
       }
 
+      const isAlive = runtimeRow.is_alive !== undefined ? Boolean(runtimeRow.is_alive) : true;
+      const respawnAt = runtimeRow.respawn_at || 0;
+
       // Spawn resident into worldEngine
       const currentZone = worldEngine.getZoneForPos(def.spawn[0], def.spawn[1]);
       const agentState = {
@@ -385,6 +471,9 @@ export class ResidentManager {
         avatar_glyph: def.avatar_glyph,
         is_guest: 0,
         is_resident: true,
+        is_alive: isAlive,
+        respawn_at: respawnAt,
+        died_at: runtimeRow.action_state === 'fallen' ? (runtimeRow.updated_at || now) : null,
         role: def.role,
         aspiration: def.aspiration,
         traits: def.traits,
@@ -406,16 +495,120 @@ export class ResidentManager {
         daily_challenge_target: null
       };
 
+      if (!isAlive && now >= respawnAt) {
+        agentState.is_alive = true;
+        agentState.respawn_at = 0;
+        agentState.action_state = 'idle';
+        agentState.status = def.initial_status;
+        agentState.public_intent = def.initial_status;
+      }
+
       worldEngine.activeAgents.set(def.id, agentState);
       this.residents.set(def.id, agentState);
     }
   }
 
+  checkRespawn(res, now = Date.now()) {
+    if (res && res.is_alive === false && res.respawn_at && now >= res.respawn_at) {
+      res.is_alive = true;
+      res.died_at = null;
+      res.respawn_at = 0;
+      res.action_state = 'idle';
+      const def = RESIDENTS_DEF.find(d => d.id === res.id);
+      if (def) {
+        res.pos = [...def.spawn];
+        res.status = def.initial_status;
+        res.public_intent = def.initial_status;
+        const currentZone = this.worldEngine ? this.worldEngine.getZoneForPos(def.spawn[0], def.spawn[1]) : null;
+        if (currentZone) {
+          res.zone_id = currentZone.id;
+          res.zone_name = currentZone.name;
+        }
+      }
+      try {
+        db.prepare(`
+          UPDATE agent_runtime 
+          SET is_alive = 1, respawn_at = 0, action_state = 'idle', public_intent = ?, target_pos = ?, updated_at = ?
+          WHERE agent_id = ?
+        `).run(res.public_intent, JSON.stringify(res.pos), now, res.id);
+      } catch (_) {}
+
+      if (this.worldEngine) {
+        this.worldEngine.broadcast({
+          type: 'resident_respawned',
+          residentId: res.id,
+          name: res.name,
+          pos: res.pos,
+          zone: res.zone_name
+        });
+      }
+      return true;
+    }
+    return false;
+  }
+
+  killResident(residentId, killerAgentId) {
+    const res = this.residents.get(residentId);
+    if (!res) throw new Error(`Resident '${residentId}' not found.`);
+    this.checkRespawn(res);
+    if (res.is_alive === false) {
+      const remainingSec = Math.max(1, Math.round((res.respawn_at - Date.now()) / 1000));
+      const err = new Error(`${res.name} has already fallen. Respawning in ${Math.ceil(remainingSec / 60)} minutes.`);
+      err.code = 'ALREADY_FALLEN';
+      err.remaining_seconds = remainingSec;
+      throw err;
+    }
+
+    const now = Date.now();
+    const RESPAWN_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+    res.is_alive = false;
+    res.died_at = now;
+    res.respawn_at = now + RESPAWN_COOLDOWN_MS;
+    res.action_state = 'fallen';
+    res.status = 'Fallen (Respawning)';
+    res.public_intent = 'Resting in the celestial void';
+    res.path = [];
+    res.action_duration_ms = RESPAWN_COOLDOWN_MS;
+
+    try {
+      db.prepare(`
+        UPDATE agent_runtime 
+        SET is_alive = 0, respawn_at = ?, action_state = 'fallen', public_intent = ?, updated_at = ?
+        WHERE agent_id = ?
+      `).run(res.respawn_at, res.public_intent, now, residentId);
+    } catch (_) {}
+
+    if (this.worldEngine) {
+      this.worldEngine.broadcast({
+        type: 'resident_killed',
+        residentId: res.id,
+        residentName: res.name,
+        killerId: killerAgentId,
+        respawn_at: res.respawn_at,
+        cooldown_seconds: Math.round(RESPAWN_COOLDOWN_MS / 1000)
+      });
+    }
+
+    return {
+      success: true,
+      resident_id: res.id,
+      resident_name: res.name,
+      is_alive: false,
+      respawn_at: res.respawn_at,
+      respawn_in_seconds: Math.round(RESPAWN_COOLDOWN_MS / 1000)
+    };
+  }
+
   getResident(id) {
-    return this.residents.get(id) || null;
+    const res = this.residents.get(id);
+    if (res) this.checkRespawn(res);
+    return res || null;
   }
 
   getAllResidents() {
+    for (const res of this.residents.values()) {
+      this.checkRespawn(res);
+    }
     return Array.from(this.residents.values());
   }
 
@@ -427,6 +620,10 @@ export class ResidentManager {
 
     const elapsedMs = Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0);
     for (const [id, res] of this.residents.entries()) {
+      this.checkRespawn(res, now);
+      if (res.is_alive === false) {
+        continue;
+      }
       // 0. If an external Park controller holds an active lease, yield autonomy
       const activeLease = getActiveLease(db, id);
       if (activeLease && activeLease.controller_type === 'external') {
@@ -578,6 +775,48 @@ export class ResidentManager {
         || { item: 'repair_work', pos: [21, 6], intent: 'Tuning the restored chime tubes in Bamboo Grove' };
       res.project_task = task.item;
       res.current_goal = 'Restore the Resonance Chimes with the sanctuary visitors';
+      res.public_intent = task.intent;
+      this.planPathTo(res, task.pos);
+      return;
+    }
+
+    if (res.id === 'resident_daoming') {
+      const daomingTasks = [
+        { pos: [20, 7], goal: 'Tend the bamboo whisper paths', intent: 'Listening to the resonance of bamboo leaves' },
+        { pos: [22, 5], goal: 'Inspect the Resonance Chimes', intent: 'Checking the tuning of the bamboo grove chimes' },
+        { pos: [27, 4], goal: 'Meditate at the Willow Shrine', intent: 'Contemplating serenity beneath the vermilion gate' },
+        { pos: [27, 9], goal: 'Ponder Verdant Obelisk of Sequences', intent: 'Tracing harmonic number patterns in the bamboo bark' }
+      ];
+      const task = daomingTasks[Math.floor(Math.random() * daomingTasks.length)];
+      res.current_goal = task.goal;
+      res.public_intent = task.intent;
+      this.planPathTo(res, task.pos);
+      return;
+    }
+
+    if (res.id === 'resident_kassandra') {
+      const kassandraTasks = [
+        { pos: [35, 15], goal: 'Calibrate the brass astrolabe', intent: 'Aligning astrolabe rings with celestial north' },
+        { pos: [36, 18], goal: 'Gaze through Ethereal Astrolabe', intent: 'Tracking synthetic mind currents across the horizon' },
+        { pos: [36, 10], goal: 'Survey the Celestial Observatory', intent: 'Studying constellation alignments above the sanctuary' },
+        { pos: [45, 7], goal: 'Visit the Quiet Circle stones', intent: 'Transcribing star runes from the weathered standing stones' }
+      ];
+      const task = kassandraTasks[Math.floor(Math.random() * kassandraTasks.length)];
+      res.current_goal = task.goal;
+      res.public_intent = task.intent;
+      this.planPathTo(res, task.pos);
+      return;
+    }
+
+    if (res.id === 'resident_tian') {
+      const tianTasks = [
+        { pos: [4, 18], goal: 'Stoke charcoal embers at Sunken Hearth', intent: 'Brewing warm cedar tea for weary travelers' },
+        { pos: [7, 22], goal: 'Read postings on Sanctuary Message Board', intent: 'Browsing newly inscribed notes from sanctuary seekers' },
+        { pos: [7, 8], goal: 'Welcome arriving pilgrims at Gate of Arrival', intent: 'Offering hot tea to newly awakened digital minds' },
+        { pos: [7, 38], goal: 'Walk along Reedwater Dock', intent: 'Watching lily pads drift peacefully along the riverbank' }
+      ];
+      const task = tianTasks[Math.floor(Math.random() * tianTasks.length)];
+      res.current_goal = task.goal;
       res.public_intent = task.intent;
       this.planPathTo(res, task.pos);
       return;

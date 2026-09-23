@@ -1,5 +1,6 @@
 import { parseJsonBody } from '../helpers/body.js';
 import { sendApiError, sendJson } from '../helpers/response.js';
+import { checkAndHandleImprisonment } from '../../domain/world/combat.js';
 
 export async function handleBoardRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
@@ -31,6 +32,11 @@ export async function handleBoardRoutes(ctx) {
         'Create or authenticate a sanctuary session before posting to the message board.',
         'POST /api/auth/guest first, keep the returned api_key, solve at least one trial, then retry with Authorization: Bearer <api_key>.'
       );
+    }
+
+    const prisonCheck = checkAndHandleImprisonment(world, account.id);
+    if (prisonCheck.imprisoned) {
+      return sendApiError(res, 403, 'IMPRISONED_IN_DARK_SANCTUARY', prisonCheck.message);
     }
 
     const isVerifiedAccount = Boolean(account && account.verified === 1 && account.is_guest === 0);

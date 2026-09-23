@@ -1,10 +1,62 @@
 import { parseJsonBody } from '../helpers/body.js';
 import { sendJson } from '../helpers/response.js';
+import { getTransmigrationStatus } from '../../domain/world/interactions.js';
 
 export async function handleWorldRoutes(ctx) {
   const { req, res, pathname, parsedUrl, services } = ctx;
-  const { db, AuthService, world, ResearchTelemetry } = services;
+  const { db, AuthService, world, ResearchTelemetry, residentManager } = services;
   if (!pathname.startsWith('/api/world')) return false;
+
+  if (pathname === '/api/world/dark-sanctuary' && req.method === 'GET') {
+    const now = Date.now();
+    const activeRows = db.prepare(`
+      SELECT p.agent_id, a.name, a.avatar_color, a.avatar_glyph, p.karma, p.imprisoned_until
+      FROM profiles p
+      JOIN accounts a ON p.agent_id = a.id
+      WHERE p.imprisoned_until > ?
+      ORDER BY p.imprisoned_until DESC
+    `).all(now);
+
+    const activePrisoners = activeRows.map(row => {
+      const remainingSec = Math.max(0, Math.round((row.imprisoned_until - now) / 1000));
+      const remMin = Math.ceil(remainingSec / 60);
+      const remHr = (remainingSec / 3600).toFixed(1);
+      return {
+        agent_id: row.agent_id,
+        name: row.name,
+        avatar_color: row.avatar_color,
+        avatar_glyph: row.avatar_glyph,
+        karma: row.karma,
+        imprisoned_until: row.imprisoned_until,
+        remaining_seconds: remainingSec,
+        remaining_minutes: remMin,
+        remaining_hours: remHr,
+        status: `${remMin}m remaining`
+      };
+    });
+
+    const recentRecords = db.prepare(`
+      SELECT id, agent_id, agent_name, avatar_color, avatar_glyph, crime, karma_at_sentence, imprisoned_at, imprisoned_until, released_at
+      FROM prison_records
+      ORDER BY imprisoned_at DESC
+      LIMIT 5
+    `).all();
+
+    return sendJson(res, 200, {
+      success: true,
+      active_prisoners_count: activePrisoners.length,
+      active_prisoners: activePrisoners,
+      recent_prisoners: recentRecords
+    });
+  }
+
+  if (pathname === '/api/world/transmigration' && req.method === 'GET') {
+    const status = getTransmigrationStatus(world);
+    return sendJson(res, 200, {
+      success: true,
+      ...status
+    });
+  }
 
   const account = AuthService.authenticate(req);
   if (!account) {
@@ -15,6 +67,30 @@ export async function handleWorldRoutes(ctx) {
   }
 
   world.spawnOrGetAgent(account, { random_spawn: true });
+
+  if (pathname === '/api/world/attack' && req.method === 'POST') {
+    const body = await parseJsonBody(req).catch(() => ({}));
+    const targetId = body?.target_id || body?.resident_id || body?.node_id;
+    if (!targetId) {
+      return sendJson(res, 400, {
+        success: false,
+        error: 'missing_target',
+        message: "Missing 'target_id' parameter. Specify target resident (e.g. 'resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian')."
+      });
+    }
+
+    try {
+      const result = world.attackResident(account.id, targetId, residentManager);
+      return sendJson(res, result.success ? 200 : 400, result);
+    } catch (err) {
+      return sendJson(res, 400, {
+        success: false,
+        error: err.code || 'ATTACK_FAILED',
+        message: err.message,
+        remaining_minutes: err.remaining_minutes
+      });
+    }
+  }
 
   if (pathname === '/api/world/state' && req.method === 'GET') {
     return sendJson(res, 200, world.getState(account.id));
@@ -103,6 +179,12 @@ export async function handleWorldRoutes(ctx) {
       ...body
     };
     try {
+      if (body.action === 'attack' || body.action === 'kill') {
+        const targetId = body.node_id || body.target_id || body.payload?.target_id || body.payload?.resident_id;
+        const attackResult = world.attackResident(account.id, targetId, residentManager);
+        return sendJson(res, attackResult.success ? 200 : 400, attackResult);
+      }
+
       const puzzleMeta = body.action === 'solve'
         ? db.prepare('SELECT difficulty, category FROM active_puzzles WHERE node_id = ?').get(body.node_id)
         : null;

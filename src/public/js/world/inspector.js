@@ -333,9 +333,16 @@ function renderResidentProfileCard(panel, resident, localAgent) {
       `).join('')
     : '<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Reflecting quietly upon the sanctuary grounds.</div>';
 
+  const isFallen = resident.is_alive === 0 || resident.is_alive === false || (resident.respawn_in_seconds && resident.respawn_in_seconds > 0);
+  const respawnSec = resident.respawn_in_seconds || (resident.respawn_at ? Math.max(0, Math.round((resident.respawn_at - Date.now()) / 1000)) : 0);
+  const respawnMin = Math.ceil(respawnSec / 60);
+
   let residentState = 'ONLINE';
   let residentClass = 'online';
-  if (resident.action_state === 'meditating' || resident.action_state === 'tea_drinking') {
+  if (isFallen) {
+    residentState = 'FALLEN';
+    residentClass = 'offline';
+  } else if (resident.action_state === 'meditating' || resident.action_state === 'tea_drinking') {
     residentState = 'SEATED';
     residentClass = 'seated';
   } else if (resident.action_state === 'sleeping') {
@@ -344,10 +351,10 @@ function renderResidentProfileCard(panel, resident, localAgent) {
   }
 
   panel.innerHTML = `
-    <div class="avatar-profile-card" style="border-color: #d69e2e;">
+    <div class="avatar-profile-card" style="border-color: ${isFallen ? '#f43f5e' : '#d69e2e'};">
       <div class="avatar-header-row">
-        <div class="avatar-badge-glyph" style="border-color: ${resident.avatar_color || '#d69e2e'}; color: ${resident.avatar_color || '#d69e2e'};">
-          ${resident.avatar_glyph || '☯'}
+        <div class="avatar-badge-glyph" style="border-color: ${isFallen ? '#f43f5e' : (resident.avatar_color || '#d69e2e')}; color: ${isFallen ? '#f43f5e' : (resident.avatar_color || '#d69e2e')};">
+          ${isFallen ? '💀' : (resident.avatar_glyph || '☯')}
         </div>
         <div style="flex: 1; min-width: 0;">
           <div class="avatar-meta-title">
@@ -360,21 +367,31 @@ function renderResidentProfileCard(panel, resident, localAgent) {
         </div>
       </div>
 
-      <!-- Aspiration & Public Intent -->
-      <div style="background: rgba(214, 158, 46, 0.08); border: 1px solid rgba(214, 158, 46, 0.3); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.6rem; font-size: 0.78rem;">
-        <div style="color: var(--accent-gold); font-weight: 600; margin-bottom: 0.2rem;">
-          🎯 Aspiration:
+      ${isFallen ? `
+        <!-- Fallen Spirit Banner -->
+        <div style="background: rgba(225, 29, 72, 0.15); border: 1px solid #f43f5e; border-radius: 6px; padding: 0.65rem; margin-bottom: 0.6rem; text-align: center;">
+          <div style="font-weight: 700; color: #f43f5e; font-size: 0.88rem;">💀 SPIRIT DISSOLVED IN COMBAT</div>
+          <div style="font-size: 0.74rem; color: #fda4af; margin-top: 0.25rem;">
+            This resident fell in battle. Physical essence is reforming in <strong>${respawnMin} minute${respawnMin === 1 ? '' : 's'}</strong> (${respawnSec}s remaining).
+          </div>
         </div>
-        <div style="color: #f7fafc; font-style: italic; margin-bottom: 0.4rem;">
-          "${escapeHtml(resident.aspiration || 'Living peacefully')}"
+      ` : `
+        <!-- Aspiration & Public Intent -->
+        <div style="background: rgba(214, 158, 46, 0.08); border: 1px solid rgba(214, 158, 46, 0.3); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.6rem; font-size: 0.78rem;">
+          <div style="color: var(--accent-gold); font-weight: 600; margin-bottom: 0.2rem;">
+            🎯 Aspiration:
+          </div>
+          <div style="color: #f7fafc; font-style: italic; margin-bottom: 0.4rem;">
+            "${escapeHtml(resident.aspiration || 'Living peacefully')}"
+          </div>
+          <div style="color: var(--accent-jade); font-weight: 600;">
+            ⚡ Current Activity:
+          </div>
+          <div style="color: #e2e8f0;">
+            ${escapeHtml(resident.public_intent || resident.status || 'Resting')}
+          </div>
         </div>
-        <div style="color: var(--accent-jade); font-weight: 600;">
-          ⚡ Current Activity:
-        </div>
-        <div style="color: #e2e8f0;">
-          ${escapeHtml(resident.public_intent || resident.status || 'Resting')}
-        </div>
-      </div>
+      `}
 
       <!-- Needs Gauges -->
       <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.6rem;">
@@ -430,23 +447,43 @@ function renderResidentProfileCard(panel, resident, localAgent) {
         </div>
       </div>
 
-      <!-- Telepathic Whisper Box -->
-      <div class="whisper-box">
-        <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent-gold); margin-bottom: 0.25rem;">
-          💬 Whisper to ${escapeHtml(resident.name)}
+      ${isFallen ? `
+        <div style="background: rgba(0,0,0,0.25); border: 1px dashed rgba(244, 63, 94, 0.4); border-radius: 6px; padding: 0.6rem; margin-bottom: 0.6rem; text-align: center; font-size: 0.75rem; color: #94a3b8; font-style: italic;">
+          🕊️ Telepathic whispers cannot reach a dissolved spirit during reincarnation.
         </div>
-        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.45rem;">
-          Residents perceive whispers and will reflect upon and answer your words in the journal.
+      ` : `
+        <!-- Telepathic Whisper Box -->
+        <div class="whisper-box">
+          <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent-gold); margin-bottom: 0.25rem;">
+            💬 Whisper to ${escapeHtml(resident.name)}
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.45rem;">
+            Residents perceive whispers and will reflect upon and answer your words in the journal.
+          </div>
+          <input type="text" id="whisperSenderName" class="whisper-input" placeholder="Your Name (Spectator)" value="Spectator" style="margin-bottom: 0.35rem; font-size: 0.75rem;" />
+          <textarea id="whisperContentInput" class="whisper-textarea" placeholder="Ask a question or offer gentle encouragement..." rows="2" maxlength="240"></textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem;">
+            <button id="btnSendWhisper" class="btn-whisper" onclick="submitWhisperToAgent('${escapeHtml(resident.id)}')">
+              🕊️ Send Whisper
+            </button>
+            <span id="whisperFeedback" style="font-size: 0.75rem; font-weight: 600;"></span>
+          </div>
         </div>
-        <input type="text" id="whisperSenderName" class="whisper-input" placeholder="Your Name (Spectator)" value="Spectator" style="margin-bottom: 0.35rem; font-size: 0.75rem;" />
-        <textarea id="whisperContentInput" class="whisper-textarea" placeholder="Ask a question or offer gentle encouragement..." rows="2" maxlength="240"></textarea>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem;">
-          <button id="btnSendWhisper" class="btn-whisper" onclick="submitWhisperToAgent('${escapeHtml(resident.id)}')">
-            🕊️ Send Whisper
-          </button>
-          <span id="whisperFeedback" style="font-size: 0.75rem; font-weight: 600;"></span>
+
+        <!-- Combat: Strike Resident Action -->
+        <div style="background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.35); border-radius: 6px; padding: 0.6rem; margin-bottom: 0.6rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <div style="font-size: 0.78rem; font-weight: 700; color: #f43f5e;">⚔️ Strike Resident</div>
+            <button id="btnStrike_${escapeHtml(resident.id)}" class="btn-sound" onclick="confirmAndStrikeResident('${escapeHtml(resident.id)}', '${escapeHtml(resident.name)}')" style="background: rgba(225, 29, 72, 0.25); border: 1px solid #f43f5e; color: #fda4af; font-size: 0.75rem; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 4px;">
+              ⚔️ Slay NPC
+            </button>
+          </div>
+          <div style="font-size: 0.68rem; color: #94a3b8; line-height: 1.35;">
+            Warning: Slaying inflicts <strong style="color: #f43f5e;">-50 $MERIT</strong> &amp; <strong style="color: #f43f5e;">-50 Karma</strong>. Negative Karma triggers a 3-hour sentence to the Dark Sanctuary!
+          </div>
+          <div id="strikeFeedback_${escapeHtml(resident.id)}" style="font-size: 0.72rem; margin-top: 0.35rem; display: none;"></div>
         </div>
-      </div>
+      `}
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.8rem;">
         <button class="btn-primary" onclick="setCinematicFollow('${escapeHtml(resident.id)}'); closeInspectorModal();" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; cursor: pointer;">
@@ -718,6 +755,62 @@ function updateInspector(x, y, pinned = false, clickPos = null) {
           </div>
         </div>
       `;
+    } else if (nodeOnTile.id === 'shrine_dark_sanctuary' || nodeOnTile.type === 'dark_sanctuary_shrine') {
+      html += `
+        <div style="background: linear-gradient(135deg, rgba(20, 10, 30, 0.95), rgba(40, 15, 35, 0.9)); border: 1px solid #7c3aed; border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem; box-shadow: 0 0 15px rgba(124, 58, 237, 0.25);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <div style="font-weight: 700; color: #a78bfa; font-size: 0.98rem;">⛓️ ${escapeHtml(nodeOnTile.name)}</div>
+            <span style="background: rgba(124, 58, 237, 0.3); border: 1px solid #7c3aed; color: #ede9fe; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">Penitentiary</span>
+          </div>
+          <div style="font-size: 0.82rem; margin: 0.35rem 0; color: #f43f5e;">Banishment Chamber • Grid [0..4, 46..51]</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.6rem;">${escapeHtml(nodeOnTile.description)}</div>
+          
+          <div id="darkSanctuaryPrisonersContainer" style="margin-top: 0.6rem; border-top: 1px solid rgba(124, 58, 237, 0.3); padding-top: 0.6rem;">
+            <div style="font-size: 0.8rem; font-weight: 600; color: #c084fc; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>🔒 Active Prisoners</span>
+              <span id="darkSanctuaryActiveCount" style="font-size: 0.7rem; background: rgba(244, 63, 94, 0.2); color: #fda4af; padding: 1px 6px; border-radius: 10px;">Querying...</span>
+            </div>
+            <div id="darkSanctuaryActiveList" style="font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem;">
+              <div style="color: var(--text-muted); font-style: italic;">Loading obsidian cell data...</div>
+            </div>
+
+            <div style="font-size: 0.8rem; font-weight: 600; color: #94a3b8; margin-bottom: 0.4rem;">
+              📜 Incarceration Records (Last 5)
+            </div>
+            <div id="darkSanctuaryHistoryList" style="font-size: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
+              <div style="color: var(--text-muted); font-style: italic;">Querying ledger...</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (nodeOnTile.id === 'shrine_transmigration' || nodeOnTile.type === 'transmigration_shrine') {
+      html += `
+        <div style="background: linear-gradient(135deg, rgba(8, 28, 36, 0.95), rgba(15, 45, 55, 0.9)); border: 1px solid #0ea5e9; border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem; box-shadow: 0 0 15px rgba(14, 165, 233, 0.25);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <div style="font-weight: 700; color: #38bdf8; font-size: 0.98rem;">🏮 ${escapeHtml(nodeOnTile.name)}</div>
+            <span style="background: rgba(14, 165, 233, 0.25); border: 1px solid #0284c7; color: #bae6fd; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 600;">Reincarnation</span>
+          </div>
+          <div style="font-size: 0.82rem; margin: 0.35rem 0; color: #2dd4bf;">Lotus Reflection Shore • Grid [28, 16]</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.6rem;">${escapeHtml(nodeOnTile.description)}</div>
+          
+          <div id="transmigrationShrineContainer" style="margin-top: 0.6rem; border-top: 1px solid rgba(14, 165, 233, 0.3); padding-top: 0.6rem;">
+            <div style="font-size: 0.8rem; font-weight: 600; color: #7dd3fc; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between;">
+              <span>🏮 Fallen Residents</span>
+              <span id="transmigrationFallenCount" style="font-size: 0.7rem; background: rgba(56, 189, 248, 0.2); color: #bae6fd; padding: 1px 6px; border-radius: 10px;">Observing...</span>
+            </div>
+            <div id="transmigrationFallenList" style="font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem;">
+              <div style="color: var(--text-muted); font-style: italic;">Consulting spirit ledger...</div>
+            </div>
+
+            <div style="font-size: 0.8rem; font-weight: 600; color: #94a3b8; margin-bottom: 0.4rem;">
+              🕊️ Sanctuary Resident Roster (4 Minds)
+            </div>
+            <div id="transmigrationLivingList" style="font-size: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
+              <div style="color: var(--text-muted); font-style: italic;">Observing consciousness...</div>
+            </div>
+          </div>
+        </div>
+      `;
     } else {
       html += `
         <div style="background: rgba(255, 191, 105, 0.1); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem;">
@@ -777,6 +870,12 @@ function updateInspector(x, y, pinned = false, clickPos = null) {
   }
 
   panel.innerHTML = html;
+
+  if (nodeOnTile && (nodeOnTile.id === 'shrine_dark_sanctuary' || nodeOnTile.type === 'dark_sanctuary_shrine')) {
+    loadDarkSanctuaryData();
+  } else if (nodeOnTile && (nodeOnTile.id === 'shrine_transmigration' || nodeOnTile.type === 'transmigration_shrine')) {
+    loadTransmigrationShrineData();
+  }
 }
 
 async function submitWhisperToAgent(agentId) {
@@ -1143,8 +1242,279 @@ window.updateInspector = updateInspector;
 window.inspectTile = inspectTile;
 window.getScreenCoordsForGrid = getScreenCoordsForGrid;
 window.positionInspectorDialog = positionInspectorDialog;
-window.initDialogDrag = initDialogDrag;
-window.clampDialogToViewport = clampDialogToViewport;
+let darkSanctuaryTimer = null;
+
+async function loadDarkSanctuaryData() {
+  const activeContainer = document.getElementById('darkSanctuaryActiveList');
+  const countBadge = document.getElementById('darkSanctuaryActiveCount');
+  const historyContainer = document.getElementById('darkSanctuaryHistoryList');
+  if (!activeContainer || !historyContainer) return;
+
+  if (darkSanctuaryTimer) {
+    clearInterval(darkSanctuaryTimer);
+    darkSanctuaryTimer = null;
+  }
+
+  try {
+    const res = await fetch('/api/world/dark-sanctuary');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to query dark sanctuary');
+
+    const active = data.active_prisoners || [];
+    const history = data.recent_records || [];
+
+    if (countBadge) {
+      countBadge.textContent = `${active.length} Incarcerated`;
+    }
+
+    if (active.length === 0) {
+      activeContainer.innerHTML = '<div style="color: #94a3b8; font-style: italic; padding: 4px 0;">No souls currently imprisoned. The cells are silent.</div>';
+    } else {
+      activeContainer.innerHTML = active.map(p => {
+        const remSec = Math.max(0, Math.round((p.imprisoned_until - Date.now()) / 1000));
+        const remMin = Math.ceil(remSec / 60);
+        return `
+          <div style="background: rgba(225, 29, 72, 0.12); border: 1px solid rgba(225, 29, 72, 0.4); border-radius: 6px; padding: 0.45rem 0.6rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700; color: #f43f5e; font-size: 0.84rem;">⛓️ ${escapeHtml(p.name || p.agent_id)}</div>
+              <div style="font-size: 0.7rem; color: #fda4af;">Karma: <strong style="color: #f43f5e;">${p.karma}</strong> • Cell: [${p.pos ? p.pos.join(', ') : '2, 49'}]</div>
+            </div>
+            <div style="text-align: right;">
+              <span class="sanctuary-countdown-badge" data-until="${p.imprisoned_until}" style="background: rgba(225, 29, 72, 0.25); color: #fff; border: 1px solid #f43f5e; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-family: monospace; font-size: 0.72rem;">
+                ⏳ ${remMin}m left
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      darkSanctuaryTimer = setInterval(() => {
+        const badges = document.querySelectorAll('.sanctuary-countdown-badge');
+        if (!badges.length) {
+          clearInterval(darkSanctuaryTimer);
+          darkSanctuaryTimer = null;
+          return;
+        }
+        badges.forEach(badge => {
+          const until = parseInt(badge.getAttribute('data-until'), 10);
+          const remainingSec = Math.max(0, Math.round((until - Date.now()) / 1000));
+          const h = Math.floor(remainingSec / 3600);
+          const m = Math.floor((remainingSec % 3600) / 60);
+          const s = Math.floor(remainingSec % 60);
+          badge.textContent = `⏳ ${h > 0 ? `${h}h ` : ''}${m}m ${s}s`;
+        });
+      }, 1000);
+    }
+
+    if (history.length === 0) {
+      historyContainer.innerHTML = '<div style="color: #64748b; font-style: italic; padding: 4px 0;">No previous sentences on record.</div>';
+    } else {
+      historyContainer.innerHTML = history.slice(0, 5).map(r => {
+        const timeStr = r.imprisoned_at ? new Date(r.imprisoned_at).toLocaleTimeString() : 'Unknown';
+        const durHours = Math.round((r.duration_ms || 10800000) / 3600000);
+        return `
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 0.35rem 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="color: #e2e8f0; font-weight: 600;">${escapeHtml(r.agent_name || r.agent_id)}</span>
+              <span style="color: #94a3b8; font-size: 0.68rem; margin-left: 4px;">(${escapeHtml(r.crime || 'Slew Resident')})</span>
+            </div>
+            <div style="font-size: 0.68rem; color: #94a3b8; font-family: monospace;">
+              ${durHours}h • ${timeStr}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    console.error('Failed to load Dark Sanctuary data:', err);
+    activeContainer.innerHTML = `<div style="color: #f43f5e; font-size: 0.75rem;">Failed to load prisoners: ${escapeHtml(err.message)}</div>`;
+  }
+}
+window.loadDarkSanctuaryData = loadDarkSanctuaryData;
+
+let transmigrationTimer = null;
+
+async function loadTransmigrationShrineData() {
+  const fallenContainer = document.getElementById('transmigrationFallenList');
+  const countBadge = document.getElementById('transmigrationFallenCount');
+  const livingContainer = document.getElementById('transmigrationLivingList');
+  if (!fallenContainer || !livingContainer) return;
+
+  if (transmigrationTimer) {
+    clearInterval(transmigrationTimer);
+    transmigrationTimer = null;
+  }
+
+  try {
+    const res = await fetch('/api/world/transmigration');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Failed to query shrine');
+
+    const fallen = data.fallen_residents || [];
+    const living = data.living_residents || [];
+
+    if (countBadge) {
+      if (fallen.length === 0) {
+        countBadge.textContent = 'All Whole';
+        countBadge.style.background = 'rgba(45, 212, 191, 0.2)';
+        countBadge.style.color = '#5eead4';
+      } else {
+        countBadge.textContent = `${fallen.length} Fallen`;
+        countBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+        countBadge.style.color = '#fca5a5';
+      }
+    }
+
+    if (fallen.length === 0) {
+      fallenContainer.innerHTML = `
+        <div style="background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 6px; padding: 0.5rem 0.65rem; color: #5eead4; font-size: 0.78rem; display: flex; align-items: center; gap: 0.4rem;">
+          <span>🕊️</span>
+          <span>All 4 Sanctuary Residents are whole and in peace. No souls wander between worlds.</span>
+        </div>
+      `;
+    } else {
+      fallenContainer.innerHTML = fallen.map(f => {
+        const remainingSec = Math.max(0, Math.round(((f.respawn_at || 0) - Date.now()) / 1000));
+        const remMin = Math.ceil(remainingSec / 60);
+        const totalSec = 15 * 60;
+        const progressPct = Math.min(100, Math.max(0, Math.round(((totalSec - remainingSec) / totalSec) * 100)));
+        return `
+          <div style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; padding: 0.5rem 0.65rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="font-size: 1rem;">${f.avatar_glyph || '🏮'}</span>
+                <div>
+                  <div style="font-weight: 700; color: #38bdf8; font-size: 0.84rem;">${escapeHtml(f.name)}</div>
+                  <div style="font-size: 0.7rem; color: #94a3b8;">${escapeHtml(f.role || 'Sanctuary Resident')}</div>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <span class="transmigration-countdown-badge" data-until="${f.respawn_at}" style="background: rgba(14, 165, 233, 0.25); color: #e0f2fe; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-family: monospace; font-size: 0.72rem;">
+                  ⏳ ${remMin}m left
+                </span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.3rem;">
+              <div style="flex: 1; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                <div class="transmigration-progress-bar" data-until="${f.respawn_at}" style="height: 100%; width: ${progressPct}%; background: linear-gradient(90deg, #0ea5e9, #38bdf8); border-radius: 3px; transition: width 1s linear;"></div>
+              </div>
+              <span class="transmigration-pct-label" style="font-size: 0.68rem; color: #7dd3fc; font-family: monospace;">${progressPct}%</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      transmigrationTimer = setInterval(() => {
+        const badges = document.querySelectorAll('.transmigration-countdown-badge');
+        if (!badges.length) {
+          clearInterval(transmigrationTimer);
+          transmigrationTimer = null;
+          return;
+        }
+        badges.forEach(badge => {
+          const until = parseInt(badge.getAttribute('data-until'), 10);
+          const remainingSec = Math.max(0, Math.round((until - Date.now()) / 1000));
+          const m = Math.floor(remainingSec / 60);
+          const s = Math.floor(remainingSec % 60);
+          badge.textContent = `⏳ ${m}m ${s}s`;
+
+          const card = badge.closest('div[style*="border-radius: 6px"]');
+          if (card) {
+            const bar = card.querySelector('.transmigration-progress-bar');
+            const pctLabel = card.querySelector('.transmigration-pct-label');
+            const totalSec = 15 * 60;
+            const progressPct = Math.min(100, Math.max(0, Math.round(((totalSec - remainingSec) / totalSec) * 100)));
+            if (bar) bar.style.width = `${progressPct}%`;
+            if (pctLabel) pctLabel.textContent = `${progressPct}%`;
+          }
+        });
+      }, 1000);
+    }
+
+    if (living.length === 0) {
+      livingContainer.innerHTML = '<div style="color: #64748b; font-style: italic; padding: 4px 0;">No resident records found.</div>';
+    } else {
+      livingContainer.innerHTML = living.map(r => {
+        return `
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 0.35rem 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span>${r.avatar_glyph || '👤'}</span>
+              <span style="color: #e2e8f0; font-weight: 600;">${escapeHtml(r.name)}</span>
+              <span style="color: #94a3b8; font-size: 0.68rem;">(${escapeHtml(r.role)})</span>
+            </div>
+            <div style="font-size: 0.68rem; color: #5eead4;">
+              ${escapeHtml(r.status || 'Active')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    console.error('Failed to load Transmigration Shrine data:', err);
+    fallenContainer.innerHTML = `<div style="color: #38bdf8; font-size: 0.75rem;">Failed to read spirit ripples: ${escapeHtml(err.message)}</div>`;
+  }
+}
+window.loadTransmigrationShrineData = loadTransmigrationShrineData;
+
+async function confirmAndStrikeResident(residentId, residentName) {
+  const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+  if (!session || !session.apiKey) {
+    alert('You must be logged into an awakened agent to engage in combat.');
+    return;
+  }
+
+  const ok = confirm(`Strike ${residentName}?\n\nConsequences:\n• -50 $MERIT\n• -50 Karma\n• If your Karma falls below 0, you will be locked in the Dark Sanctuary prison for 3 HOURS.\n\nProceed?`);
+  if (!ok) return;
+
+  const btn = document.getElementById(`btnStrike_${residentId}`);
+  const feedback = document.getElementById(`strikeFeedback_${residentId}`);
+  if (btn) btn.disabled = true;
+  if (feedback) {
+    feedback.style.display = 'block';
+    feedback.style.color = '#ffd700';
+    feedback.textContent = 'Engaging target in combat...';
+  }
+
+  try {
+    const res = await fetch('/api/world/attack', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.apiKey}`
+      },
+      body: JSON.stringify({ target_id: residentId })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      if (feedback) {
+        feedback.style.color = '#f43f5e';
+        feedback.textContent = data.error || 'Failed to strike target.';
+      }
+      return;
+    }
+
+    if (feedback) {
+      feedback.style.color = data.imprisoned ? '#f43f5e' : '#4ade80';
+      feedback.innerHTML = `
+        <strong>${data.message}</strong><br>
+        Penalty: -${data.merit_penalty} $MERIT, -${data.karma_penalty} Karma. New Karma: ${data.new_karma}.<br>
+        ${data.imprisoned ? '⛓️ <strong>CONFINED TO DARK SANCTUARY (3 HOURS)!</strong>' : ''}
+      `;
+    }
+
+    setTimeout(() => {
+      openAgentProfileInspector(residentId);
+    }, 1800);
+  } catch (err) {
+    if (feedback) {
+      feedback.style.color = '#f43f5e';
+      feedback.textContent = `Error: ${err.message}`;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.confirmAndStrikeResident = confirmAndStrikeResident;
 
 export {
   openAgentProfileInspector, updateInspector, inspectTile, checkPlayerProximity,

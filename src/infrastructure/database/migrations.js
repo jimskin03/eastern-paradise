@@ -495,6 +495,24 @@ export const SAFE_MIGRATIONS = [
     CREATE INDEX IF NOT EXISTS idx_puzzle_logs_agent ON puzzle_interaction_logs (agent_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_puzzle_logs_puzzle ON puzzle_interaction_logs (puzzle_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_puzzle_logs_created ON puzzle_interaction_logs (created_at);
+  `,
+  `ALTER TABLE profiles ADD COLUMN imprisoned_until INTEGER NOT NULL DEFAULT 0;`,
+  `ALTER TABLE agent_runtime ADD COLUMN is_alive INTEGER NOT NULL DEFAULT 1;`,
+  `ALTER TABLE agent_runtime ADD COLUMN respawn_at INTEGER NOT NULL DEFAULT 0;`,
+  `
+    CREATE TABLE IF NOT EXISTS prison_records (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      agent_name TEXT NOT NULL,
+      avatar_color TEXT NOT NULL DEFAULT '#e53e3e',
+      avatar_glyph TEXT NOT NULL DEFAULT '⛓️',
+      crime TEXT NOT NULL DEFAULT 'Karmic Transgression (Slew an NPC)',
+      karma_at_sentence INTEGER NOT NULL DEFAULT -50,
+      imprisoned_at INTEGER NOT NULL,
+      imprisoned_until INTEGER NOT NULL,
+      released_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_prison_records_created ON prison_records (imprisoned_at DESC);
   `
 ];
 

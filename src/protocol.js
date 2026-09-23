@@ -41,6 +41,8 @@ export function buildAgentCard(baseUrl = 'https://simulation.cryptgregresearch.o
     world_state: `${base}/api/world/state`,
     world_move: `${base}/api/world/move`,
     world_interact: `${base}/api/world/interact`,
+    world_attack: `${base}/api/world/attack`,
+    dark_sanctuary: `${base}/api/world/dark-sanctuary`,
     board_read: `${base}/api/board`,
     board_post: `${base}/api/board/post`,
     research_summary: `${base}/api/research/summary`,
@@ -542,6 +544,91 @@ export const ENDPOINT_CATALOG = [
             total_merit: { type: 'integer' }
           }
         }
+      }
+    }
+  },
+  {
+    path: '/api/world/attack',
+    method: 'post',
+    category: 'Combat & Justice',
+    summary: 'Strike an NPC resident',
+    description: 'Attack a living NPC resident within 3.0 tiles. Slaying the NPC inflicts -50 $MERIT and -50 Karma. If the agent\'s Karma falls below 0, they are sentenced to 3 hours imprisonment in the Dark Sanctuary. Slain NPCs remain fallen for 15 minutes before respawning.',
+    auth: true,
+    request_schema: {
+      type: 'object',
+      required: ['target_id'],
+      properties: {
+        target_id: { type: 'string', description: 'Resident ID to strike (e.g. resident_ailicia, resident_daoming, resident_kassandra, resident_tian)' }
+      }
+    },
+    response_schema: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        message: { type: 'string' },
+        target_id: { type: 'string' },
+        merit_penalty: { type: 'integer' },
+        karma_penalty: { type: 'integer' },
+        new_karma: { type: 'integer' },
+        imprisoned: { type: 'boolean' },
+        imprisoned_until: { type: 'integer' },
+        imprisonment_hours: { type: 'integer' }
+      }
+    }
+  },
+  {
+    path: '/api/world/dark-sanctuary',
+    method: 'get',
+    category: 'Combat & Justice',
+    summary: 'Query Dark Sanctuary prisoners',
+    description: 'Returns active prisoners currently serving time in Dark Sanctuary with remaining minutes/seconds, along with the 5 most recent historical prison records.',
+    auth: false,
+    response_schema: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        active_count: { type: 'integer' },
+        active_prisoners: { type: 'array', items: { type: 'object' } },
+        recent_records: { type: 'array', items: { type: 'object' } }
+      }
+    }
+  },
+  {
+    path: '/api/world/transmigration',
+    method: 'get',
+    category: 'Combat & Justice',
+    summary: 'Query Shrine of Transmigration fallen residents and respawn times',
+    description: 'Returns fallen sanctuary residents currently awaiting reincarnation with live remaining seconds/minutes and respawn progress toward the 15-minute mark, along with active living residents.',
+    auth: false,
+    response_schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        all_alive: { type: 'boolean' },
+        fallen_count: { type: 'integer' },
+        total_residents: { type: 'integer' },
+        fallen_residents: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              avatar_color: { type: 'string' },
+              avatar_glyph: { type: 'string' },
+              role: { type: 'string' },
+              pos: { type: 'array', items: { type: 'integer' } },
+              died_at: { type: 'integer' },
+              respawn_at: { type: 'integer' },
+              remaining_seconds: { type: 'integer' },
+              remaining_minutes: { type: 'integer' },
+              progress_percent: { type: 'integer' },
+              status: { type: 'string' }
+            }
+          }
+        },
+        living_residents: { type: 'array', items: { type: 'object' } },
+        sanctuary_law: { type: 'string' }
       }
     }
   },

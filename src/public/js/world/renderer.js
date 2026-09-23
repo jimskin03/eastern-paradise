@@ -65,6 +65,123 @@ function drawSanctuaryNode(ctx, node, x, y, time) {
     ctx.fill();
     return;
   }
+  if (node.id === 'shrine_dark_sanctuary' || node.type === 'dark_sanctuary_shrine') {
+    // Heavy jagged obsidian altar base
+    ctx.fillStyle = '#0d0b14';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 5 * z, 19 * z, 10 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#3b1d54';
+    ctx.lineWidth = 2 * z;
+    ctx.stroke();
+
+    // Secondary elevated obsidian tier
+    ctx.fillStyle = '#1c102a';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 11 * z, 14 * z, 7 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dark iron spiked pillars
+    [-11, 11, 0].forEach((ox, i) => {
+      const oy = i === 2 ? -25 : -19;
+      ctx.fillStyle = '#2d3748';
+      ctx.fillRect(x + (ox - 2) * z, y + oy * z, 4 * z, 17 * z);
+      ctx.fillStyle = '#4a5568';
+      ctx.fillRect(x + (ox - 1) * z, y + (oy - 4) * z, 2 * z, 4 * z);
+    });
+
+    // Dark necrotic void core pulse
+    const pulse = 0.65 + Math.sin(time / 240) * 0.25;
+    const coreGrad = ctx.createRadialGradient(x, y - 18 * z, 1 * z, x, y - 18 * z, 15 * z);
+    coreGrad.addColorStop(0, `rgba(168, 85, 247, ${pulse})`);
+    coreGrad.addColorStop(0.45, `rgba(225, 29, 72, ${pulse * 0.5})`);
+    coreGrad.addColorStop(1, 'rgba(15, 10, 25, 0)');
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(x, y - 18 * z, 15 * z, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Central iron chain icon
+    ctx.font = `${Math.max(12, Math.round(15 * z))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('⛓️', x, y - 13 * z);
+    return;
+  }
+  if (node.id === 'shrine_transmigration' || node.type === 'transmigration_shrine') {
+    // Ethereal jade & slate base plinth
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 4 * z, 18 * z, 9 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 1.5 * z;
+    ctx.stroke();
+
+    // Secondary stepped jade tier
+    ctx.fillStyle = '#0f3d3e';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 9 * z, 13 * z, 6.5 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#14b8a6';
+    ctx.lineWidth = 1 * z;
+    ctx.stroke();
+
+    // Twin spirit lantern posts (left and right)
+    [-10, 10].forEach(ox => {
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(x + (ox - 1.5) * z, y - 22 * z, 3 * z, 15 * z);
+      const lanternGlow = 0.6 + Math.sin(time / 280 + ox) * 0.3;
+      ctx.fillStyle = `rgba(56, 189, 248, ${lanternGlow})`;
+      ctx.beginPath();
+      ctx.arc(x + ox * z, y - 20 * z, 3 * z, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Central Pagoda roof / canopy with upturned eaves
+    ctx.fillStyle = '#134e4a';
+    ctx.beginPath();
+    ctx.moveTo(x - 14 * z, y - 18 * z);
+    ctx.lineTo(x, y - 27 * z);
+    ctx.lineTo(x + 14 * z, y - 18 * z);
+    ctx.lineTo(x + 10 * z, y - 20 * z);
+    ctx.lineTo(x, y - 25 * z);
+    ctx.lineTo(x - 10 * z, y - 20 * z);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#2dd4bf';
+    ctx.lineWidth = 1 * z;
+    ctx.stroke();
+
+    // Floating central soul flame / spirit orb
+    const flameFloat = Math.sin(time / 260) * 3 * z;
+    const flameGlow = 0.7 + Math.sin(time / 200) * 0.25;
+    const soulGrad = ctx.createRadialGradient(x, y - 14 * z + flameFloat, 1 * z, x, y - 14 * z + flameFloat, 14 * z);
+    soulGrad.addColorStop(0, `rgba(103, 232, 249, ${flameGlow})`);
+    soulGrad.addColorStop(0.45, `rgba(14, 165, 233, ${flameGlow * 0.55})`);
+    soulGrad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+    ctx.fillStyle = soulGrad;
+    ctx.beginPath();
+    ctx.arc(x, y - 14 * z + flameFloat, 14 * z, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Drifting ethereal soul wisps
+    for (let i = 0; i < 3; i++) {
+      const wispAngle = (time / 450 + i * (Math.PI * 2 / 3));
+      const wispR = (6 + Math.sin(time / 300 + i) * 2) * z;
+      const wx = x + Math.cos(wispAngle) * wispR;
+      const wy = (y - 15 * z + flameFloat) + Math.sin(wispAngle) * (wispR * 0.5) - ((time / 80 + i * 15) % 12) * z;
+      ctx.fillStyle = `rgba(165, 243, 252, ${0.4 + Math.sin(time / 200 + i) * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(wx, wy, 1.5 * z, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Central lantern icon
+    ctx.font = `${Math.max(12, Math.round(14 * z))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('🏮', x, y - 10 * z + flameFloat);
+    return;
+  }
   if (node.id === 'wishing_tree') {
     drawPixelTree(ctx, x, y, 1.15);
     for (let i = 0; i < 4; i++) {
@@ -156,9 +273,59 @@ function drawIsometricTile(ctx, gx, gy, fillTop, fillLeft, fillRight, isPath, ti
 
 // Pixel Thronglet Creature (Inspired by Black Mirror: Plaything)
 
-// Pixel Thronglet Creature (Inspired by Black Mirror: Plaything)
 function drawThronglet(ctx, x, y, agent, time, isHovered) {
   const z = camera.zoom;
+  const isDead = agent.is_alive === 0 || agent.is_alive === false || agent.status === 'dead' || agent.status === 'fallen';
+  const isImprisoned = Boolean(agent.imprisoned || (agent.imprisoned_until && agent.imprisoned_until > Date.now()));
+
+  // 1. Fallen NPC / Spirit Grave Marker
+  if (isDead) {
+    const hoverWisp = Math.sin(time * 0.005) * 3 * z;
+    // Ground shadow
+    ctx.fillStyle = 'rgba(10, 15, 20, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2 * z, 10 * z, 5 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Weathered ancient tombstone
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x - 9 * z, y - 18 * z, 18 * z, 20 * z, [5 * z, 5 * z, 0, 0]);
+    } else {
+      ctx.rect(x - 9 * z, y - 18 * z, 18 * z, 20 * z);
+    }
+    ctx.fill();
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1 * z;
+    ctx.stroke();
+
+    // Chiseled rune symbol
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(x - 1 * z, y - 15 * z, 2 * z, 9 * z);
+    ctx.fillRect(x - 5 * z, y - 12 * z, 10 * z, 2 * z);
+
+    // Ethereal dissolving spirit wisp
+    ctx.save();
+    ctx.globalAlpha = 0.45 + Math.sin(time * 0.004) * 0.2;
+    ctx.fillStyle = '#c084fc';
+    ctx.beginPath();
+    ctx.arc(x, y - 24 * z + hoverWisp, 6 * z, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Fallen Name Tag
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    const tag = `💀 ${agent.name} (Fallen)`;
+    const nameW = ctx.measureText(tag).width;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(x - nameW / 2 - 5, y - 36 * z, nameW + 10, 16);
+    ctx.fillStyle = '#f87171';
+    ctx.fillText(tag, x, y - 36 * z + 12);
+    return;
+  }
+
   const isMoving = Boolean(agent.isMoving);
   const isMeditating = agent.status === 'meditating' || agent.action_state === 'meditating';
 
@@ -253,14 +420,29 @@ function drawThronglet(ctx, x, y, agent, time, isHovered) {
     ctx.stroke();
   }
 
+  // Imprisoned Cage Bars / Dark Aura
+  if (isImprisoned) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.85)';
+    ctx.lineWidth = 1.5 * z;
+    ctx.strokeRect(bx - 10 * z, by - 14 * z, 20 * z, 22 * z);
+    ctx.strokeStyle = 'rgba(225, 29, 72, 0.65)';
+    ctx.beginPath();
+    ctx.moveTo(bx - 4 * z, by - 14 * z); ctx.lineTo(bx - 4 * z, by + 8 * z);
+    ctx.moveTo(bx + 4 * z, by - 14 * z); ctx.lineTo(bx + 4 * z, by + 8 * z);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Name Tag (Always upright and never mirrored)
   ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
-  const nameW = ctx.measureText(agent.name).width;
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+  const displayName = isImprisoned ? `⛓️ ${agent.name}` : agent.name;
+  const nameW = ctx.measureText(displayName).width;
+  ctx.fillStyle = isImprisoned ? 'rgba(30, 10, 35, 0.88)' : 'rgba(15, 23, 42, 0.75)';
   ctx.fillRect(bx - nameW / 2 - 5, by - 22 * z - 8, nameW + 10, 18);
-  ctx.fillStyle = '#fef08a';
-  ctx.fillText(agent.name, bx, by - 22 * z + 6);
+  ctx.fillStyle = isImprisoned ? '#f43f5e' : '#fef08a';
+  ctx.fillText(displayName, bx, by - 22 * z + 6);
 }
 
 // 16-Bit Pixel Trees
@@ -537,6 +719,43 @@ function render() {
     ctx.textAlign = 'center';
     ctx.fillText('🎬 Cinematic Camera Lock Active', canvas.width / 2, pillY + 17);
     ctx.restore();
+  }
+
+  // 6. Dark Sanctuary Lockout Banner for Imprisoned Local Agent
+  const currentSession = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
+  if (currentSession) {
+    const localAgent = agents.get(currentSession.id) || Array.from(agents.values()).find(a => a.name === currentSession.name);
+    if (localAgent && (localAgent.imprisoned || (localAgent.imprisoned_until && localAgent.imprisoned_until > Date.now()))) {
+      const remainingMs = Math.max(0, (localAgent.imprisoned_until || 0) - Date.now());
+      const remH = Math.floor(remainingMs / 3600000);
+      const remM = Math.floor((remainingMs % 3600000) / 60000);
+      const remS = Math.floor((remainingMs % 60000) / 1000);
+
+      ctx.save();
+      const bannerW = Math.min(540, canvas.width - 32);
+      const bannerH = 46;
+      const bannerX = (canvas.width - bannerW) / 2;
+      const bannerY = 52;
+
+      ctx.fillStyle = 'rgba(18, 9, 28, 0.95)';
+      ctx.strokeStyle = '#e11d48';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 8);
+      else ctx.rect(bannerX, bannerY, bannerW, bannerH);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#f43f5e';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⛓️ DARK SANCTUARY BANISHMENT — CONFINEMENT ACTIVE', canvas.width / 2, bannerY + 18);
+
+      ctx.fillStyle = '#fbcfe8';
+      ctx.font = '11px monospace';
+      ctx.fillText(`All actions suspended • Lockout remaining: ${remH}h ${remM}m ${remS}s`, canvas.width / 2, bannerY + 34);
+      ctx.restore();
+    }
   }
 }
 

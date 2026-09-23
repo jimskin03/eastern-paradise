@@ -15,7 +15,9 @@ const { WorldEngine } = worldModule;
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const PUBLIC_METHODS = [
+  'attackResident',
   'broadcast',
+  'checkImprisonment',
   'getAllEntitiesForSpectator',
   'getAllNodes',
   'getState',

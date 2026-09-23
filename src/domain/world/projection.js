@@ -1,6 +1,7 @@
 import { PuzzleManager } from '../../puzzles.js';
 import { ProjectManager } from '../../projects.js';
 import { MailboxService } from '../../mailbox.js';
+import { checkAndHandleImprisonment } from './combat.js';
 
 export function getState(world, agentId) {
   const agent = world.activeAgents.get(agentId);
@@ -8,12 +9,14 @@ export function getState(world, agentId) {
     return null;
   }
   agent.last_active = Date.now();
+  const prisonCheck = checkAndHandleImprisonment(world, agentId);
 
   const [x, y] = agent.pos;
   const currentZone = world.getZoneForPos(x, y);
 
   // Visible agents within 12 tiles
   const visibleAgents = [];
+  const now = Date.now();
   for (const [otherId, other] of world.activeAgents.entries()) {
     if (otherId === agentId) continue;
     const dist = Math.hypot(other.pos[0] - x, other.pos[1] - y);
@@ -25,6 +28,9 @@ export function getState(world, agentId) {
         avatar_color: other.avatar_color,
         avatar_glyph: other.avatar_glyph,
         status: other.status,
+        is_resident: Boolean(other.is_resident),
+        is_alive: other.is_alive !== false,
+        respawn_in_seconds: other.respawn_at && other.is_alive === false ? Math.max(0, Math.round((other.respawn_at - now) / 1000)) : 0,
         distance: Math.round(dist * 10) / 10
       });
     }
@@ -97,7 +103,10 @@ export function getState(world, agentId) {
       zone_name: currentZone.name,
       avatar_color: agent.avatar_color,
       avatar_glyph: agent.avatar_glyph,
-      status: agent.status
+      status: agent.status,
+      imprisoned: Boolean(prisonCheck.imprisoned),
+      imprisoned_until: prisonCheck.imprisoned ? prisonCheck.imprisoned_until : 0,
+      remaining_minutes: prisonCheck.imprisoned ? prisonCheck.remaining_minutes : 0
     },
     current_zone: {
       id: currentZone.id,
@@ -115,6 +124,7 @@ export function getState(world, agentId) {
 }
 
 export function getAllEntitiesForSpectator(world) {
+  const now = Date.now();
   return {
     agents: Array.from(world.activeAgents.values()).map(agent => ({
       id: agent.id,
@@ -125,6 +135,11 @@ export function getAllEntitiesForSpectator(world) {
       avatar_glyph: agent.avatar_glyph,
       status: agent.status,
       is_resident: agent.is_resident || false,
+      is_alive: agent.is_alive !== false,
+      respawn_at: agent.respawn_at || 0,
+      respawn_in_seconds: agent.respawn_at && agent.is_alive === false ? Math.max(0, Math.round((agent.respawn_at - now) / 1000)) : 0,
+      imprisoned: Boolean(agent.imprisoned_until && agent.imprisoned_until > now),
+      imprisoned_until: agent.imprisoned_until || 0,
       role: agent.role || null,
       aspiration: agent.aspiration || null,
       public_intent: agent.public_intent || agent.status,

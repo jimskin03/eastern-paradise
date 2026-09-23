@@ -24,7 +24,7 @@ export function generateWorld(source) {
   const props = [], bridges = [];
   const zones = structuredClone(source.zones.filter(zone => CORE_ZONES.includes(zone.id)));
   zones.forEach(zone => {
-    zone.nodes = zone.nodes.filter(node => node.type !== 'landmark' && node.id !== 'cryptgreg_terminal');
+    zone.nodes = zone.nodes.filter(node => node.type !== 'landmark' && node.id !== 'cryptgreg_terminal' && node.id !== 'shrine_dark_sanctuary' && node.id !== 'shrine_transmigration');
     zone.floorType = 'grass';
     zone.themeColor = '#26754a';
   });
@@ -110,6 +110,28 @@ export function generateWorld(source) {
   };
   reserve(unlitSunShrine.pos, 2);
   zoneAt(unlitSunShrine.pos).nodes.push(unlitSunShrine);
+
+  const darkSanctuaryShrine = {
+    id: 'shrine_dark_sanctuary',
+    name: 'The Dark Sanctuary Shrine',
+    type: 'dark_sanctuary_shrine',
+    pos: [2, 48],
+    icon: '⛓️',
+    description: 'A forbidding monolith of blackened iron and obsidian. It binds fallen minds who have severed the sacred balance of karma.'
+  };
+  reserve(darkSanctuaryShrine.pos, 2);
+  zoneAt(darkSanctuaryShrine.pos).nodes.push(darkSanctuaryShrine);
+
+  const transmigrationShrine = {
+    id: 'shrine_transmigration',
+    name: 'Shrine of Transmigration',
+    type: 'transmigration_shrine',
+    pos: [28, 16],
+    icon: '🏮',
+    description: 'A serene spirit pavilion on the reflection shore. Floating azure lanterns chronicle the wandering souls of fallen residents and channel their reincarnation.'
+  };
+  reserve(transmigrationShrine.pos, 2);
+  zoneAt(transmigrationShrine.pos).nodes.push(transmigrationShrine);
 
   // A narrow north/south river and a gentler eastern tributary.
   const mainRiver = [[13, 0], [13, 5], [16, 10], [16, 14], [18, 18], [16, 23], [19, 29], [25, 35], [28, 43], [34, 51]];
@@ -332,7 +354,7 @@ export function generateWorld(source) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()) {
   const world = generateWorld(JSON.parse(fs.readFileSync(WORLD_PATH, 'utf8')));
   fs.writeFileSync(WORLD_PATH, JSON.stringify(world, null, 2) + '\n');
   console.log(`Generated ${world.dimensions.width}x${world.dimensions.height} world: ${world.landscape.trees.length} trees, ${world.landscape.bridges.length} bridges, ${world.landscape.landmarks.length} landmarks.`);

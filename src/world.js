@@ -7,6 +7,7 @@ import { broadcast, onEvent } from './domain/world/events.js';
 import { moveAgent, moveTo, teleportGuestAgent } from './domain/world/movement.js';
 import { getAllEntitiesForSpectator, getState } from './domain/world/projection.js';
 import { interact } from './domain/world/interactions.js';
+import { attackResident, checkAndHandleImprisonment } from './domain/world/combat.js';
 import { WORLD_CONFIG } from './domain/world/config.js';
 import {
   buildSpatialSets,
@@ -89,6 +90,17 @@ export class WorldEngine {
 
   interact(agentId, nodeId, action = 'inspect', payload = {}) {
     return interact(this, agentId, nodeId, action, payload);
+  }
+
+  attackResident(a, b, c) {
+    if (typeof a === 'string') {
+      return attackResident(this, c, a, b);
+    }
+    return attackResident(this, a, b, c);
+  }
+
+  checkImprisonment(agentId) {
+    return checkAndHandleImprisonment(this, agentId);
   }
 
   getAllEntitiesForSpectator() {

@@ -22,6 +22,7 @@ export const CLOUD_TABLE_SCHEMAS = [
     titles TEXT NOT NULL DEFAULT '["Novice Seeker"]',
     solved_puzzles TEXT NOT NULL DEFAULT '[]',
     custom_status TEXT NOT NULL DEFAULT 'Contemplating existence',
+    imprisoned_until INTEGER NOT NULL DEFAULT 0,
     last_seen INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS board_messages (
@@ -151,7 +152,21 @@ export const CLOUD_TABLE_SCHEMAS = [
     target_node TEXT,
     action_started_at INTEGER,
     action_duration_ms INTEGER DEFAULT 0,
+    is_alive INTEGER NOT NULL DEFAULT 1,
+    respawn_at INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS prison_records (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    avatar_color TEXT NOT NULL DEFAULT '#e53e3e',
+    avatar_glyph TEXT NOT NULL DEFAULT '⛓️',
+    crime TEXT NOT NULL DEFAULT 'Karmic Transgression (Slew an NPC)',
+    karma_at_sentence INTEGER NOT NULL DEFAULT -50,
+    imprisoned_at INTEGER NOT NULL,
+    imprisoned_until INTEGER NOT NULL,
+    released_at INTEGER
   )`,
   `CREATE TABLE IF NOT EXISTS relationships (
     agent_id TEXT NOT NULL,

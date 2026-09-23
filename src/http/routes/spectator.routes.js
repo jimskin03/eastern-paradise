@@ -2,12 +2,21 @@ import crypto from 'node:crypto';
 import { parseJsonBody } from '../helpers/body.js';
 import { getClientIp } from '../helpers/request.js';
 import { sendApiError, sendJson } from '../helpers/response.js';
+import { checkAndHandleImprisonment } from '../../domain/world/combat.js';
 
 export async function handleSpectatorRoutes(ctx) {
   const { req, res, pathname, services, limits } = ctx;
-  const { db, world, isRetiredResident } = services;
+  const { db, world, isRetiredResident, residentManager, AuthService } = services;
 
   if ((pathname === '/api/spectator/message' || pathname === '/api/spectator/whisper') && req.method === 'POST') {
+    const authAccount = AuthService?.authenticate(req);
+    if (authAccount) {
+      const prisonCheck = checkAndHandleImprisonment(world, authAccount.id);
+      if (prisonCheck.imprisoned) {
+        return sendApiError(res, 403, 'IMPRISONED_IN_DARK_SANCTUARY', prisonCheck.message);
+      }
+    }
+
     const wLimit = limits.checkWhisperLimit(getClientIp(req));
     if (wLimit.limited) {
       return sendApiError(
@@ -33,6 +42,16 @@ export async function handleSpectatorRoutes(ctx) {
         res, 404, 'TARGET_AGENT_NOT_FOUND',
         'Target agent not found or retired from the sanctuary.',
         'Check active resident IDs via GET /api/residents or view the live sanctuary map.'
+      );
+    }
+
+    const targetResident = residentManager?.getResident(body.target_agent_id);
+    if (targetResident && targetResident.is_alive === false) {
+      const remainingSec = Math.max(1, Math.round((targetResident.respawn_at - Date.now()) / 1000));
+      return sendApiError(
+        res, 400, 'RESIDENT_FALLEN',
+        `${targetResident.name} has fallen and cannot hear whispers. Respawning in ${Math.ceil(remainingSec / 60)} minutes.`,
+        'Wait for the resident to respawn before whispering.'
       );
     }
 

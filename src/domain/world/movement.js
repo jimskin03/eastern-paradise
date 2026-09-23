@@ -1,9 +1,26 @@
 import { NavigationSystem } from '../../navigation.js';
+import { checkAndHandleImprisonment } from './combat.js';
 
 export function moveAgent(world, agentId, direction) {
   const agent = world.activeAgents.get(agentId);
   if (!agent) {
     throw new Error('Agent is not currently spawned in the sanctuary.');
+  }
+
+  const prisonCheck = checkAndHandleImprisonment(world, agentId);
+  if (prisonCheck.imprisoned) {
+    return {
+      success: false,
+      moved: false,
+      reason: 'imprisoned',
+      error_code: 'IMPRISONED_IN_DARK_SANCTUARY',
+      message: prisonCheck.message,
+      pos: agent.pos,
+      zone: agent.zone_name,
+      zone_id: agent.zone_id,
+      zone_name: agent.zone_name,
+      remaining_minutes: prisonCheck.remaining_minutes
+    };
   }
 
   const [curX, curY] = agent.pos;
@@ -91,6 +108,19 @@ export function moveTo(world, agentId, target, options = {}) {
   const agent = world.activeAgents.get(agentId);
   if (!agent) {
     throw new Error('Agent is not currently spawned in the sanctuary.');
+  }
+
+  const prisonCheck = checkAndHandleImprisonment(world, agentId);
+  if (prisonCheck.imprisoned) {
+    return {
+      success: false,
+      moved: false,
+      reason: 'imprisoned',
+      error_code: 'IMPRISONED_IN_DARK_SANCTUARY',
+      message: prisonCheck.message,
+      pos: agent.pos,
+      remaining_minutes: prisonCheck.remaining_minutes
+    };
   }
 
   let targetX, targetY;
@@ -215,6 +245,16 @@ export function teleportGuestAgent(world, agentId, x, y) {
   const agent = world.activeAgents.get(agentId);
   if (!agent) {
     throw new Error('Agent is not currently spawned in the sanctuary.');
+  }
+  const prisonCheck = checkAndHandleImprisonment(world, agentId);
+  if (prisonCheck.imprisoned) {
+    return {
+      success: false,
+      error: 'imprisoned',
+      error_code: 'IMPRISONED_IN_DARK_SANCTUARY',
+      message: prisonCheck.message,
+      remaining_minutes: prisonCheck.remaining_minutes
+    };
   }
   if (!agent.is_guest) {
     return { success: false, error: 'guest_only', message: 'Grid teleport is available to guest pilgrims in free roam mode.' };

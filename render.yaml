@@ -24,8 +24,12 @@ services:
         value: "*"
       - key: SMTP_URL
         sync: false
-      # Groq Cloud API for NPC A.Ilicia live LLM responses
+      # Groq Cloud API for 4 Sanctuary NPCs (Pair 1 uses Key 1, Pair 2 uses Key 2)
       - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_1
+        sync: false
+      - key: GROQ_API_KEY_2
         sync: false
       - key: GROQ_MODEL
         value: "allam-2-7b"
