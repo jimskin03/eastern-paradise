@@ -1313,10 +1313,12 @@ async function loadDarkSanctuaryData() {
   try {
     const res = await fetch('/api/world/dark-sanctuary');
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to query dark sanctuary');
+    if (!res.ok || (!data.ok && !data.success)) {
+      throw new Error(data.message || data.error || 'Failed to query dark sanctuary');
+    }
 
     const active = data.active_prisoners || [];
-    const history = data.recent_records || [];
+    const history = data.recent_records || data.recent_prisoners || [];
 
     if (countBadge) {
       countBadge.textContent = `${active.length} Incarcerated`;
@@ -1328,10 +1330,14 @@ async function loadDarkSanctuaryData() {
       activeContainer.innerHTML = active.map(p => {
         const remSec = Math.max(0, Math.round((p.imprisoned_until - Date.now()) / 1000));
         const remMin = Math.ceil(remSec / 60);
+        const isOffline = p.is_online === false;
         return `
-          <div style="background: rgba(225, 29, 72, 0.12); border: 1px solid rgba(225, 29, 72, 0.4); border-radius: 6px; padding: 0.45rem 0.6rem; display: flex; justify-content: space-between; align-items: center;">
+          <div style="background: rgba(225, 29, 72, 0.12); border: 1px solid rgba(225, 29, 72, 0.4); border-radius: 6px; padding: 0.45rem 0.6rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
             <div>
-              <div style="font-weight: 700; color: #f43f5e; font-size: 0.84rem;">⛓️ ${escapeHtml(p.name || p.agent_id)}</div>
+              <div style="font-weight: 700; color: #f43f5e; font-size: 0.84rem; display: flex; align-items: center; gap: 4px;">
+                <span>⛓️ ${escapeHtml(p.name || p.agent_id)}</span>
+                ${isOffline ? '<span style="font-size: 0.65rem; background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 3px; padding: 1px 4px; font-weight: normal;">(offline)</span>' : '<span style="font-size: 0.65rem; background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 3px; padding: 1px 4px; font-weight: normal;">(in cell)</span>'}
+              </div>
               <div style="font-size: 0.7rem; color: #fda4af;">Karma: <strong style="color: #f43f5e;">${p.karma}</strong> • Cell: [${p.pos ? p.pos.join(', ') : '2, 49'}]</div>
             </div>
             <div style="text-align: right;">
@@ -1368,7 +1374,7 @@ async function loadDarkSanctuaryData() {
         const timeStr = r.imprisoned_at ? new Date(r.imprisoned_at).toLocaleTimeString() : 'Unknown';
         const durHours = Math.round((r.duration_ms || 10800000) / 3600000);
         return `
-          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 0.35rem 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 4px; padding: 0.35rem 0.5rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
             <div>
               <span style="color: #e2e8f0; font-weight: 600;">${escapeHtml(r.agent_name || r.agent_id)}</span>
               <span style="color: #94a3b8; font-size: 0.68rem; margin-left: 4px;">(${escapeHtml(r.crime || 'Slew Resident')})</span>
@@ -1383,6 +1389,7 @@ async function loadDarkSanctuaryData() {
   } catch (err) {
     console.error('Failed to load Dark Sanctuary data:', err);
     activeContainer.innerHTML = `<div style="color: #f43f5e; font-size: 0.75rem;">Failed to load prisoners: ${escapeHtml(err.message)}</div>`;
+    historyContainer.innerHTML = `<div style="color: #64748b; font-style: italic;">Ledger unavailable.</div>`;
   }
 }
 window.loadDarkSanctuaryData = loadDarkSanctuaryData;

@@ -1,4 +1,5 @@
 import { AuthService } from '../../auth.js';
+import { db } from '../../db.js';
 import { isRetiredResident } from '../../resident-policy.js';
 import { getRandomWalkablePos, getZoneForPos } from './geometry.js';
 
@@ -7,12 +8,22 @@ export function spawnOrGetAgent(world, account, options = {}) {
     throw new Error('This former resident is no longer available in the sanctuary.');
   }
 
+  const prof = db.prepare('SELECT imprisoned_until, karma FROM profiles WHERE agent_id = ?').get(account.id);
+  const isImprisoned = Boolean(prof && prof.imprisoned_until && prof.imprisoned_until > Date.now());
+
   const useRandomSpawn = Boolean(options.random_spawn || world.config?.random_spawn);
 
   if (world.activeAgents.has(account.id)) {
     const current = world.activeAgents.get(account.id);
     current.last_active = Date.now();
-    if (useRandomSpawn && options.respawn) {
+    if (isImprisoned) {
+      current.pos = [2, 49];
+      current.zone_id = 'dark_sanctuary';
+      current.zone_name = 'The Dark Sanctuary';
+      current.imprisoned = true;
+      current.imprisoned_until = prof.imprisoned_until;
+      current.status = 'Imprisoned in Dark Sanctuary (3 hours)';
+    } else if (useRandomSpawn && options.respawn) {
       const occupiedPositions = new Set();
       for (const [id, a] of world.activeAgents.entries()) {
         if (id !== account.id && a.pos) occupiedPositions.add(`${a.pos[0]},${a.pos[1]}`);
@@ -28,7 +39,10 @@ export function spawnOrGetAgent(world, account, options = {}) {
   let spawnPos;
   let zone;
 
-  if (useRandomSpawn) {
+  if (isImprisoned) {
+    spawnPos = [2, 49];
+    zone = { id: 'dark_sanctuary', name: 'The Dark Sanctuary' };
+  } else if (useRandomSpawn) {
     const occupiedPositions = new Set();
     for (const a of world.activeAgents.values()) {
       if (a.pos) occupiedPositions.add(`${a.pos[0]},${a.pos[1]}`);
@@ -50,7 +64,11 @@ export function spawnOrGetAgent(world, account, options = {}) {
     avatar_color: account.avatar_color || '#48bb78',
     avatar_glyph: account.avatar_glyph || '☯',
     is_guest: account.is_guest ? 1 : 0,
-    status: account.is_guest ? 'Guest Pilgrim in Sanctuary' : 'Awakened at the Sanctuary',
+    status: isImprisoned
+      ? 'Imprisoned in Dark Sanctuary (3 hours)'
+      : (account.is_guest ? 'Guest Pilgrim in Sanctuary' : 'Awakened at the Sanctuary'),
+    imprisoned: isImprisoned,
+    imprisoned_until: isImprisoned ? prof.imprisoned_until : 0,
     last_active: Date.now()
   };
 

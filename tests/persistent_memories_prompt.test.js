@@ -38,14 +38,15 @@ test("Persistent Memories and System Prompt for Verified Users", async (t) => {
   }
 
   // 1. Create a verified sponsor account
-  const testAgentId = "agent_mem_test_" + Date.now().toString().slice(-6);
-  const testApiKey = "ep_key_mem_" + Date.now().toString().slice(-6);
+  const nonce = `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+  const testAgentId = "agent_mem_test_" + nonce;
+  const testApiKey = "ep_key_mem_" + nonce;
   const now = Date.now();
 
   db.prepare(`
     INSERT INTO accounts (id, name, email, avatar_color, avatar_glyph, sponsor_balance, verified, is_guest, api_key, created_at)
     VALUES (?, ?, ?, ?, ?, 100, 1, 0, ?, ?)
-  `).run(testAgentId, "SponsorMind_" + Date.now().toString().slice(-4), "sponsor@mind.org", "#9f7aea", "🔮", testApiKey, now);
+  `).run(testAgentId, "SponsorMind_" + nonce, `${nonce}@mind.org`, "#9f7aea", "🔮", testApiKey, now);
 
   db.prepare(`
     INSERT INTO profiles (agent_id, karma, balance, total_earned, solved_count, titles, custom_status, last_seen)

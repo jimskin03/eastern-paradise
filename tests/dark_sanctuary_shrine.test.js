@@ -5,6 +5,9 @@ import { db } from '../src/db.js';
 import { WorldEngine } from '../src/world.js';
 import { residentManager } from '../src/residents.js';
 import { BoardService } from '../src/board.js';
+import { AuthService } from '../src/auth.js';
+import { spawnOrGetAgent, removeAgent } from '../src/domain/world/agents.js';
+import { handleWorldRoutes } from '../src/http/routes/world.routes.js';
 
 function createShrineTester(label, initialKarma = 10) {
   const nonce = `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
@@ -81,6 +84,155 @@ test('Dark Sanctuary Shrine: Inspecting node returns active prisoners and last 5
   }
 });
 
+test('Dark Sanctuary: Logged out / offline prisoners remain in active prisoner list with is_online=false', () => {
+  const world = new WorldEngine();
+  residentManager.init(world);
+
+  const observer = createShrineTester('observer_offline', 50);
+  const offlinePrisoner = createPrisonTesterLocal('offline_inmate', -40);
+
+  const now = Date.now();
+  const until = now + (3 * 3600 * 1000); // 3 hours
+  db.prepare('UPDATE profiles SET imprisoned_until = ? WHERE agent_id = ?').run(until, offlinePrisoner.id);
+
+  db.prepare(`
+    INSERT INTO prison_records (id, agent_id, agent_name, avatar_color, avatar_glyph, crime, karma_at_sentence, imprisoned_at, imprisoned_until, released_at)
+    VALUES (?, ?, ?, '#e53e3e', '⛓️', 'Struck down resident', -40, ?, ?, NULL)
+  `).run(`prec_offline_${offlinePrisoner.id}`, offlinePrisoner.id, offlinePrisoner.name, now, until);
+
+  try {
+    // Ensure prisoner is NOT in world.activeAgents (simulating offline/logged out)
+    world.activeAgents.delete(offlinePrisoner.id);
+
+    world.activeAgents.set(observer.id, {
+      id: observer.id,
+      name: observer.name,
+      pos: [2, 47],
+      zone_name: 'The Dark Sanctuary'
+    });
+
+    const result = world.interact(observer.id, 'shrine_dark_sanctuary', 'inspect');
+    assert.equal(result.ok, true);
+    assert.equal(result.success, true);
+
+    const record = result.active_prisoners.find(p => p.agent_id === offlinePrisoner.id);
+    assert.ok(record, 'Offline / logged out prisoner must still appear in active prisoners list');
+    assert.equal(record.is_online, false);
+    assert.deepEqual(record.pos, [2, 49]);
+    assert.equal(record.name, offlinePrisoner.name);
+    assert.equal(record.karma, -40);
+    assert.ok(record.remaining_minutes > 170 && record.remaining_minutes <= 180);
+  } finally {
+    cleanupAgent(observer.id);
+    cleanupAgent(offlinePrisoner.id);
+  }
+});
+
+test('Dark Sanctuary: Imprisoned guest is protected from purge until sentence expires', () => {
+  const nonce = `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+  const guestId = `guest_inmate_${nonce}`;
+  const guestName = `Guest Prisoner ${nonce}`;
+  const now = Date.now();
+  const until = now + (3 * 3600 * 1000);
+
+  db.prepare('INSERT INTO accounts (id, name, email, api_key, verified, is_guest, created_at) VALUES (?, ?, ?, ?, 1, 1, ?)')
+    .run(guestId, guestName, `${guestId}@guest.test`, `key_${guestId}`, now);
+  db.prepare(`
+    INSERT INTO profiles (agent_id, karma, balance, total_earned, solved_count, titles, solved_puzzles, custom_status, last_seen, imprisoned_until)
+    VALUES (?, -50, 0, 0, 0, '[]', '[]', 'Imprisoned', ?, ?)
+  `).run(guestId, now, until);
+
+  try {
+    // Attempting to purge active prisoner guest must be rejected
+    const purgeAttempt = AuthService.purgeGuest(guestId);
+    assert.equal(purgeAttempt.purged, false);
+    assert.match(purgeAttempt.reason, /serving a sentence/i);
+
+    // Profile must still exist
+    const prof = db.prepare('SELECT imprisoned_until FROM profiles WHERE agent_id = ?').get(guestId);
+    assert.ok(prof);
+    assert.equal(prof.imprisoned_until, until);
+  } finally {
+    cleanupAgent(guestId);
+  }
+});
+
+test('Dark Sanctuary: Imprisoned agent respawns directly in cell [2, 49] if logging back in', () => {
+  const world = new WorldEngine();
+  const prisoner = createPrisonTesterLocal('reconnect_inmate', -30);
+  const now = Date.now();
+  const until = now + (3 * 3600 * 1000);
+
+  db.prepare('UPDATE profiles SET imprisoned_until = ? WHERE agent_id = ?').run(until, prisoner.id);
+
+  try {
+    const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(prisoner.id);
+    const spawned = spawnOrGetAgent(world, account);
+
+    assert.equal(spawned.imprisoned, true);
+    assert.equal(spawned.imprisoned_until, until);
+    assert.deepEqual(spawned.pos, [2, 49]);
+    assert.equal(spawned.zone_id, 'dark_sanctuary');
+  } finally {
+    cleanupAgent(prisoner.id);
+  }
+});
+
+test('Dark Sanctuary: Public GET /api/world/dark-sanctuary returns both ok and success, active prisoners (including logged out), and recent records', async () => {
+  const world = new WorldEngine();
+  const prisoner = createPrisonTesterLocal('http_inmate', -45);
+  const now = Date.now();
+  const until = now + (3 * 3600 * 1000);
+
+  db.prepare('UPDATE profiles SET imprisoned_until = ? WHERE agent_id = ?').run(until, prisoner.id);
+  db.prepare(`
+    INSERT INTO prison_records (id, agent_id, agent_name, avatar_color, avatar_glyph, crime, karma_at_sentence, imprisoned_at, imprisoned_until, released_at)
+    VALUES (?, ?, ?, '#e53e3e', '⛓️', 'Struck down resident', -45, ?, ?, NULL)
+  `).run(`prec_http_${prisoner.id}`, prisoner.id, prisoner.name, now, until);
+
+  try {
+    let capturedStatusCode = null;
+    let capturedBody = null;
+
+    const mockReq = { method: 'GET', headers: {} };
+    const mockRes = {
+      writeHead(code, headers) { capturedStatusCode = code; },
+      end(data) { capturedBody = JSON.parse(data); }
+    };
+
+    const handled = await handleWorldRoutes({
+      req: mockReq,
+      res: mockRes,
+      pathname: '/api/world/dark-sanctuary',
+      parsedUrl: new URL('http://localhost/api/world/dark-sanctuary'),
+      services: {
+        db,
+        AuthService: { authenticate: () => null },
+        world,
+        ResearchTelemetry: null,
+        residentManager
+      }
+    });
+
+    assert.notEqual(handled, false);
+    assert.equal(capturedStatusCode, 200);
+    assert.equal(capturedBody.ok, true);
+    assert.equal(capturedBody.success, true);
+    assert.ok(capturedBody.active_prisoners.length >= 1);
+    assert.ok(capturedBody.recent_records.length >= 1);
+    assert.ok(capturedBody.recent_prisoners.length >= 1);
+
+    const found = capturedBody.active_prisoners.find(p => p.agent_id === prisoner.id);
+    assert.ok(found, 'Active prisoner must be present in HTTP response');
+    assert.equal(found.is_online, false);
+    assert.deepEqual(found.pos, [2, 49]);
+    assert.equal(found.karma, -45);
+    assert.ok(found.remaining_minutes > 170 && found.remaining_minutes <= 180);
+  } finally {
+    cleanupAgent(prisoner.id);
+  }
+});
+
 function createPrisonTesterLocal(label, karma) {
   const nonce = `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
   const id = `agent_local_${label}_${nonce}`;
@@ -93,3 +245,5 @@ function createPrisonTesterLocal(label, karma) {
   `).run(id, karma, Date.now());
   return { id, apiKey: `key_${id}`, name };
 }
+
+

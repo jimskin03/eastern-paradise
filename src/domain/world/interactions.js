@@ -434,17 +434,33 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
     case 'dark_sanctuary_shrine': {
       const now = Date.now();
       const activeRows = db.prepare(`
-        SELECT p.agent_id, a.name, a.avatar_color, a.avatar_glyph, p.karma, p.imprisoned_until
-        FROM profiles p
-        JOIN accounts a ON p.agent_id = a.id
-        WHERE p.imprisoned_until > ?
+        SELECT 
+          p.agent_id,
+          COALESCE(a.name, pr.agent_name, p.agent_id) AS name,
+          COALESCE(a.avatar_color, pr.avatar_color, '#e11d48') AS avatar_color,
+          COALESCE(a.avatar_glyph, pr.avatar_glyph, '⛓️') AS avatar_glyph,
+          COALESCE(p.karma, pr.karma_at_sentence, -50) AS karma,
+          p.imprisoned_until
+        FROM (
+          SELECT agent_id, karma, imprisoned_until FROM profiles WHERE imprisoned_until > ?
+          UNION
+          SELECT agent_id, karma_at_sentence AS karma, imprisoned_until FROM prison_records WHERE imprisoned_until > ? AND (released_at IS NULL OR released_at = 0)
+        ) p
+        LEFT JOIN accounts a ON p.agent_id = a.id
+        LEFT JOIN (
+          SELECT agent_id, agent_name, avatar_color, avatar_glyph, karma_at_sentence
+          FROM prison_records
+          ORDER BY imprisoned_at DESC
+        ) pr ON p.agent_id = pr.agent_id
+        GROUP BY p.agent_id
         ORDER BY p.imprisoned_until DESC
-      `).all(now);
+      `).all(now, now);
 
       const activePrisoners = activeRows.map(row => {
         const remainingSec = Math.max(0, Math.round((row.imprisoned_until - now) / 1000));
         const remMin = Math.ceil(remainingSec / 60);
         const remHr = (remainingSec / 3600).toFixed(1);
+        const liveAgent = world?.activeAgents?.get(row.agent_id);
         return {
           agent_id: row.agent_id,
           name: row.name,
@@ -455,7 +471,9 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
           remaining_seconds: remainingSec,
           remaining_minutes: remMin,
           remaining_hours: remHr,
-          status: `${remMin}m remaining`
+          status: `${remMin}m remaining`,
+          is_online: Boolean(liveAgent),
+          pos: liveAgent?.pos || [2, 49]
         };
       });
 
@@ -467,11 +485,14 @@ export function interact(world, agentId, nodeId, action = 'inspect', payload = {
       `).all();
 
       return {
+        ok: true,
         success: true,
         node: targetNode.name,
         description: targetNode.description,
+        active_count: activePrisoners.length,
         active_prisoners_count: activePrisoners.length,
         active_prisoners: activePrisoners,
+        recent_records: recentRecords,
         recent_prisoners: recentRecords,
         sanctuary_law: 'Any synthetic or biological intelligence whose karma drops below 0 is cast into the Dark Sanctuary for 3 hours of stillness.'
       };

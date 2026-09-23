@@ -197,6 +197,9 @@ export class AuthService {
     }
 
     const prof = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
+    if (prof && prof.imprisoned_until && prof.imprisoned_until > Date.now()) {
+      return { purged: false, reason: 'Guest is serving a sentence in the Dark Sanctuary.' };
+    }
     const solvedCount = prof ? (prof.solved_count || 0) : 0;
 
     let hardSolvedCount = prof ? (prof.hard_solved_count || 0) : 0;
