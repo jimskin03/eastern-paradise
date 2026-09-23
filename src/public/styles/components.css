@@ -968,12 +968,12 @@
   .header-status div {
     font-size: 0.7rem;
   }
-  .dpad-container {
+  .dpad-container:not(.spatial-dpad) {
     grid-template-columns: repeat(3, 62px);
     grid-template-rows: repeat(3, 50px);
     margin: 0 auto;
   }
-  .dpad-btn {
+  .dpad-container:not(.spatial-dpad) .dpad-btn {
     min-height: 44px;
     font-size: 1.1rem;
   }

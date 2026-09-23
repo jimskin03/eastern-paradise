@@ -365,13 +365,28 @@ import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShr
       const hud = document.getElementById('spatialNavHud');
       const btn = document.getElementById('btnToggleNavHud');
       if (!hud) return;
-      const isHidden = hud.classList.toggle('hidden');
-      if (isHidden) {
-        hud.dataset.userClosed = 'true';
-        if (btn) btn.classList.remove('active');
-      } else {
+      if (hud.classList.contains('hidden')) {
+        hud.classList.remove('hidden');
+        hud.classList.remove('minimized');
         delete hud.dataset.userClosed;
         if (btn) btn.classList.add('active');
+        const minBtn = document.getElementById('btnMinimizeNavHud');
+        if (minBtn) {
+          minBtn.textContent = '–';
+          minBtn.title = 'Minimize Navigation Deck';
+        }
+      } else if (hud.classList.contains('minimized')) {
+        hud.classList.remove('minimized');
+        const minBtn = document.getElementById('btnMinimizeNavHud');
+        if (minBtn) {
+          minBtn.textContent = '–';
+          minBtn.title = 'Minimize Navigation Deck';
+        }
+        if (btn) btn.classList.add('active');
+      } else {
+        hud.classList.add('hidden');
+        hud.dataset.userClosed = 'true';
+        if (btn) btn.classList.remove('active');
       }
     }
 
@@ -380,7 +395,13 @@ import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShr
       const btn = document.getElementById('btnToggleNavHud');
       if (hud) {
         hud.classList.remove('hidden');
+        hud.classList.remove('minimized');
         delete hud.dataset.userClosed;
+        const minBtn = document.getElementById('btnMinimizeNavHud');
+        if (minBtn) {
+          minBtn.textContent = '–';
+          minBtn.title = 'Minimize Navigation Deck';
+        }
       }
       if (btn) btn.classList.add('active');
     }
@@ -406,6 +427,91 @@ import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShr
         minBtn.textContent = isMin ? '+' : '–';
         minBtn.title = isMin ? 'Expand Navigation Deck' : 'Minimize Navigation Deck';
       }
+    }
+
+    function handleNavHudClick(e) {
+      const hud = document.getElementById('spatialNavHud');
+      if (hud && hud.classList.contains('minimized')) {
+        if (e.target && (e.target.id === 'btnCloseNavHud' || e.target.closest('#btnCloseNavHud'))) return;
+        toggleMinimizeNavHud(e);
+      }
+    }
+
+    function initNavHudDrag() {
+      const hud = document.getElementById('spatialNavHud');
+      if (!hud || hud.dataset.dragInitialized === 'true') return;
+      hud.dataset.dragInitialized = 'true';
+
+      const header = hud.querySelector('.spatial-nav-header');
+      if (!header) return;
+
+      let isDragging = false;
+      let startX = 0;
+      let startY = 0;
+      let initialLeft = 0;
+      let initialTop = 0;
+
+      const onPointerMove = (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        const rect = hud.getBoundingClientRect();
+        const minLeft = 4;
+        const maxLeft = Math.max(minLeft, window.innerWidth - rect.width - 4);
+        const minTop = 4;
+        const maxTop = Math.max(minTop, window.innerHeight - rect.height - 4);
+
+        newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+        newTop = Math.max(minTop, Math.min(newTop, maxTop));
+
+        hud.style.left = `${Math.round(newLeft)}px`;
+        hud.style.top = `${Math.round(newTop)}px`;
+        hud.style.right = 'auto';
+        hud.style.bottom = 'auto';
+      };
+
+      const onPointerUp = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        hud.classList.remove('is-dragging');
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        header.removeEventListener('pointerup', onPointerUp);
+        header.removeEventListener('pointercancel', onPointerUp);
+        try {
+          if (e && e.pointerId !== undefined && header.hasPointerCapture(e.pointerId)) {
+            header.releasePointerCapture(e.pointerId);
+          }
+        } catch (_) {}
+      };
+
+      header.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button, select, input, a')) return;
+        isDragging = true;
+        hud.classList.add('is-dragging');
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = hud.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        try {
+          if (e.pointerId !== undefined) {
+            header.setPointerCapture(e.pointerId);
+          }
+        } catch (_) {}
+
+        window.addEventListener('pointermove', onPointerMove, { passive: false });
+        window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointercancel', onPointerUp);
+        header.addEventListener('pointerup', onPointerUp);
+        header.addEventListener('pointercancel', onPointerUp);
+      });
     }
 
     let lastMoveTime = 0;
@@ -745,6 +851,8 @@ installGlobals({
   openNavHud,
   closeNavHud,
   toggleMinimizeNavHud,
+  handleNavHudClick,
+  initNavHudDrag,
   uiTeleportToGrid,
   uiInspectNode,
   uiSubmitPuzzle,
@@ -780,3 +888,4 @@ installGlobals({
 
 initHappeningNow();
 initMoreMenu();
+initNavHudDrag();

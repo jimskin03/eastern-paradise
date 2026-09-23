@@ -119,7 +119,7 @@
         </div>
 
         <!-- Floating In-Canvas Spatial Navigation Deck -->
-        <div id="spatialNavHud" class="spatial-nav-hud" role="region" aria-label="Spatial Navigation Deck">
+        <div id="spatialNavHud" class="spatial-nav-hud" role="region" aria-label="Spatial Navigation Deck" onclick="handleNavHudClick(event)">
           <div class="spatial-nav-header">
             <div class="spatial-nav-title-wrap">
               <span class="spatial-nav-icon">🧭</span>
@@ -192,7 +192,7 @@
 
             <!-- Live Feedback & Hotkey Hint -->
             <div id="hudMoveFeedback" class="spatial-nav-feedback">
-              WASD / Arrows to step • Click landmark to walk • 🎯 Center
+              <span class="nav-hint-desktop">WASD / Arrows to step • Click landmark to walk • 🎯 Center</span>
             </div>
           </div>
         </div>

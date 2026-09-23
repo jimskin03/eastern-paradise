@@ -155,11 +155,13 @@
   margin-top: -2px;
 }
 
-.dpad-btn.pressed {
+.dpad-btn.pressed,
+.dpad-btn:active:not(:disabled),
+.dpad-center-btn:active {
   background: rgba(46, 196, 182, 0.45) !important;
   border-color: var(--accent-jade) !important;
   color: #fff !important;
-  transform: scale(0.95);
+  transform: scale(0.94);
 }
 
 /* -----------------------------------------------------------------------------
@@ -181,6 +183,12 @@
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: auto;
   user-select: none;
+}
+
+.spatial-nav-hud.is-dragging {
+  opacity: 0.92;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
+  transition: none !important;
 }
 
 .spatial-nav-hud.hidden {
@@ -207,6 +215,12 @@
   gap: 0.5rem;
   padding: 0.65rem 0.85rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  touch-action: none;
+}
+
+.spatial-nav-hud.is-dragging .spatial-nav-header {
+  cursor: grabbing;
 }
 
 .spatial-nav-hud.minimized .spatial-nav-header {
