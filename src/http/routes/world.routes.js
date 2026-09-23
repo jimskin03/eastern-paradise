@@ -101,7 +101,7 @@ export async function handleWorldRoutes(ctx) {
     }
 
     try {
-      const result = world.attackResident(account.id, targetId, residentManager);
+      const result = await world.attackResident(account.id, targetId, residentManager);
       return sendJson(res, result.success ? 200 : 400, result);
     } catch (err) {
       return sendJson(res, 400, {
@@ -202,7 +202,7 @@ export async function handleWorldRoutes(ctx) {
     try {
       if (body.action === 'attack' || body.action === 'kill') {
         const targetId = body.node_id || body.target_id || body.payload?.target_id || body.payload?.resident_id;
-        const attackResult = world.attackResident(account.id, targetId, residentManager);
+        const attackResult = await world.attackResident(account.id, targetId, residentManager);
         return sendJson(res, attackResult.success ? 200 : 400, attackResult);
       }
 

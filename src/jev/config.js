@@ -18,6 +18,10 @@ export const JEV_GLOBAL_COOLDOWN_MS = parseInt(process.env.JEV_GLOBAL_COOLDOWN_M
 export const JEV_RESIDENT_COOLDOWN_MS = parseInt(process.env.JEV_RESIDENT_COOLDOWN_MS, 10) || (4 * 60 * 60 * 1000); // 4 hours
 export const JEV_EVENT_BATCH_WINDOW_MS = parseInt(process.env.JEV_EVENT_BATCH_WINDOW_MS, 10) || (30 * 1000); // 30 seconds
 export const JEV_TIMEOUT_MS = parseInt(process.env.JEV_TIMEOUT_MS, 10) || 4000; // 4 seconds
+export const JEV_COMBAT_DECISIONS_ENABLED = process.env.JEV_COMBAT_DECISIONS_ENABLED !== 'false';
+export const JEV_COMBAT_DEFEND_KARMA = parseInt(process.env.JEV_COMBAT_DEFEND_KARMA, 10) || 10;
+export const JEV_COMBAT_REPEL_KARMA_PENALTY = parseInt(process.env.JEV_COMBAT_REPEL_KARMA_PENALTY, 10) || 10;
+export const JEV_COMBAT_DEFEND_MERIT_COST = parseInt(process.env.JEV_COMBAT_DEFEND_MERIT_COST, 10) || 1;
 
 export const BOUNDED_ACTIONS = [
   'REST',
@@ -30,7 +34,9 @@ export const BOUNDED_ACTIONS = [
   'VISIT_PROJECT',
   'VISIT_PUZZLE',
   'EXPLORE',
-  'RETURN_HOME_ZONE'
+  'RETURN_HOME_ZONE',
+  'DEFEND',
+  'IGNORE'
 ];
 
 export const ACTION_CRITERIA = {
@@ -44,7 +50,9 @@ export const ACTION_CRITERIA = {
   VISIT_PROJECT: 'Inspect or contribute work to a sanctuary communal construction or project.',
   VISIT_PUZZLE: 'Approach an elemental obelisk or trial monolith to contemplate its axioms.',
   EXPLORE: 'Roam toward outer boundary markers or survey unfamiliar grounds.',
-  RETURN_HOME_ZONE: 'Return to the resident\'s primary sanctuary sanctuary habitat or pavilion.'
+  RETURN_HOME_ZONE: 'Return to the resident\'s primary sanctuary sanctuary habitat or pavilion.',
+  DEFEND: 'Intervene to protect the attacked resident and repel the aggressor.',
+  IGNORE: 'Do not intervene; allow the current conflict to proceed.'
 };
 
 export const PRIORITY_LEVELS = ['routine', 'meaningful', 'urgent'];

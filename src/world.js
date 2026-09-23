@@ -94,9 +94,9 @@ export class WorldEngine {
 
   attackResident(a, b, c) {
     if (typeof a === 'string') {
-      return attackResident(this, c, a, b);
+      return attackResident(this, c, a, b, this.combatDecisionService);
     }
-    return attackResident(this, a, b, c);
+    return attackResident(this, a, b, c, this.combatDecisionService);
   }
 
   checkImprisonment(agentId) {
