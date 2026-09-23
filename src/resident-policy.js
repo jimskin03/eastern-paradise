@@ -9,3 +9,9 @@ export const RETIRED_RESIDENT_SQL = "'resident_mei', 'resident_lin', 'resident_j
 export function isRetiredResident(agentId) {
   return RETIRED_RESIDENT_IDS.includes(agentId);
 }
+
+export function isNpcAgent(agentId) {
+  if (!agentId || typeof agentId !== 'string') return false;
+  return agentId.startsWith('resident_') || agentId.startsWith('npc_');
+}
+

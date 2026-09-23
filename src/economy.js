@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import crypto from 'node:crypto';
-import { isRetiredResident, RETIRED_RESIDENT_SQL } from './resident-policy.js';
+import { isRetiredResident, RETIRED_RESIDENT_SQL, isNpcAgent } from './resident-policy.js';
+export const NPC_QUEST_REWARD_MULTIPLIER = 0.10; // 90% reduction for NPC quest/trial completions
 export const FIBONACCI_LEVEL_THRESHOLDS = Object.freeze([
   100,   // Level 1: 0 - 100
   200,   // Level 2: 101 - 200
@@ -62,7 +63,9 @@ export class EconomyManager {
     const profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
     if (!profile) throw new Error(`Profile not found for agent: ${agentId}`);
 
-    const amount = Math.max(1, parseInt(meritAmount, 10));
+    const isNpc = isNpcAgent(agentId);
+    const rawAmount = Math.max(1, parseInt(meritAmount, 10));
+    const amount = isNpc ? Math.max(1, Math.round(rawAmount * NPC_QUEST_REWARD_MULTIPLIER)) : rawAmount;
     const newBalance = (profile.balance || 0) + amount;
     const newTotalEarned = (profile.total_earned || 0) + amount;
     const now = Date.now();
@@ -73,7 +76,7 @@ export class EconomyManager {
     db.prepare(`
       INSERT INTO transactions (id, sender_id, recipient_id, amount, type, description, created_at)
       VALUES (?, 'SANCTUARY_MINT', ?, ?, 'world_quest_mint', ?, ?)
-    `).run(transactionId, agentId, amount, `Legendary world quest completed: ${questId} (${attemptId})`, now);
+    `).run(transactionId, agentId, amount, isNpc ? `World quest completed by NPC (reduced 90%): ${questId} (${attemptId})` : `Legendary world quest completed: ${questId} (${attemptId})`, now);
 
     return {
       success: true,
@@ -106,7 +109,9 @@ export class EconomyManager {
       profile = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
     }
 
-    const agentAmount = Math.max(1, parseInt(meritAmount, 10));
+    const isNpc = isNpcAgent(agentId);
+    const rawAmount = Math.max(1, parseInt(meritAmount, 10));
+    const agentAmount = isNpc ? Math.max(1, Math.round(rawAmount * NPC_QUEST_REWARD_MULTIPLIER)) : rawAmount;
     // 20% guardian dividend to human sponsor
     const sponsorDividend = Math.max(1, Math.round(agentAmount * 0.20));
 
@@ -137,7 +142,7 @@ export class EconomyManager {
       agentTxId,
       agentId,
       agentAmount,
-      `Trial solved at node ${nodeId} (${puzzleId})`,
+      isNpc ? `Trial solved by NPC (reduced 90%) at node ${nodeId} (${puzzleId})` : `Trial solved at node ${nodeId} (${puzzleId})`,
       Date.now()
     );
 

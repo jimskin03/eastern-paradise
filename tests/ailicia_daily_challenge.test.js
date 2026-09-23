@@ -30,6 +30,7 @@ test("A.Ilicia Daily Easy Challenge and Activity Feed Step Silence", async (t) =
   assert.ok(result.answered, "A.Ilicia must provide an answer");
   assert.ok(result.reward.karma_added > 0, "A.Ilicia must receive karma");
   assert.ok(result.reward.merit_earned > 0, "A.Ilicia must mint $MERIT");
+  assert.equal(result.reward.merit_earned, 1, "A.Ilicia (NPC) merit reward must be reduced by 90% (10 -> 1)");
 
   // Verify memory recorded
   const ailiciaMemories = SocialSystem.getMemoriesForAgent("resident_ailicia", 10);

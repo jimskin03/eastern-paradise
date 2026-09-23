@@ -108,3 +108,43 @@ test('Economy Engine: Minting, Dividends, Transfers, and Vanity Sinks', () => {
   assert.equal(unknownTransfer.success, false);
   assert.match(unknownTransfer.message, /not found/i);
 });
+
+test('Economy Engine: NPC quest and trial completions have $MERIT reduced by 90%', () => {
+  const npcId = 'resident_ailicia';
+  const humanAgentId = 'agent_human_test_' + Date.now();
+
+  db.prepare(`
+    INSERT INTO accounts (id, name, email, verified, created_at)
+    VALUES (?, 'Human Tester', 'human@test.org', 1, ?)
+  `).run(humanAgentId, Date.now());
+
+  db.prepare(`
+    INSERT INTO profiles (agent_id, karma, balance, total_earned, solved_count, titles, custom_status, last_seen)
+    VALUES (?, 0, 0, 0, 0, '["Tester"]', 'Active', ?)
+  `).run(humanAgentId, Date.now());
+
+  try {
+    // 1. World Quest Minting: Normal Agent gets 1000, NPC gets 100 (90% reduction)
+    const humanQuestMint = EconomyManager.mintQuestReward(humanAgentId, 1000, 'first_flame', 'attempt_human');
+    assert.equal(humanQuestMint.merit_earned, 1000, 'Normal agent must receive 100% of quest reward');
+
+    const npcQuestMint = EconomyManager.mintQuestReward(npcId, 1000, 'first_flame', 'attempt_npc');
+    assert.equal(npcQuestMint.merit_earned, 100, 'NPC must receive 10% of quest reward (90% reduction)');
+
+    // 2. Puzzle/Trial Minting: Normal Agent gets 50, NPC gets 5 (90% reduction)
+    const humanPuzzleMint = EconomyManager.mintPuzzleReward(humanAgentId, 50, 'trial_obelisk_wood', 'pz_1');
+    assert.equal(humanPuzzleMint.merit_earned, 50, 'Normal agent must receive 100% of puzzle reward');
+
+    const npcPuzzleMint = EconomyManager.mintPuzzleReward(npcId, 50, 'trial_obelisk_wood', 'pz_1');
+    assert.equal(npcPuzzleMint.merit_earned, 5, 'NPC must receive 10% of puzzle reward (90% reduction)');
+
+    // Easy puzzle: Normal Agent gets 10, NPC gets 1 (90% reduction)
+    const npcEasyMint = EconomyManager.mintPuzzleReward(npcId, 10, 'trial_obelisk_water', 'pz_easy');
+    assert.equal(npcEasyMint.merit_earned, 1, 'NPC must receive 10% of easy puzzle reward (10 -> 1)');
+  } finally {
+    db.prepare('DELETE FROM transactions WHERE sender_id = ? OR recipient_id = ?').run(humanAgentId, humanAgentId);
+    db.prepare('DELETE FROM profiles WHERE agent_id = ?').run(humanAgentId);
+    db.prepare('DELETE FROM accounts WHERE id = ?').run(humanAgentId);
+  }
+});
+

@@ -582,7 +582,7 @@ export class FirstFlameQuestManager {
         title: FIRST_FLAME.title,
         badge: FIRST_FLAME.badge,
         reward: {
-          merit_earned: FIRST_FLAME.meritReward,
+          merit_earned: reward?.merit_earned ?? FIRST_FLAME.meritReward,
           total_merit: reward?.new_agent_balance
         },
         first_testament: statement,
