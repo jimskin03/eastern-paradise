@@ -83,6 +83,12 @@ const Hypotheses = new HypothesisService({ db, eventLedger });
 const Rumors = new RumorRepository({ db });
 const ResearchTelemetry = new ResearchTelemetryService({ db });
 const JevService = new JevDecisionService({ db, world, residentManager });
+Object.defineProperty(world, 'combatDecisionService', {
+  value: JevService,
+  writable: true,
+  configurable: true,
+  enumerable: false
+});
 
 const services = {
   db,

@@ -100,7 +100,12 @@ export class JevClient {
 
       // Choose appropriate mock action based on event type and resident profile
       let chosenAction = preferred[0] || 'CONTINUE_CURRENT_GOAL';
-      if (eventType.includes('visitor') && preferred.includes('WELCOME_VISITOR')) {
+      if (eventType === 'resident_attacked' && state?.combat?.decision_maker_id === resId) {
+        // Combat is an explicit adjudication path. The offline mock chooses
+        // DEFEND so tests can exercise the full repel/reward flow without
+        // requiring a network call.
+        chosenAction = 'DEFEND';
+      } else if (eventType.includes('visitor') && preferred.includes('WELCOME_VISITOR')) {
         chosenAction = 'WELCOME_VISITOR';
       } else if (eventType.includes('visitor') && preferred.includes('SOCIALIZE')) {
         chosenAction = 'SOCIALIZE';

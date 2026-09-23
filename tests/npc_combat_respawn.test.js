@@ -4,6 +4,7 @@ import { db } from '../src/db.js';
 import { WorldEngine } from '../src/world.js';
 import { residentManager, RESIDENTS_DEF, getApiKeyForResident } from '../src/residents.js';
 import { AuthService } from '../src/auth.js';
+import { JevDecisionService } from '../src/jev/decision-service.js';
 
 function createCombatAgent(label, initialMerit = 100, initialKarma = 100) {
   const id = `agent_combat_${label}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -126,6 +127,99 @@ test('NPC Combat: 15-minute respawn cooldown timer', () => {
     assert.equal(tian.respawn_at, 0);
   } finally {
     cleanupAgent(killerId);
+  }
+});
+
+test('NPC Combat: one surviving NPC can defend via JEV and repel the attack', async () => {
+  const world = new WorldEngine();
+  residentManager.init(world);
+
+  const target = residentManager.getResident('resident_kassandra');
+  const defender = residentManager.getResident('resident_ailicia');
+  assert.ok(target);
+  assert.ok(defender);
+
+  target.pos = [35, 15];
+  target.is_alive = true;
+  target.respawn_at = 0;
+  defender.pos = [35, 16]; // nearest surviving resident, distance 1
+  defender.is_alive = true;
+  defender.imprisoned = false;
+
+  db.prepare('UPDATE profiles SET balance = 250, karma = 150, imprisoned_until = 0 WHERE agent_id = ?').run(defender.id);
+
+  const attacker = createCombatAgent('defended', 100, 100);
+  world.activeAgents.set(attacker.id, {
+    id: attacker.id,
+    name: `Warrior defended`,
+    pos: [35, 17]
+  });
+
+  const jevService = new JevDecisionService({
+    db,
+    world,
+    residentManager,
+    options: { mock: true, globalCooldownMs: 0 }
+  });
+  const periodKey = jevService.budget.getPeriodKey();
+  db.prepare('DELETE FROM jev_usage_daily WHERE period_key = ?').run(periodKey);
+  db.prepare('UPDATE agent_runtime SET last_jev_decision_at = 0').run();
+  for (const res of residentManager.getAllResidents()) {
+    res.last_jev_decision_at = 0;
+  }
+  Object.defineProperty(world, 'combatDecisionService', {
+    value: jevService,
+    writable: true,
+    configurable: true,
+    enumerable: false
+  });
+
+  try {
+    const result = await world.attackResident(residentManager, attacker.id, target.id);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.success, true);
+    assert.equal(result.outcome, 'repelled');
+    assert.equal(result.defended, true);
+    assert.equal(result.defender_id, defender.id);
+    assert.equal(result.defender_merit_lost, 1);
+    assert.equal(result.defender_karma_gained, 10);
+    assert.equal(result.attacker_karma_lost, 10);
+    assert.equal(result.merit_lost, 0);
+    assert.equal(Boolean(target.is_alive), true, 'Defended target must survive the attack');
+
+    const defenderProfile = db.prepare('SELECT balance, karma FROM profiles WHERE agent_id = ?').get(defender.id);
+    const attackerProfile = db.prepare('SELECT balance, karma FROM profiles WHERE agent_id = ?').get(attacker.id);
+    assert.equal(defenderProfile.balance, 249);
+    assert.equal(defenderProfile.karma, 160);
+    assert.equal(attackerProfile.balance, 100);
+    assert.equal(attackerProfile.karma, 90);
+
+    const attackEvent = db.prepare("SELECT * FROM world_events WHERE event_type = 'resident_attacked' AND actor_id = ? ORDER BY seq DESC LIMIT 1").get(attacker.id);
+    assert.ok(attackEvent);
+    const attackPayload = JSON.parse(attackEvent.payload);
+    assert.equal(attackPayload.decision_maker_id, defender.id);
+    assert.equal(attackPayload.combat_resolution, 'pre_resolve');
+
+    const defenseEvent = db.prepare("SELECT * FROM world_events WHERE event_type = 'resident_defended' AND actor_id = ? ORDER BY seq DESC LIMIT 1").get(defender.id);
+    assert.ok(defenseEvent);
+    const defensePayload = JSON.parse(defenseEvent.payload);
+    assert.equal(defensePayload.attack_event_id, attackEvent.id);
+    assert.equal(defensePayload.defender_merit_lost, 1);
+    assert.equal(defensePayload.defender_karma_gained, 10);
+    assert.equal(defensePayload.attacker_karma_lost, 10);
+
+    const combatDecision = db.prepare("SELECT * FROM jev_decisions WHERE event_id = ? AND trigger_type = 'resident_attacked' ORDER BY request_started_at DESC LIMIT 1").get(attackEvent.id);
+    assert.ok(combatDecision, 'Combat attack must create exactly one JEV decision record');
+    assert.equal(combatDecision.decision_count, 1);
+
+    const actionRow = db.prepare('SELECT * FROM jev_resident_actions WHERE jev_decision_id = ?').get(combatDecision.id);
+    assert.ok(actionRow);
+    assert.equal(actionRow.action, 'DEFEND');
+    assert.equal(actionRow.execution_status, 'EXECUTED');
+  } finally {
+    world.activeAgents.delete(attacker.id);
+    cleanupAgent(attacker.id);
   }
 });
 
