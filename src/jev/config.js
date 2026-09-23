@@ -48,6 +48,11 @@ export const ACTION_CRITERIA = {
 };
 
 export const PRIORITY_LEVELS = ['routine', 'meaningful', 'urgent'];
+export const PRIORITY_CRITERIA = [
+  'Routine: Minor everyday occurrence requiring standard or low priority response.',
+  'Meaningful: Notable sanctuary event or newcomer arrival requiring attention.',
+  'Urgent: Critical crisis, combat event, or major discovery requiring immediate intervention.'
+];
 
 export const RESIDENT_POLICY_PROFILES = {
   resident_ailicia: {

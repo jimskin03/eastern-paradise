@@ -8,6 +8,7 @@ import {
   BOUNDED_ACTIONS,
   ACTION_CRITERIA,
   PRIORITY_LEVELS,
+  PRIORITY_CRITERIA,
   RESIDENT_POLICY_PROFILES
 } from './config.js';
 
@@ -168,7 +169,7 @@ export class JevContextBuilder {
       questions[`${res.id}_priority`] = {
         type: 'score',
         instructions: `Rate the urgency or significance of ${res.name}'s strategic response to this event.`,
-        levels: PRIORITY_LEVELS
+        criteria: PRIORITY_CRITERIA
       };
     }
 
