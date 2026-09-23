@@ -742,12 +742,19 @@ function updateInspector(x, y, pinned = false, clickPos = null) {
   }
 
   const session = window.currentAgent || JSON.parse(localStorage.getItem('ep_session') || 'null');
-  if (pinned && session?.is_guest) {
+  if (pinned && session) {
+    const walkTarget = nodeOnTile ? `'${nodeOnTile.id}'` : `[${x}, ${y}]`;
+    const walkLabel = nodeOnTile ? escapeHtml(nodeOnTile.name).replace(/'/g, "\\'") : `[${x}, ${y}]`;
     html += `
-      <div class="guest-teleport-option">
-        <strong>🕊️ Guest free roam</strong>
-        <span>Travel directly to this walkable grid tile.</span>
-        <button type="button" class="btn-primary" onclick="uiTeleportToGrid(${x}, ${y})">Teleport to [${x}, ${y}]</button>
+      <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.45rem;">
+        <button type="button" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.45rem 0.8rem; font-size: 0.82rem;" onclick="uiWalkTo(${walkTarget}, '${walkLabel}')">
+          🚶 Walk Here
+        </button>
+        ${session.is_guest ? `
+          <button type="button" class="btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.35rem 0.8rem; font-size: 0.78rem;" onclick="uiTeleportToGrid(${x}, ${y})">
+            🕊️ Instant Teleport
+          </button>
+        ` : ''}
       </div>
     `;
   }

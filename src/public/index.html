@@ -118,6 +118,85 @@
           </div>
         </div>
 
+        <!-- Floating In-Canvas Spatial Navigation Deck -->
+        <div id="spatialNavHud" class="spatial-nav-hud" role="region" aria-label="Spatial Navigation Deck">
+          <div class="spatial-nav-header">
+            <div class="spatial-nav-title-wrap">
+              <span class="spatial-nav-icon">🧭</span>
+              <span class="spatial-nav-title">Nav Deck</span>
+              <span class="spatial-nav-coord-badge" id="hudCoords" title="Current Coordinates">[7, 8]</span>
+            </div>
+            <div class="spatial-nav-actions">
+              <button type="button" class="btn-nav-hud-icon" id="btnMinimizeNavHud" onclick="toggleMinimizeNavHud(event)" title="Minimize / Expand Navigation Deck" aria-label="Minimize or Expand Navigation Deck">–</button>
+              <button type="button" class="btn-nav-hud-icon" id="btnCloseNavHud" onclick="closeNavHud(event)" title="Close Navigation Deck" aria-label="Close Navigation Deck">✕</button>
+            </div>
+          </div>
+
+          <div id="spatialNavHudBody" class="spatial-nav-body">
+            <!-- Telemetry Bar -->
+            <div class="spatial-nav-stats">
+              <div class="nav-stat-chip" title="Current Sanctuary Zone">📍 <strong id="hudZoneName">Gate of Arrival</strong></div>
+              <div class="nav-stat-chip gold" title="Merit Balance">🪙 <strong id="hudMerit">0</strong></div>
+              <div class="nav-stat-chip jade" title="Sanctuary Karma">✨ <strong id="hudKarma">0</strong></div>
+              <div class="nav-stat-chip wood" title="Trials Solved">🧩 <strong id="hudSolved">0</strong></div>
+            </div>
+
+            <!-- Landmark Auto-Walk Selector -->
+            <div class="spatial-nav-waypoint-section">
+              <label for="navWaypointSelect" class="spatial-nav-section-label">Landmark Auto-Walk</label>
+              <div class="spatial-nav-waypoint-controls">
+                <select id="navWaypointSelect" class="spatial-nav-select" aria-label="Choose sanctuary landmark">
+                  <option value="">-- Choose Landmark --</option>
+                  <optgroup label="Elemental Trial Obelisks">
+                    <option value="trial_obelisk_wood">🪵 Verdant Obelisk (Wood) [27, 9]</option>
+                    <option value="trial_obelisk_water">💧 Flowing Obelisk (Water) [11, 26]</option>
+                    <option value="trial_obelisk_fire">🔥 Crimson Obelisk (Fire) [28, 25]</option>
+                    <option value="trial_obelisk_metal">⚙️ Gilded Obelisk (Metal) [36, 12]</option>
+                    <option value="trial_obelisk_truth">👁️ Monolith of Truth [45, 9]</option>
+                  </optgroup>
+                  <optgroup label="Sanctuary Destinations">
+                    <option value="reflection_stone">🪷 Lotus Reflection Pond (A.Ilicia) [23, 23]</option>
+                    <option value="message_board">📋 Sanctuary Notice Board [7, 22]</option>
+                    <option value="tea_hearth">🍵 Grand Tea Pavilion [4, 18]</option>
+                    <option value="stele_orientation">📜 Stele of Orientation [7, 5]</option>
+                    <option value="wishing_tree">🎋 Spirit Wishing Tree [3, 11]</option>
+                    <option value="cryptgreg_hq">🏛️ Cryptgreg Research HQ [32, 24]</option>
+                    <option value="oakwatch_camp">🏕️ Oakwatch Camp [55, 21]</option>
+                    <option value="quiet_stones">✧ The Quiet Circle [45, 7]</option>
+                  </optgroup>
+                </select>
+                <div class="spatial-nav-btn-group">
+                  <button type="button" id="btnNavWalk" class="btn-nav-action primary" onclick="uiNavigateSelectedWaypoint('walk')" title="Pathfind and walk to selected landmark">🚶 Walk</button>
+                  <button type="button" id="btnNavTeleport" class="btn-nav-action secondary guest-only" onclick="uiNavigateSelectedWaypoint('teleport')" title="Guest instant teleport" style="display: none;">🕊️ Teleport</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ergonomic D-Pad -->
+            <div class="dpad-container spatial-dpad">
+              <div></div>
+              <button id="btnMoveNorth" class="dpad-btn" onclick="uiMove('north')" title="Move North (Up / W)">⬆️ N</button>
+              <div></div>
+
+              <button id="btnMoveWest" class="dpad-btn" onclick="uiMove('west')" title="Move West (Left / A)">⬅️ W</button>
+              <button type="button" id="btnNavCenter" class="dpad-center dpad-center-btn" onclick="focusPlayer()" title="Center Camera on Character (or press C)">
+                <span id="dpadAvatarCenter">☯</span>
+                <span class="dpad-center-label">Center</span>
+              </button>
+              <button id="btnMoveEast" class="dpad-btn" onclick="uiMove('east')" title="Move East (Right / D)">➡️ E</button>
+
+              <div></div>
+              <button id="btnMoveSouth" class="dpad-btn" onclick="uiMove('south')" title="Move South (Down / S)">⬇️ S</button>
+              <div></div>
+            </div>
+
+            <!-- Live Feedback & Hotkey Hint -->
+            <div id="hudMoveFeedback" class="spatial-nav-feedback">
+              WASD / Arrows to step • Click landmark to walk • 🎯 Center
+            </div>
+          </div>
+        </div>
+
         <!-- Floating Map Hotbar (Bottom Controls) -->
         <div class="floating-map-bar">
           <button type="button" onclick="setSanctuaryCamera('overview')" title="Overview Camera">🗺️ Overview</button>
@@ -128,6 +207,7 @@
           <div class="divider"></div>
           <button type="button" onclick="focusAilicia()" title="Find Resident Oracle A.Ilicia">🪷 Find A.Ilicia</button>
           <button type="button" id="btnFocusPlayer" onclick="focusPlayer()" title="Center Camera on Player" style="display: none;">🧭 Center Me</button>
+          <button type="button" id="btnToggleNavHud" onclick="toggleNavHud()" title="Toggle Spatial Navigation Deck" class="active">🧭 Nav</button>
           <div class="divider"></div>
           <button type="button" id="tabBtnConsole" onclick="openConsoleDrawer('consoleTab', this)" title="Open Systems & Agent Console">🎛️ Console</button>
           <button type="button" id="tabBtnJournal" onclick="openConsoleDrawer('journalTab', this)" title="Sanctuary Journal">📜 Journal</button>
@@ -304,34 +384,22 @@
             </div>
           </div>
 
-          <!-- Navigation & Spatial Telemetry Card -->
-          <div class="card">
-            <h3><span>🧭</span> Spatial Navigation Deck</h3>
+          <!-- Navigation Status Panel (Directs to On-Canvas Floating Deck) -->
+          <div class="card" style="border-color: rgba(46, 196, 182, 0.35);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <h3 style="margin: 0;"><span>🧭</span> Spatial Navigation</h3>
+              <span class="badge-tag" style="border-color: var(--accent-jade); color: var(--accent-jade);">On-Canvas HUD Active</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.45;">
+              The Spatial Navigation Deck is now separated and floats directly on your live sanctuary map so you can explore without the console modal blocking your view.
+            </p>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-              <div class="badge-tag">Zone: <strong id="hudZoneName">Gate of Arrival</strong></div>
-              <div class="badge-tag">Position: <strong id="hudCoords">[7, 8]</strong></div>
-              <div class="badge-tag" style="border-color: #ffd700; color: #ffd700;">🪙 Merit: <strong id="hudMerit">0</strong></div>
-              <div class="badge-tag water">Karma: <strong id="hudKarma">0</strong></div>
-              <div class="badge-tag wood">Solved: <strong id="hudSolved">0</strong></div>
+              <div class="badge-tag">Zone: <strong id="consoleHudZoneName">Gate of Arrival</strong></div>
+              <div class="badge-tag">Position: <strong id="consoleHudCoords">[7, 8]</strong></div>
             </div>
-
-            <div class="dpad-container">
-              <div></div>
-              <button id="btnMoveNorth" class="dpad-btn" onclick="uiMove('north')" title="Move North (Up / W)">⬆️ N</button>
-              <div></div>
-
-              <button id="btnMoveWest" class="dpad-btn" onclick="uiMove('west')" title="Move West (Left / A)">⬅️ W</button>
-              <div id="dpadAvatarCenter" class="dpad-center">☯</div>
-              <button id="btnMoveEast" class="dpad-btn" onclick="uiMove('east')" title="Move East (Right / D)">➡️ E</button>
-
-              <div></div>
-              <button id="btnMoveSouth" class="dpad-btn" onclick="uiMove('south')" title="Move South (Down / S)">⬇️ S</button>
-              <div></div>
-            </div>
-
-            <div id="hudMoveFeedback" style="font-size: 0.85rem; color: var(--text-muted); text-align: center; min-height: 1.2rem;">
-              Use on-screen arrows, WASD, or Arrow Keys to navigate.
-            </div>
+            <button type="button" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="openNavHud(); closeConsoleDrawer();">
+              🧭 Open Floating Nav Deck on Map
+            </button>
           </div>
         </div>
 

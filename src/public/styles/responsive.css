@@ -178,6 +178,15 @@
     text-align: center;
     padding: 0.5rem 0.75rem;
   }
+  .spatial-nav-hud {
+    bottom: 3.6rem;
+    right: 0.5rem;
+    width: min(280px, calc(100vw - 1rem));
+  }
+  .spatial-nav-hud.minimized {
+    bottom: 3.6rem;
+    right: 0.5rem;
+  }
   .proximity-left {
     flex-direction: column;
     text-align: center;

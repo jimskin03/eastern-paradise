@@ -75,6 +75,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') window.uiMove?.('south');
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') window.uiMove?.('west');
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') window.uiMove?.('east');
+  if (e.key === 'c' || e.key === 'C') window.focusPlayer?.();
 });
 export async function uiPostFromBoardTab() {
   const category = document.getElementById('boardTabCategory').value;

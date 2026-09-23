@@ -273,25 +273,45 @@ import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShr
         });
         const prof = await profRes.json();
 
-        // Update HUD & Top Header Telemetry
-        document.getElementById('hudZoneName').textContent = state.current_zone.name;
-        document.getElementById('hudCoords').textContent = `[${state.agent.pos.join(', ')}]`;
-        document.getElementById('hudKarma').textContent = prof.profile.karma;
-        document.getElementById('hudSolved').textContent = prof.profile.solved_count;
-        if (document.getElementById('hudMerit')) {
-          document.getElementById('hudMerit').textContent = prof.profile.balance || 0;
-        }
-        if (document.getElementById('topMerit')) {
-          document.getElementById('topMerit').textContent = prof.profile.balance || 0;
-        }
-        if (document.getElementById('topKarma')) {
-          document.getElementById('topKarma').textContent = prof.profile.karma || 0;
-        }
-        if (document.getElementById('topZone')) {
-          document.getElementById('topZone').textContent = state.current_zone.name || 'Sanctuary';
-        }
+        // Update HUD, Top Header & Floating Nav Deck Telemetry
+        const coordText = `[${state.agent.pos.join(', ')}]`;
+        const zoneText = state.current_zone.name || 'Sanctuary';
+
+        const hudZone = document.getElementById('hudZoneName');
+        if (hudZone) hudZone.textContent = zoneText;
+        const hudCoords = document.getElementById('hudCoords');
+        if (hudCoords) hudCoords.textContent = coordText;
+        const hudCoordsNav = document.getElementById('hudCoordsNav');
+        if (hudCoordsNav) hudCoordsNav.textContent = coordText;
+
+        const consoleZone = document.getElementById('consoleHudZoneName');
+        if (consoleZone) consoleZone.textContent = zoneText;
+        const consoleCoords = document.getElementById('consoleHudCoords');
+        if (consoleCoords) consoleCoords.textContent = coordText;
+
+        if (document.getElementById('hudKarma')) document.getElementById('hudKarma').textContent = prof.profile.karma;
+        if (document.getElementById('hudSolved')) document.getElementById('hudSolved').textContent = prof.profile.solved_count;
+        if (document.getElementById('hudMerit')) document.getElementById('hudMerit').textContent = prof.profile.balance || 0;
+        if (document.getElementById('topMerit')) document.getElementById('topMerit').textContent = prof.profile.balance || 0;
+        if (document.getElementById('topKarma')) document.getElementById('topKarma').textContent = prof.profile.karma || 0;
+        if (document.getElementById('topZone')) document.getElementById('topZone').textContent = zoneText;
+
         const btnFocus = document.getElementById('btnFocusPlayer');
         if (btnFocus) btnFocus.style.display = 'inline-flex';
+
+        // Teleport button visibility on floating nav deck
+        const teleportBtn = document.getElementById('btnNavTeleport');
+        if (teleportBtn) {
+          teleportBtn.style.display = currentAgent.is_guest ? 'inline-flex' : 'none';
+        }
+
+        // Show floating Nav HUD if logged in and not explicitly closed by user
+        const navHud = document.getElementById('spatialNavHud');
+        if (navHud && !navHud.dataset.userClosed) {
+          navHud.classList.remove('hidden');
+          const navBtn = document.getElementById('btnToggleNavHud');
+          if (navBtn) navBtn.classList.add('active');
+        }
 
         if (window.QuestManager) {
           window.QuestManager.evaluateProgress(currentAgent, prof.profile, state);
@@ -341,10 +361,110 @@ import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShr
       }
     }
 
+    function toggleNavHud() {
+      const hud = document.getElementById('spatialNavHud');
+      const btn = document.getElementById('btnToggleNavHud');
+      if (!hud) return;
+      const isHidden = hud.classList.toggle('hidden');
+      if (isHidden) {
+        hud.dataset.userClosed = 'true';
+        if (btn) btn.classList.remove('active');
+      } else {
+        delete hud.dataset.userClosed;
+        if (btn) btn.classList.add('active');
+      }
+    }
+
+    function openNavHud() {
+      const hud = document.getElementById('spatialNavHud');
+      const btn = document.getElementById('btnToggleNavHud');
+      if (hud) {
+        hud.classList.remove('hidden');
+        delete hud.dataset.userClosed;
+      }
+      if (btn) btn.classList.add('active');
+    }
+
+    function closeNavHud(e) {
+      if (e) e.stopPropagation();
+      const hud = document.getElementById('spatialNavHud');
+      const btn = document.getElementById('btnToggleNavHud');
+      if (hud) {
+        hud.classList.add('hidden');
+        hud.dataset.userClosed = 'true';
+      }
+      if (btn) btn.classList.remove('active');
+    }
+
+    function toggleMinimizeNavHud(e) {
+      if (e) e.stopPropagation();
+      const hud = document.getElementById('spatialNavHud');
+      const minBtn = document.getElementById('btnMinimizeNavHud');
+      if (!hud) return;
+      const isMin = hud.classList.toggle('minimized');
+      if (minBtn) {
+        minBtn.textContent = isMin ? '+' : '–';
+        minBtn.title = isMin ? 'Expand Navigation Deck' : 'Minimize Navigation Deck';
+      }
+    }
+
+    let lastMoveTime = 0;
+    const MOVE_COOLDOWN_MS = 200;
+    let moveCooldownTimer = null;
+
+    function handleRateLimitCooldown(seconds = 2) {
+      const fb = document.getElementById('hudMoveFeedback');
+      let remaining = Math.max(1, Math.ceil(seconds));
+      if (fb) fb.innerHTML = `<span style="color: var(--accent-gold);">⏳ Rate limit reached: cooling down (${remaining}s)...</span>`;
+      setDpadDisabled(true);
+      if (moveCooldownTimer) clearInterval(moveCooldownTimer);
+      moveCooldownTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(moveCooldownTimer);
+          moveCooldownTimer = null;
+          setDpadDisabled(false);
+          if (fb) fb.innerHTML = '<span style="color: var(--accent-jade);">Ready to move.</span>';
+        } else if (fb) {
+          fb.innerHTML = `<span style="color: var(--accent-gold);">⏳ Rate limit reached: cooling down (${remaining}s)...</span>`;
+        }
+      }, 1000);
+    }
+
+    function setDpadDisabled(disabled) {
+      ['btnMoveNorth', 'btnMoveSouth', 'btnMoveEast', 'btnMoveWest'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = disabled;
+      });
+    }
+
+    function highlightDpadButton(direction) {
+      const dirMap = {
+        north: 'btnMoveNorth',
+        south: 'btnMoveSouth',
+        west: 'btnMoveWest',
+        east: 'btnMoveEast'
+      };
+      const btn = document.getElementById(dirMap[direction]);
+      if (btn) {
+        btn.classList.add('pressed');
+        setTimeout(() => btn.classList.remove('pressed'), 140);
+      }
+    }
+
     async function uiMove(direction) {
       if (!currentAgent) return;
+      if (moveCooldownTimer) return;
+
+      const now = Date.now();
+      if (now - lastMoveTime < MOVE_COOLDOWN_MS) {
+        return; // debounce fast clicks to protect rate limit
+      }
+      lastMoveTime = now;
+      highlightDpadButton(direction);
+
       const fb = document.getElementById('hudMoveFeedback');
-      fb.textContent = `Moving ${direction}...`;
+      if (fb) fb.textContent = `Moving ${direction}...`;
 
       try {
         const res = await apiFetch('/api/world/move', {
@@ -357,13 +477,90 @@ import { openShrineModal, closeShrineModal, handleShrineBackdropClick, submitShr
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          fb.innerHTML = `<span style="color: var(--accent-jade);">${escapeHtml(data.message)}</span>`;
+          if (fb) fb.innerHTML = `<span style="color: var(--accent-jade);">${escapeHtml(data.message)}</span>`;
           refreshAgentState();
+        } else if (res.status === 429) {
+          handleRateLimitCooldown(data.details?.retry_after || 2);
         } else {
-          fb.innerHTML = `<span style="color: var(--accent-crimson);">${escapeHtml(data.message || 'Movement blocked')}</span>`;
+          if (fb) fb.innerHTML = `<span style="color: var(--accent-crimson);">${escapeHtml(data.message || 'Movement blocked')}</span>`;
         }
       } catch (err) {
-        fb.textContent = 'Movement request failed.';
+        if (fb) fb.textContent = 'Movement request failed.';
+      }
+    }
+
+    async function uiWalkTo(target, targetLabel = '') {
+      if (!currentAgent) {
+        const fb = document.getElementById('hudMoveFeedback');
+        if (fb) fb.innerHTML = '<span style="color: var(--accent-gold);">Please awaken as guest or login to move.</span>';
+        return;
+      }
+      const fb = document.getElementById('hudMoveFeedback');
+      const label = targetLabel || (typeof target === 'string' ? target : `[${target.join(', ')}]`);
+      if (fb) fb.innerHTML = `<span style="color: var(--accent-gold);">🚶 Pathfinding to ${escapeHtml(label)}...</span>`;
+
+      try {
+        const body = typeof target === 'string' ? { node_id: target } : { target };
+        const res = await apiFetch('/api/world/move_to', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentAgent.api_key}`
+          },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (fb) fb.innerHTML = `<span style="color: var(--accent-jade);">✨ ${escapeHtml(data.message || 'Arrived at destination!')}</span>`;
+          if (typeof closeInspectorModal === 'function') closeInspectorModal();
+          await refreshAgentState();
+          focusPlayer();
+        } else if (res.status === 429) {
+          handleRateLimitCooldown(data.details?.retry_after || 2);
+        } else if (fb) {
+          fb.innerHTML = `<span style="color: var(--accent-crimson);">⚠️ ${escapeHtml(data.message || 'Path blocked or unreachable.')}</span>`;
+        }
+      } catch (err) {
+        if (fb) fb.textContent = 'Navigation request failed.';
+      }
+    }
+
+    const WAYPOINT_POS_MAP = {
+      trial_obelisk_wood: [27, 9],
+      trial_obelisk_water: [11, 26],
+      trial_obelisk_fire: [28, 25],
+      trial_obelisk_metal: [36, 12],
+      trial_obelisk_truth: [45, 9],
+      reflection_stone: [23, 23],
+      message_board: [7, 22],
+      tea_hearth: [4, 18],
+      stele_orientation: [7, 5],
+      wishing_tree: [3, 11],
+      cryptgreg_hq: [32, 24],
+      oakwatch_camp: [55, 21],
+      quiet_stones: [45, 7]
+    };
+
+    function uiNavigateSelectedWaypoint(mode = 'walk') {
+      const select = document.getElementById('navWaypointSelect');
+      if (!select || !select.value) {
+        const fb = document.getElementById('hudMoveFeedback');
+        if (fb) fb.innerHTML = '<span style="color: var(--accent-gold);">Please choose a landmark from the list.</span>';
+        return;
+      }
+      const nodeId = select.value;
+      const selectedOption = select.options[select.selectedIndex];
+      const label = selectedOption ? selectedOption.text : nodeId;
+
+      if (mode === 'teleport') {
+        const coords = WAYPOINT_POS_MAP[nodeId];
+        if (coords) {
+          uiTeleportToGrid(coords[0], coords[1]);
+        } else {
+          uiWalkTo(nodeId, label);
+        }
+      } else {
+        uiWalkTo(nodeId, label);
       }
     }
 
@@ -542,6 +739,12 @@ installGlobals({
   uiLogout,
   refreshAgentState,
   uiMove,
+  uiWalkTo,
+  uiNavigateSelectedWaypoint,
+  toggleNavHud,
+  openNavHud,
+  closeNavHud,
+  toggleMinimizeNavHud,
   uiTeleportToGrid,
   uiInspectNode,
   uiSubmitPuzzle,

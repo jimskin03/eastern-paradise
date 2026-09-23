@@ -9,7 +9,7 @@ export async function collectMemorialInscriptions(fetchPage) {
     inscriptions.push(...page.inscriptions);
     if (!page.pagination.has_more) return inscriptions;
     const nextCursor = page.pagination.next_cursor;
-    assert.ok(Number.isFinite(nextCursor) && nextCursor > (cursor ?? 0),
+    assert.ok(Number.isFinite(nextCursor) && (cursor === null || nextCursor !== cursor),
       'Memorial pagination must advance without repeating a page');
     cursor = nextCursor;
   } while (true);

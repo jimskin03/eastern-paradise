@@ -143,6 +143,11 @@ export async function uiLogout() {
   if (document.getElementById('topMerit')) document.getElementById('topMerit').textContent = '0';
   if (document.getElementById('topKarma')) document.getElementById('topKarma').textContent = '0';
   if (document.getElementById('topZone')) document.getElementById('topZone').textContent = 'Gate of Arrival';
+  if (document.getElementById('hudCoordsNav')) document.getElementById('hudCoordsNav').textContent = '[7, 8]';
+  if (document.getElementById('consoleHudZoneName')) document.getElementById('consoleHudZoneName').textContent = 'Gate of Arrival';
+  if (document.getElementById('consoleHudCoords')) document.getElementById('consoleHudCoords').textContent = '[7, 8]';
+  const navTeleport = document.getElementById('btnNavTeleport');
+  if (navTeleport) navTeleport.style.display = 'none';
   window.refreshBoard();
   window.refreshInhabitants();
 }
