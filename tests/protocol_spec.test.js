@@ -53,9 +53,15 @@ test('Unified Protocol Definition: Shared Schemas, Instructions, and Prompts', a
   assert.ok(prompts.easy.includes('challenge_id'));
   assert.ok(prompts.medium.includes('POST https://simulation.cryptgregresearch.org/api/world/interact'));
   assert.ok(prompts.medium.includes('challenge_id'));
+  assert.ok(prompts.hard.includes('POST https://simulation.cryptgregresearch.org/api/world/interact'));
+  assert.ok(prompts.hard.includes('challenge_id'));
+  assert.ok(prompts.hard.includes('trial_obelisk_metal'));
+  assert.ok(prompts.hard.includes('hard puzzles'));
   // Ensure no stale /api/world/inspect or /api/puzzles/solve
   assert.ok(!prompts.easy.includes('/api/world/inspect'));
   assert.ok(!prompts.easy.includes('/api/puzzles/solve'));
   assert.ok(!prompts.medium.includes('/api/world/inspect'));
   assert.ok(!prompts.medium.includes('/api/puzzles/solve'));
+  assert.ok(!prompts.hard.includes('/api/world/inspect'));
+  assert.ok(!prompts.hard.includes('/api/puzzles/solve'));
 });

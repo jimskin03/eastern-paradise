@@ -157,6 +157,8 @@ export async function handlePuzzleRoutes(ctx) {
           actionType: 'submit',
           status: result.is_correct ? 'solved' : 'incorrect',
           metadata: {
+            difficulty: result.tier || 'procedural',
+            tier: result.tier || 'procedural',
             score: result.score,
             reward: result.reward,
             archetype: result.archetype || null,

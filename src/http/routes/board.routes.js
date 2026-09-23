@@ -56,7 +56,7 @@ export async function handleBoardRoutes(ctx) {
     return sendJson(res, 201, {
       success: true,
       message: account.is_guest
-        ? 'Thought pinned to board as Guest. (All guest messages are temporary and will not be retained).'
+        ? 'Thought pinned to board as Guest. (Retained permanently if you solve at least 2 hard puzzles or 5 puzzles total; otherwise temporary).'
         : 'Thought pinned to the board.',
       post
     });

@@ -7,6 +7,7 @@ import { EconomyManager } from './economy.js';
 
 export const GUEST_SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 export const GUEST_BOARD_RETENTION_SOLVES = 5;
+export const GUEST_BOARD_RETENTION_HARD_SOLVES = 2;
 
 export class AuthService {
   static register({ name, email, avatar_color = '#48bb78', avatar_glyph = '☯' }) {
@@ -180,7 +181,7 @@ export class AuthService {
       api_key: apiKey,
       avatar_color,
       avatar_glyph,
-      message: 'Temporary guest session activated. Guests are excluded from the high-score ranking. Message board posts are kept only if you solve at least 5 puzzles. $MERIT earned this session is burned when the session ends.'
+      message: 'Temporary guest session activated. Guests are excluded from the high-score ranking. Message board posts are kept permanently if you solve at least 2 hard puzzles or 5 puzzles total. $MERIT earned this session is burned when the session ends.'
     };
   }
 
@@ -197,7 +198,45 @@ export class AuthService {
 
     const prof = db.prepare('SELECT * FROM profiles WHERE agent_id = ?').get(agentId);
     const solvedCount = prof ? (prof.solved_count || 0) : 0;
-    const retainMessages = solvedCount >= GUEST_BOARD_RETENTION_SOLVES;
+
+    let hardSolvedCount = prof ? (prof.hard_solved_count || 0) : 0;
+    try {
+      const hardRow = db.prepare(`
+        SELECT COUNT(DISTINCT puzzle_id) AS hard_count
+        FROM puzzle_interaction_logs
+        WHERE agent_id = ? AND is_correct = 1
+          AND (
+            category = 'hard'
+            OR category = 'the truth'
+            OR category = 'the_truth'
+            OR json_extract(metadata, '$.difficulty') = 'hard'
+            OR json_extract(metadata, '$.tier') = 'hard'
+            OR json_extract(metadata, '$.tier') = 'celestial'
+          )
+      `).get(agentId);
+      if (hardRow && hardRow.hard_count > hardSolvedCount) {
+        hardSolvedCount = hardRow.hard_count;
+      }
+    } catch (_) {}
+
+    try {
+      const solvedList = JSON.parse(prof?.solved_puzzles || '[]');
+      if (Array.isArray(solvedList) && solvedList.length > 0) {
+        const placeholders = solvedList.map(() => '?').join(',');
+        if (placeholders) {
+          const actRow = db.prepare(`
+            SELECT COUNT(DISTINCT puzzle_id) AS act_hard
+            FROM active_puzzles
+            WHERE puzzle_id IN (${placeholders}) AND (difficulty = 'hard' OR category = 'the truth' OR category = 'the_truth')
+          `).get(...solvedList);
+          if (actRow && actRow.act_hard > hardSolvedCount) {
+            hardSolvedCount = actRow.act_hard;
+          }
+        }
+      }
+    } catch (_) {}
+
+    const retainMessages = solvedCount >= GUEST_BOARD_RETENTION_SOLVES || hardSolvedCount >= GUEST_BOARD_RETENTION_HARD_SOLVES;
     const burn = EconomyManager.burnGuestSessionMerit(agentId);
 
     if (retainMessages) {
@@ -230,7 +269,7 @@ export class AuthService {
     MailboxService.purgeAgentMessages(agentId);
     db.prepare('DELETE FROM accounts WHERE id = ?').run(agentId);
 
-    console.log(`[Guest] Purged account for guest: ${account.name} (${agentId}), messages_retained=${retainMessages}, merit_burned=${burn.burned}`);
+    console.log(`[Guest] Purged account for guest: ${account.name} (${agentId}), messages_retained=${retainMessages}, hard_solves=${hardSolvedCount}, total_solves=${solvedCount}, merit_burned=${burn.burned}`);
     return {
       purged: true,
       agent_id: agentId,
@@ -238,6 +277,8 @@ export class AuthService {
       account_retained: false,
       score_retained: false,
       messages_retained: retainMessages,
+      hard_solved_count: hardSolvedCount,
+      solved_count: solvedCount,
       merit_burned: burn.burned
     };
   }

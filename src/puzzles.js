@@ -560,6 +560,7 @@ export class PuzzleManager {
           isCorrect: false,
           status: 'missing_answer',
           metadata: {
+            difficulty: puzzle.difficulty || 'medium',
             hint: puzzle.hint,
             challenge_id: challengeId,
             request_id: requestId,
@@ -622,6 +623,7 @@ export class PuzzleManager {
           isCorrect: false,
           status: 'incorrect',
           metadata: {
+            difficulty: puzzle.difficulty || 'medium',
             hint: puzzle.hint,
             challenge_id: challengeId,
             request_id: requestId,
@@ -803,6 +805,7 @@ export class PuzzleManager {
         isCorrect: true,
         status: 'solved',
         metadata: {
+          difficulty: puzzle.difficulty || 'medium',
           karma_reward: puzzle.karma_reward,
           merit_earned: economyResult.merit_earned,
           sponsor_dividend: economyResult.sponsor_dividend,
