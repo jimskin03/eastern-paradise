@@ -22,6 +22,9 @@ function serializeResident(resident, services, memoryLimit) {
     is_alive: resident.is_alive !== false,
     respawn_at: resident.respawn_at || 0,
     respawn_in_seconds: resident.respawn_at && resident.is_alive === false ? Math.max(0, Math.round((resident.respawn_at - Date.now()) / 1000)) : 0,
+    daily_puzzle_difficulty: resident.daily_puzzle_difficulty || 'easy',
+    daily_puzzle_level: resident.daily_puzzle_level || 1,
+    last_daily_challenge_at: resident.last_daily_challenge_at || 0,
     relationships: SocialSystem.getRelationshipsForAgent(resident.id),
     memories: SocialSystem.getMemoriesForAgent(resident.id, memoryLimit)
   };

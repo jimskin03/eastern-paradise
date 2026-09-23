@@ -231,6 +231,9 @@ export const LOCAL_SCHEMA = `
     action_duration_ms INTEGER DEFAULT 0,
     is_alive INTEGER NOT NULL DEFAULT 1,
     respawn_at INTEGER NOT NULL DEFAULT 0,
+    daily_puzzle_difficulty TEXT NOT NULL DEFAULT 'easy',
+    daily_puzzle_level INTEGER NOT NULL DEFAULT 1,
+    last_jev_decision_at INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL
   );
 
@@ -247,6 +250,54 @@ export const LOCAL_SCHEMA = `
     released_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_prison_records_created ON prison_records (imprisoned_at DESC);
+
+  CREATE TABLE IF NOT EXISTS jev_usage_daily (
+    period_key TEXT PRIMARY KEY,
+    call_count INTEGER NOT NULL DEFAULT 0,
+    soft_limit INTEGER NOT NULL DEFAULT 3,
+    hard_limit INTEGER NOT NULL DEFAULT 5,
+    last_call_at INTEGER,
+    last_event_id TEXT,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS jev_decisions (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    period_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    request_hash TEXT,
+    trigger_type TEXT NOT NULL,
+    request_started_at INTEGER NOT NULL,
+    request_completed_at INTEGER,
+    latency_ms INTEGER,
+    model TEXT,
+    provider TEXT,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cost REAL,
+    decision_count INTEGER NOT NULL DEFAULT 0,
+    metadata TEXT NOT NULL DEFAULT '{}'
+  );
+  CREATE INDEX IF NOT EXISTS idx_jev_decisions_period ON jev_decisions (period_key, request_started_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_jev_decisions_event ON jev_decisions (event_id);
+
+  CREATE TABLE IF NOT EXISTS jev_resident_actions (
+    id TEXT PRIMARY KEY,
+    jev_decision_id TEXT NOT NULL,
+    resident_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_id TEXT,
+    priority REAL,
+    confidence REAL,
+    probabilities TEXT NOT NULL DEFAULT '{}',
+    reason_code TEXT,
+    validation_status TEXT NOT NULL,
+    execution_status TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_jev_resident_actions_decision ON jev_resident_actions (jev_decision_id);
+  CREATE INDEX IF NOT EXISTS idx_jev_resident_actions_resident ON jev_resident_actions (resident_id, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS relationships (
     agent_id TEXT NOT NULL,

@@ -65,7 +65,10 @@ const EXPECTED_TABLES = [
   'park_identity_revisions',
   'park_controller_leases',
   'puzzle_interaction_logs',
-  'prison_records'
+  'prison_records',
+  'jev_usage_daily',
+  'jev_decisions',
+  'jev_resident_actions'
 ];
 
 const EXPECTED_INDEXES = [
@@ -109,7 +112,11 @@ const EXPECTED_INDEXES = [
   'idx_puzzle_logs_agent',
   'idx_puzzle_logs_puzzle',
   'idx_puzzle_logs_created',
-  'idx_prison_records_created'
+  'idx_prison_records_created',
+  'idx_jev_decisions_period',
+  'idx_jev_decisions_event',
+  'idx_jev_resident_actions_decision',
+  'idx_jev_resident_actions_resident'
 ];
 
 function createTempDatabase() {

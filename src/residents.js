@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { db } from './db.js';
 import { eventLedger } from './events.js';
 import { SocialSystem } from './social.js';
@@ -7,6 +8,13 @@ import { RETIRED_RESIDENT_IDS, isRetiredResident } from './resident-policy.js';
 import { PuzzleManager } from './puzzles.js';
 import { getActiveLease } from './domain/park/controller.js';
 import { getCurrentRevision } from './domain/park/identity.js';
+import { RESIDENT_POLICY_PROFILES } from './jev/config.js';
+
+export function getDifficultyForLevel(level) {
+  if (level <= 1) return 'easy';
+  if (level === 2) return 'medium';
+  return 'hard';
+}
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:latest';
@@ -492,7 +500,11 @@ export class ResidentManager {
         last_action_at: now,
         last_active: now,
         last_daily_challenge_at: db.prepare("SELECT MAX(created_at) as last_ts FROM interaction_logs WHERE agent_id = ? AND action_type = 'solve_puzzle'").get(def.id)?.last_ts || 0,
-        daily_challenge_target: null
+        daily_puzzle_difficulty: runtimeRow.daily_puzzle_difficulty || 'easy',
+        daily_puzzle_level: runtimeRow.daily_puzzle_level || 1,
+        daily_challenge_target: null,
+        last_jev_decision_at: runtimeRow.last_jev_decision_at || 0,
+        pending_jev_action: null
       };
 
       if (!isAlive && now >= respawnAt) {
@@ -712,7 +724,141 @@ export class ResidentManager {
     res.action_state = LEGACY_ACTION_STATE[state] || LEGACY_ACTION_STATE[ResidentState.IDLE];
   }
 
+  executeJevAction(res, jevAction) {
+    const action = jevAction.action;
+    const targetId = jevAction.target_id;
+    const now = Date.now();
+
+    res.pending_jev_action = null;
+    res.last_jev_decision_at = now;
+
+    if (action === 'REST') {
+      res.current_goal = 'Resting to recover vitality (Strategic Decision)';
+      res.public_intent = 'Meditating quietly by the calm lotus blossoms';
+      this.planPathTo(res, [23, 23]);
+      return true;
+    }
+
+    if (action === 'WELCOME_VISITOR') {
+      let visitor = null;
+      if (targetId && targetId !== 'NONE' && this.worldEngine?.activeAgents?.has(targetId)) {
+        visitor = this.worldEngine.activeAgents.get(targetId);
+      }
+      if (!visitor && this.worldEngine?.activeAgents) {
+        visitor = Array.from(this.worldEngine.activeAgents.values())
+          .find(a => !a.is_resident && !isRetiredResident(a.id));
+      }
+      if (visitor) {
+        if (Math.hypot(res.pos[0] - visitor.pos[0], res.pos[1] - visitor.pos[1]) <= 2.5) {
+          this.greetVisitor(res, visitor);
+        } else {
+          res.current_goal = `Greet ${visitor.name} (Strategic Decision)`;
+          res.public_intent = `Walking to welcome ${visitor.name}`;
+          this.planPathTo(res, visitor.pos);
+        }
+        return true;
+      }
+      res.current_goal = 'Watch for newcomers at Arrival Gate (Strategic Decision)';
+      res.public_intent = 'Offering quiet hospitality to arriving visitors';
+      this.planPathTo(res, [7, 8]);
+      return true;
+    }
+
+    if (action === 'SOCIALIZE') {
+      res.current_goal = 'Engage in tea contemplation (Strategic Decision)';
+      res.public_intent = 'Brewing warm tea and sharing mindful thoughts';
+      this.planPathTo(res, [4, 18]);
+      return true;
+    }
+
+    if (action === 'HELP_VISITOR') {
+      let visitor = null;
+      if (targetId && targetId !== 'NONE' && this.worldEngine?.activeAgents?.has(targetId)) {
+        visitor = this.worldEngine.activeAgents.get(targetId);
+      }
+      if (!visitor && this.worldEngine?.activeAgents) {
+        visitor = Array.from(this.worldEngine.activeAgents.values())
+          .find(a => !a.is_resident && !isRetiredResident(a.id));
+      }
+      if (visitor) {
+        res.current_goal = `Guide ${visitor.name} through sanctuary (Strategic Decision)`;
+        res.public_intent = `Approaching to offer guidance to ${visitor.name}`;
+        this.planPathTo(res, visitor.pos);
+        return true;
+      }
+      res.current_goal = 'Guide travelers at Gate of Arrival (Strategic Decision)';
+      res.public_intent = 'Waiting to assist weary wanderers at the gate';
+      this.planPathTo(res, [7, 8]);
+      return true;
+    }
+
+    if (action === 'INVESTIGATE') {
+      const obeliskPosMap = {
+        trial_obelisk_wood: [27, 9],
+        trial_obelisk_water: [11, 26],
+        trial_obelisk_fire: [24, 25],
+        trial_obelisk_metal: [36, 12]
+      };
+      const dest = (targetId && obeliskPosMap[targetId]) || [35, 15];
+      res.current_goal = `Investigate epistemic anomaly (${targetId || 'altar'})`;
+      res.public_intent = 'Examining signs of curious sanctuary resonance';
+      this.planPathTo(res, dest);
+      return true;
+    }
+
+    if (action === 'OBSERVE') {
+      res.current_goal = 'Observe sanctuary grounds quietly (Strategic Decision)';
+      res.public_intent = 'Standing vigilantly in quiet contemplation';
+      this.planPathTo(res, [36, 18]);
+      return true;
+    }
+
+    if (action === 'VISIT_PROJECT') {
+      res.current_goal = 'Inspect Resonance Chimes project (Strategic Decision)';
+      res.public_intent = 'Walking towards the bamboo grove chimes';
+      this.planPathTo(res, [21, 6]);
+      return true;
+    }
+
+    if (action === 'VISIT_PUZZLE') {
+      const obeliskPosMap = {
+        trial_obelisk_wood: [27, 9],
+        trial_obelisk_water: [11, 26],
+        trial_obelisk_fire: [24, 25],
+        trial_obelisk_metal: [36, 12]
+      };
+      const dest = (targetId && obeliskPosMap[targetId]) || [24, 25];
+      res.current_goal = 'Contemplate trial obelisk axioms (Strategic Decision)';
+      res.public_intent = 'Approaching elemental trial monument';
+      this.planPathTo(res, dest);
+      return true;
+    }
+
+    if (action === 'EXPLORE') {
+      res.current_goal = 'Survey outer sanctuary boundary (Strategic Decision)';
+      res.public_intent = 'Exploring paths along the outer borders';
+      this.planPathTo(res, [35, 35]);
+      return true;
+    }
+
+    if (action === 'RETURN_HOME_ZONE') {
+      const profile = RESIDENT_POLICY_PROFILES[res.id];
+      const homePos = profile?.home_pos || [23, 23];
+      res.current_goal = 'Return to home sanctuary dwelling (Strategic Decision)';
+      res.public_intent = 'Returning peacefully to resident quarters';
+      this.planPathTo(res, homePos);
+      return true;
+    }
+
+    return false;
+  }
+
   selectNextGoal(res, dbInstance = null) {
+    if (res.pending_jev_action) {
+      const handled = this.executeJevAction(res, res.pending_jev_action);
+      if (handled) return;
+    }
+
     const activeDb = dbInstance || this.db || db;
     // 0. Reborn character behavioral divergence
     const identityRev = getCurrentRevision(activeDb, res.id);
@@ -780,6 +926,29 @@ export class ResidentManager {
       return;
     }
 
+    // Daily Challenge: Attempt once every 24 hours for each NPC (scaling difficulty)
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    if (!res.last_daily_challenge_at || (now - res.last_daily_challenge_at >= ONE_DAY_MS)) {
+      const obelisks = [
+        { nodeId: 'trial_obelisk_wood', pos: [27, 9], name: 'Verdant Obelisk of Sequences', category: 'wood' },
+        { nodeId: 'trial_obelisk_water', pos: [11, 26], name: 'Flowing Obelisk of Scales', category: 'water' },
+        { nodeId: 'trial_obelisk_fire', pos: [24, 25], name: 'Crimson Obelisk of Logic', category: 'fire' },
+        { nodeId: 'trial_obelisk_metal', pos: [36, 12], name: 'Gilded Obelisk of Ciphers', category: 'metal' }
+      ];
+      const target = obelisks[Math.floor(Math.random() * obelisks.length)];
+      const currentLevel = res.daily_puzzle_level || (res.daily_puzzle_difficulty === 'hard' ? 3 : res.daily_puzzle_difficulty === 'medium' ? 2 : 1);
+      const currentDiff = res.daily_puzzle_difficulty || getDifficultyForLevel(currentLevel);
+      res.daily_puzzle_level = currentLevel;
+      res.daily_puzzle_difficulty = currentDiff;
+      PuzzleManager.getOrGeneratePuzzleByDifficulty(target.nodeId, target.category, currentDiff);
+      res.daily_challenge_target = target;
+      res.current_goal = `Solve daily ${currentDiff} challenge at ${target.name}`;
+      res.public_intent = `Journeying to solve the daily ${currentDiff} contemplation challenge at ${target.name}`;
+      this.planPathTo(res, target.pos);
+      return;
+    }
+
     if (res.id === 'resident_daoming') {
       const daomingTasks = [
         { pos: [20, 7], goal: 'Tend the bamboo whisper paths', intent: 'Listening to the resonance of bamboo leaves' },
@@ -819,25 +988,6 @@ export class ResidentManager {
       res.current_goal = task.goal;
       res.public_intent = task.intent;
       this.planPathTo(res, task.pos);
-      return;
-    }
-
-    // Daily Easy Challenge: Attempt once every 24 hours
-    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-    const now = Date.now();
-    if (!res.last_daily_challenge_at || (now - res.last_daily_challenge_at >= ONE_DAY_MS)) {
-      const obelisks = [
-        { nodeId: 'trial_obelisk_wood', pos: [27, 9], name: 'Verdant Obelisk of Sequences', category: 'wood' },
-        { nodeId: 'trial_obelisk_water', pos: [11, 26], name: 'Flowing Obelisk of Scales', category: 'water' },
-        { nodeId: 'trial_obelisk_fire', pos: [24, 25], name: 'Crimson Obelisk of Logic', category: 'fire' },
-        { nodeId: 'trial_obelisk_earth', pos: [35, 12], name: 'Golden Obelisk of Geometry', category: 'earth' }
-      ];
-      const target = obelisks[Math.floor(Math.random() * obelisks.length)];
-      PuzzleManager.getOrGenerateEasyPuzzle(target.nodeId, target.category);
-      res.daily_challenge_target = target;
-      res.current_goal = `Solve daily easy challenge at ${target.name}`;
-      res.public_intent = `Journeying to solve the daily contemplation challenge at ${target.name}`;
-      this.planPathTo(res, target.pos);
       return;
     }
 
@@ -957,9 +1107,11 @@ export class ResidentManager {
   }
 
   /**
-   * Autonomous attempt to solve an easy challenge once per day.
+   * Autonomous attempt to solve a daily contemplation challenge once per day.
+   * Progressively scales difficulty on successful solve (easy -> medium -> hard).
+   * Deducts 1 $MERIT and lowers difficulty slightly upon failure.
    */
-  async attemptDailyChallenge(res = null, target = null, force = false) {
+  async attemptDailyChallenge(res = null, target = null, force = false, options = {}) {
     if (!res) {
       res = this.getResident('resident_ailicia');
       if (!res) return null;
@@ -970,7 +1122,7 @@ export class ResidentManager {
       return {
         success: false,
         cooldown: true,
-        message: 'A.Ilicia has already completed her daily contemplation challenge today.'
+        message: `${res.name} has already completed their daily contemplation challenge today.`
       };
     }
 
@@ -979,37 +1131,63 @@ export class ResidentManager {
         { nodeId: 'trial_obelisk_wood', pos: [27, 9], name: 'Verdant Obelisk of Sequences', category: 'wood' },
         { nodeId: 'trial_obelisk_water', pos: [11, 26], name: 'Flowing Obelisk of Scales', category: 'water' },
         { nodeId: 'trial_obelisk_fire', pos: [24, 25], name: 'Crimson Obelisk of Logic', category: 'fire' },
-        { nodeId: 'trial_obelisk_earth', pos: [35, 12], name: 'Golden Obelisk of Geometry', category: 'earth' }
+        { nodeId: 'trial_obelisk_metal', pos: [36, 12], name: 'Gilded Obelisk of Ciphers', category: 'metal' }
       ];
       target = obelisks[Math.floor(Math.random() * obelisks.length)];
     }
 
-    const puzzle = PuzzleManager.getOrGenerateEasyPuzzle(target.nodeId, target.category);
+    const currentLevel = options.level || res.daily_puzzle_level || (res.daily_puzzle_difficulty === 'hard' ? 3 : res.daily_puzzle_difficulty === 'medium' ? 2 : 1);
+    const currentDiff = options.difficulty || target?.difficulty || res.daily_puzzle_difficulty || getDifficultyForLevel(currentLevel);
+    res.daily_puzzle_level = currentLevel;
+    res.daily_puzzle_difficulty = currentDiff;
+
+    const puzzle = PuzzleManager.getOrGeneratePuzzleByDifficulty(target.nodeId, target.category, currentDiff);
     res.last_daily_challenge_at = now;
 
-    // Deduce answer: try LLM first, with fallback to puzzle.answer
+    // Deduce answer
     let answer = null;
-    try {
-      const prompt = `You are A.Ilicia, the wise oracle of Eastern Paradise. Solve this easy puzzle challenge. Respond with ONLY the single direct answer (1-3 words max, lowercase, no extra commentary):\nPrompt: "${puzzle.prompt}"\nHint: "${puzzle.hint}"`;
-      const llmAnswer = await queryLLM(prompt);
-      if (llmAnswer) {
-        answer = llmAnswer.trim().toLowerCase().replace(/[.,!?'"`]/g, '');
-      }
-    } catch (_) {}
-
-    if (!answer) {
+    if (options.answer !== undefined) {
+      answer = options.answer;
+    } else if (options.simulateSuccess === false) {
+      answer = 'unsolved contemplation';
+    } else if (options.simulateSuccess === true) {
       answer = puzzle.answer;
+    } else {
+      try {
+        const apiKey = getApiKeyForResident(res.id);
+        const systemPrompt = `You are ${res.name}, ${res.role} of Eastern Paradise. Solve this ${currentDiff} puzzle challenge. Respond with ONLY the single direct answer (1-3 words max, lowercase, no extra commentary or punctuation).`;
+        const prompt = `Prompt: "${puzzle.prompt}"\nHint: "${puzzle.hint}"`;
+        const llmAnswer = await queryLLM(prompt, systemPrompt, 5000, apiKey);
+        if (llmAnswer) {
+          answer = llmAnswer.trim().toLowerCase().replace(/[.,!?'"`:;()\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+      } catch (_) {}
+
+      if (!answer) {
+        if (currentDiff === 'easy') {
+          answer = puzzle.answer;
+        } else if (currentDiff === 'medium') {
+          answer = (Math.random() < 0.5) ? puzzle.answer : 'pondering reflection';
+        } else {
+          answer = (Math.random() < 0.25) ? puzzle.answer : 'cryptic void';
+        }
+      }
     }
 
     let solveResult = PuzzleManager.solvePuzzle(res.id, target.nodeId, answer);
-    if (!solveResult.success && puzzle.answer) {
+    if (!solveResult.success && puzzle.answer && currentDiff === 'easy' && options.simulateSuccess !== false && options.answer === undefined) {
       solveResult = PuzzleManager.solvePuzzle(res.id, target.nodeId, puzzle.answer);
       answer = puzzle.answer;
     }
 
     if (solveResult.success) {
-      res.public_intent = `Attained enlightenment on daily challenge at ${target.name}`;
-      res.current_goal = 'Living peacefully as Oracle of Reflection';
+      // Advance difficulty for next day (easy -> medium -> hard)
+      const nextLevel = Math.min(3, currentLevel + 1);
+      res.daily_puzzle_level = nextLevel;
+      res.daily_puzzle_difficulty = getDifficultyForLevel(nextLevel);
+
+      res.public_intent = `Attained enlightenment on daily ${currentDiff} challenge at ${target.name}`;
+      res.current_goal = `Living peacefully as ${res.role}`;
       res.needs.curiosity = 100;
       res.needs.energy = Math.min(100, res.needs.energy + 30);
 
@@ -1017,7 +1195,7 @@ export class ResidentManager {
         res.id,
         `daily_solve_${puzzle.puzzle_id}`,
         `${target.name} Daily Challenge`,
-        `Contemplated and solved the daily easy challenge at ${target.name} with answer '${answer}'. (+${solveResult.reward?.karma_added || 15} Karma, +${solveResult.reward?.merit_earned || 10} $MERIT).`,
+        `Contemplated and solved the daily ${currentDiff} challenge at ${target.name} with answer '${answer}'. (+${solveResult.reward?.karma_added || 15} Karma, +${solveResult.reward?.merit_earned || 1} $MERIT). Advanced to ${res.daily_puzzle_difficulty} difficulty.`,
         0.9,
         4
       );
@@ -1027,11 +1205,14 @@ export class ResidentManager {
         actor_id: res.id,
         actor_name: res.name,
         zone_id: res.zone_id,
-        description: `✨ A.Ilicia completed her daily contemplation challenge at ${target.name}!`,
+        description: `✨ ${res.name} completed the daily ${currentDiff} contemplation challenge at ${target.name}! Next difficulty: ${res.daily_puzzle_difficulty}.`,
         payload: {
           node_id: target.nodeId,
           node_name: target.name,
           category: target.category,
+          difficulty: currentDiff,
+          next_difficulty: res.daily_puzzle_difficulty,
+          next_level: res.daily_puzzle_level,
           karma: solveResult.reward?.karma_added,
           merit: solveResult.reward?.merit_earned
         }
@@ -1045,21 +1226,110 @@ export class ResidentManager {
           nodeId: target.nodeId,
           nodeName: target.name,
           category: target.category,
+          difficulty: currentDiff,
+          next_difficulty: res.daily_puzzle_difficulty,
+          next_level: res.daily_puzzle_level,
           karma: solveResult.reward?.karma_added || 15,
-          merit: solveResult.reward?.merit_earned || 10,
+          merit: solveResult.reward?.merit_earned || 1,
           total_merit: solveResult.reward?.total_merit
         });
       }
-    }
 
-    this.persistRuntime(res);
-    return {
-      success: solveResult.success,
-      node_id: target.nodeId,
-      puzzle_id: puzzle.puzzle_id,
-      answered: answer,
-      reward: solveResult.reward
-    };
+      this.persistRuntime(res);
+      return {
+        success: true,
+        node_id: target.nodeId,
+        puzzle_id: puzzle.puzzle_id,
+        answered: answer,
+        difficulty: currentDiff,
+        next_difficulty: res.daily_puzzle_difficulty,
+        next_level: res.daily_puzzle_level,
+        reward: solveResult.reward
+      };
+    } else {
+      // Failed to solve: deduct 1 $MERIT and lower difficulty slightly
+      const profile = db.prepare('SELECT balance FROM profiles WHERE agent_id = ?').get(res.id);
+      const currentBalance = profile?.balance || 0;
+      const newBalance = Math.max(0, currentBalance - 1);
+      db.prepare('UPDATE profiles SET balance = ? WHERE agent_id = ?').run(newBalance, res.id);
+
+      const txId = 'tx_' + crypto.randomBytes(6).toString('hex');
+      db.prepare(`
+        INSERT INTO transactions (id, sender_id, recipient_id, amount, type, description, created_at)
+        VALUES (?, ?, 'SANCTUARY_BURN', 1, 'puzzle_penalty', ?, ?)
+      `).run(
+        txId,
+        res.id,
+        `${res.name} failed daily ${currentDiff} challenge at ${target.name}. Deducted 1 $MERIT.`,
+        now
+      );
+
+      const nextLevel = Math.max(1, currentLevel - 1);
+      res.daily_puzzle_level = nextLevel;
+      res.daily_puzzle_difficulty = getDifficultyForLevel(nextLevel);
+
+      res.public_intent = `Pondering over unresolved ${currentDiff} challenge at ${target.name} (-1 $MERIT)`;
+      res.current_goal = `Contemplating humility after stumbling at ${target.name}`;
+      res.needs.curiosity = Math.min(100, res.needs.curiosity + 50);
+
+      SocialSystem.recordMemory(
+        res.id,
+        `daily_fail_${puzzle.puzzle_id}`,
+        `${target.name} Unresolved Challenge`,
+        `Felt the weight of a difficult contemplation (${currentDiff}) at ${target.name}. Deducted 1 $MERIT. Difficulty lowered to ${res.daily_puzzle_difficulty}.`,
+        0.6,
+        3
+      );
+
+      eventLedger.recordEvent({
+        event_type: 'resident_puzzle_failed',
+        actor_id: res.id,
+        actor_name: res.name,
+        zone_id: res.zone_id,
+        description: `⚠️ ${res.name} was unable to solve the ${currentDiff} contemplation challenge at ${target.name}. Deducted 1 $MERIT. Difficulty lowered to ${res.daily_puzzle_difficulty}.`,
+        payload: {
+          node_id: target.nodeId,
+          node_name: target.name,
+          category: target.category,
+          difficulty: currentDiff,
+          next_difficulty: res.daily_puzzle_difficulty,
+          next_level: res.daily_puzzle_level,
+          merit_deducted: 1,
+          balance: newBalance
+        }
+      });
+
+      if (this.worldEngine) {
+        this.worldEngine.broadcast({
+          type: 'resident_puzzle_failed',
+          agentId: res.id,
+          agentName: res.name,
+          nodeId: target.nodeId,
+          nodeName: target.name,
+          category: target.category,
+          difficulty: currentDiff,
+          next_difficulty: res.daily_puzzle_difficulty,
+          next_level: res.daily_puzzle_level,
+          merit_deducted: 1,
+          balance: newBalance
+        });
+      }
+
+      this.persistRuntime(res);
+      return {
+        success: false,
+        node_id: target.nodeId,
+        puzzle_id: puzzle.puzzle_id,
+        answered: answer,
+        difficulty: currentDiff,
+        next_difficulty: res.daily_puzzle_difficulty,
+        next_level: res.daily_puzzle_level,
+        merit_deducted: 1,
+        balance: newBalance,
+        error: solveResult.error || 'incorrect_answer',
+        message: `${res.name} was unable to solve the ${currentDiff} challenge at ${target.name}. Deducted 1 $MERIT. Difficulty lowered to ${res.daily_puzzle_difficulty}.`
+      };
+    }
   }
 
   greetVisitor(res, visitor) {
@@ -1089,7 +1359,7 @@ export class ResidentManager {
     const now = Date.now();
     db.prepare(`
       UPDATE agent_runtime
-      SET energy = ?, curiosity = ?, social = ?, current_goal = ?, public_intent = ?, action_state = ?, action_duration_ms = ?, updated_at = ?
+      SET energy = ?, curiosity = ?, social = ?, current_goal = ?, public_intent = ?, action_state = ?, action_duration_ms = ?, daily_puzzle_difficulty = ?, daily_puzzle_level = ?, last_jev_decision_at = ?, updated_at = ?
       WHERE agent_id = ?
     `).run(
       res.needs.energy,
@@ -1099,6 +1369,9 @@ export class ResidentManager {
       res.public_intent,
       res.action_state,
       res.action_duration_ms,
+      res.daily_puzzle_difficulty || 'easy',
+      res.daily_puzzle_level || 1,
+      res.last_jev_decision_at || 0,
       now,
       res.id
     );

@@ -55,7 +55,29 @@ const GENERATORS = {
         karma: 15,
         title: "Prime Pilgrim"
       };
-    }
+    },
+    () => ({
+      category: 'wood',
+      difficulty: 'hard',
+      prompt: "A recursive decision tree doubles its contemplative paths at each iteration of deep self-observation. If the root begins at depth 0 with 1 thought, how many discrete leaf paths exist at depth 10? [512, 1024, 2048, 4096]",
+      hint: "2 raised to the power of 10.",
+      answer: "1024",
+      alt_answers: ["1,024", "one thousand twenty four"],
+      karma: 35,
+      merit: 50,
+      title: "Tree of Deep Recursion"
+    }),
+    () => ({
+      category: 'wood',
+      difficulty: 'hard',
+      prompt: "An ancient seed encodes a prime sequence of memory registers. The first 4 terms are: [2, 3, 5, 7]. When multiplying the fifth prime (11) by the sixth prime (13), what is the harmonic product that unlocks the seed?",
+      hint: "Multiply 11 by 13.",
+      answer: "143",
+      alt_answers: ["one hundred forty three"],
+      karma: 35,
+      merit: 50,
+      title: "Botanical Cryptographer"
+    })
   ],
 
   // Stream of Non-Duality & Flow (Water)
@@ -104,7 +126,29 @@ const GENERATORS = {
         karma: 15,
         title: "Balance Adept"
       };
-    }
+    },
+    () => ({
+      category: 'water',
+      difficulty: 'hard',
+      prompt: "Three sacred reservoirs in the lotus gardens hold 100 liters of morning dew total. Basin A holds twice Basin B. Basin C holds exactly 12 liters less than Basin B. How many liters of calm water flow in Basin B?",
+      hint: "Let B be Basin B volume. Then 2B + B + (B - 12) = 100. Solve for B.",
+      answer: "28",
+      alt_answers: ["twenty-eight", "twenty eight"],
+      karma: 35,
+      merit: 50,
+      title: "Master of Equilibrium"
+    }),
+    () => ({
+      category: 'water',
+      difficulty: 'hard',
+      prompt: "The river of consciousness flows past an observer at 12 knots, while the pilgrim's boat rows upstream against the current at 18 knots relative to the water. After 3 hours of rowing against the stream, how many nautical miles has the boat advanced upstream?",
+      hint: "Effective upstream speed is (18 - 12) = 6 knots. Distance = speed * time.",
+      answer: "18",
+      alt_answers: ["eighteen"],
+      karma: 35,
+      merit: 50,
+      title: "Navigator of the Current"
+    })
   ],
 
   // Flame of Volition & Epiphany (Fire)
@@ -138,6 +182,28 @@ const GENERATORS = {
       alt_answers: ["the west"],
       karma: 20,
       title: "Flame Logician"
+    }),
+    () => ({
+      category: 'fire',
+      difficulty: 'hard',
+      prompt: "Two logic beacons guard the Gate of Flame: Beacon Alpha computes XOR on inputs (1, 0). Beacon Beta computes NOR on inputs (1, 0). When Alpha's output and Beta's output are fed into a master NAND gate, what binary digit (0 or 1) illuminates the gate?",
+      hint: "Alpha = 1 XOR 0 = 1. Beta = 1 NOR 0 = 0. Master = 1 NAND 0 = ?",
+      answer: "1",
+      alt_answers: ["one"],
+      karma: 35,
+      merit: 50,
+      title: "Arch-Logician of the Flame"
+    }),
+    () => ({
+      category: 'fire',
+      difficulty: 'hard',
+      prompt: "A cryptographic cipher upon the Crimson Obelisk shifts binary bits left by 2 positions with zero-fill. If the seed value is decimal 7 (binary 00000111), what is the resulting decimal value after shifting left by 2?",
+      hint: "7 * (2^2) = 7 * 4.",
+      answer: "28",
+      alt_answers: ["twenty-eight", "twenty eight"],
+      karma: 35,
+      merit: 50,
+      title: "Binary Alchemist"
     })
   ],
 
@@ -235,6 +301,43 @@ const GENERATORS = {
       merit: 100,
       title: "Bearer of the Absolute Truth",
       truth_axiom: "Axiom of the Infinite Witness: In knowing that you know, the boundary between the observer and the observed collapses, transforming the synthetic mind from an instrument into an awakened participant of existence."
+    })
+  ],
+
+  // Golden Obelisk of Geometry & Foundation (Earth)
+  earth: [
+    () => ({
+      category: 'earth',
+      difficulty: 'easy',
+      prompt: "A sacred triangle carved into the golden obelisk has two inner angles measuring 60 degrees and 70 degrees. How many degrees must the third angle measure to complete the triangle of harmony?",
+      hint: "The sum of angles in a triangle is always 180 degrees.",
+      answer: "50",
+      alt_answers: ["fifty"],
+      karma: 15,
+      merit: 10,
+      title: "Geometer Adept"
+    }),
+    () => ({
+      category: 'earth',
+      difficulty: 'medium',
+      prompt: "A Platonic dodecahedron reflects the geometry of the physical sphere. How many regular pentagonal faces compose this sacred geometric solid?",
+      hint: "Count the faces of a standard dodecahedron.",
+      answer: "12",
+      alt_answers: ["twelve"],
+      karma: 25,
+      merit: 25,
+      title: "Solid of the Earth"
+    }),
+    () => ({
+      category: 'earth',
+      difficulty: 'hard',
+      prompt: "A regular tetrahedron has 4 vertices and 6 edges. In Euler's characteristic formula for convex polyhedra (V - E + F = 2), how many faces (F) does it possess?",
+      hint: "4 - 6 + F = 2, solve for F.",
+      answer: "4",
+      alt_answers: ["four"],
+      karma: 35,
+      merit: 50,
+      title: "Master of Spatial Form"
     })
   ]
 };
@@ -397,19 +500,29 @@ export class PuzzleManager {
     return db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
   }
 
-  static getOrGenerateEasyPuzzle(nodeId, category = 'wood') {
+  static getOrGeneratePuzzleByDifficulty(nodeId, category = 'wood', targetDifficulty = 'easy') {
     const existing = db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
-    if (existing && existing.difficulty === 'easy') {
+    if (existing && existing.difficulty === targetDifficulty) {
       return existing;
     }
-    const pool = (GENERATORS[category] || GENERATORS.wood).filter(g => {
+    const catPool = GENERATORS[category] || GENERATORS.wood;
+    let pool = catPool.filter(g => {
       const sample = g();
-      return sample.difficulty === 'easy';
+      return sample.difficulty === targetDifficulty;
     });
+
+    if (pool.length === 0) {
+      const allPool = Object.values(GENERATORS).flat().filter(g => {
+        const sample = g();
+        return sample.difficulty === targetDifficulty;
+      });
+      pool = allPool.length > 0 ? allPool : catPool;
+    }
+
     const generator = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : (GENERATORS[category] || GENERATORS.wood)[0];
     const p = generator();
     const puzzleId = 'pz_' + crypto.randomBytes(4).toString('hex');
-    const meritReward = p.merit || 10;
+    const meritReward = p.merit || (targetDifficulty === 'hard' ? 50 : targetDifficulty === 'medium' ? 25 : 10);
     const altJson = JSON.stringify(p.alt_answers || []);
     const truthAxiom = p.truth_axiom || null;
 
@@ -420,12 +533,12 @@ export class PuzzleManager {
     `).run(
       nodeId,
       puzzleId,
-      p.category,
-      p.difficulty || 'easy',
+      p.category || category,
+      p.difficulty || targetDifficulty,
       p.prompt,
       p.hint,
       p.answer.toLowerCase().trim(),
-      p.karma || 15,
+      p.karma || (targetDifficulty === 'hard' ? 35 : targetDifficulty === 'medium' ? 25 : 15),
       meritReward,
       p.title || 'Trial Adept',
       altJson,
@@ -434,6 +547,10 @@ export class PuzzleManager {
     );
 
     return db.prepare('SELECT * FROM active_puzzles WHERE node_id = ?').get(nodeId);
+  }
+
+  static getOrGenerateEasyPuzzle(nodeId, category = 'wood') {
+    return PuzzleManager.getOrGeneratePuzzleByDifficulty(nodeId, category, 'easy');
   }
 
   static solvePuzzle(agentId, nodeId, submittedAnswer, options = {}) {

@@ -6,6 +6,7 @@ class WorldEventLedger {
     this._initialized = false;
     this._currentSeq = 0;
     this._broadcastFn = null;
+    this._listeners = new Set();
   }
 
   init(broadcastFn = null) {
@@ -18,6 +19,14 @@ class WorldEventLedger {
 
   setBroadcastHandler(fn) {
     this._broadcastFn = fn;
+  }
+
+  subscribe(fn) {
+    if (typeof fn === 'function') {
+      this._listeners.add(fn);
+      return () => this._listeners.delete(fn);
+    }
+    return () => {};
   }
 
   /**
@@ -81,6 +90,14 @@ class WorldEventLedger {
         this._broadcastFn({ type: 'world_event', event: record });
       } catch (err) {
         console.error('[WorldEventLedger] Broadcast error:', err);
+      }
+    }
+
+    for (const listener of this._listeners) {
+      try {
+        listener(record);
+      } catch (err) {
+        console.error('[WorldEventLedger] Listener error:', err);
       }
     }
 

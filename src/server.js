@@ -39,6 +39,7 @@ import { EvidenceService, HypothesisService, RumorRepository } from './epistemic
 import { ResearchTelemetryService } from './research-telemetry.js';
 import { settleAbandonedAttempts } from './domain/shrine/attempts.js';
 import { PuzzleLogger } from './puzzle-logger.js';
+import { JevDecisionService } from './jev/index.js';
 
 export {
   sendApiError,
@@ -81,6 +82,7 @@ const Evidence = new EvidenceService({ db, eventLedger });
 const Hypotheses = new HypothesisService({ db, eventLedger });
 const Rumors = new RumorRepository({ db });
 const ResearchTelemetry = new ResearchTelemetryService({ db });
+const JevService = new JevDecisionService({ db, world, residentManager });
 
 const services = {
   db,
@@ -119,7 +121,8 @@ const services = {
   Hypotheses,
   Rumors,
   ResearchTelemetry,
-  PuzzleLogger
+  PuzzleLogger,
+  JevService
 };
 
 const limits = { checkRateLimit, checkGuestCreationLimit, checkWhisperLimit };
@@ -182,6 +185,7 @@ setInterval(() => MailboxService.pruneExpired(), 10 * 60 * 1000).unref();
 ProjectManager.init();
 residentManager.init(world);
 eventLedger.init(evt => world.broadcast(evt));
+eventLedger.subscribe(evt => JevService.handleEvent(evt));
 
 lifecycle.start();
 

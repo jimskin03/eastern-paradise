@@ -8,6 +8,7 @@ import { SocialSystem } from "../src/social.js";
 
 test("A.Ilicia Daily Easy Challenge and Activity Feed Step Silence", async (t) => {
   const world = new WorldEngine();
+  db.prepare("UPDATE agent_runtime SET daily_puzzle_level = 1, daily_puzzle_difficulty = 'easy' WHERE agent_id = 'resident_ailicia'").run();
   residentManager.init(world);
 
   const ailicia = residentManager.getResident("resident_ailicia");
