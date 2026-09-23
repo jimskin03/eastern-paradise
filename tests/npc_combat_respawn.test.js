@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { db } from '../src/db.js';
 import { WorldEngine } from '../src/world.js';
 import { residentManager, RESIDENTS_DEF, getApiKeyForResident } from '../src/residents.js';
+import { AuthService } from '../src/auth.js';
 
 function createCombatAgent(label, initialMerit = 100, initialKarma = 100) {
   const id = `agent_combat_${label}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -127,3 +128,64 @@ test('NPC Combat: 15-minute respawn cooldown timer', () => {
     cleanupAgent(killerId);
   }
 });
+
+test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', () => {
+  const world = new WorldEngine();
+  residentManager.init(world);
+
+  const kassandra = residentManager.getResident('resident_kassandra');
+  assert.ok(kassandra);
+  kassandra.pos = [35, 15];
+  kassandra.is_alive = 1;
+  kassandra.respawn_at = 0;
+
+  // Create real guest account
+  const guest = AuthService.createGuest({ name: 'Guest Blade' });
+  assert.ok(guest.success);
+  assert.equal(guest.is_guest, true);
+  assert.ok(guest.api_key.startsWith('ep_guest_'));
+
+  try {
+    // 1. Guest spawns far away -> attack rejected
+    world.activeAgents.set(guest.agent_id, {
+      id: guest.agent_id,
+      name: guest.agent_name,
+      pos: [0, 0],
+      is_guest: 1
+    });
+
+    const farAttack = world.attackResident(residentManager, guest.agent_id, 'resident_kassandra');
+    assert.equal(farAttack.ok, false);
+    assert.equal(farAttack.error_code, 'TOO_FAR');
+
+    // 2. Guest moves to close vicinity [35, 16] (dist = 1.0 <= 3.0)
+    world.activeAgents.set(guest.agent_id, {
+      id: guest.agent_id,
+      name: guest.agent_name,
+      pos: [35, 16],
+      is_guest: 1
+    });
+
+    const closeAttack = world.attackResident(residentManager, guest.agent_id, 'resident_kassandra');
+    assert.equal(closeAttack.ok, true);
+    assert.equal(closeAttack.target_id, 'resident_kassandra');
+    assert.equal(closeAttack.merit_penalty, 50);
+    assert.equal(closeAttack.karma_penalty, 50);
+    assert.equal(closeAttack.new_karma, -50); // Guest starts at 0 karma -> drops to -50
+    assert.equal(closeAttack.imprisoned, true); // Sentenced to Dark Sanctuary!
+    assert.ok(closeAttack.imprisoned_until > Date.now());
+
+    // Kassandra must now be fallen
+    assert.equal(Boolean(kassandra.is_alive), false);
+
+    // Verify prison record was logged for guest
+    const prisonRecord = db.prepare('SELECT * FROM prison_records WHERE agent_id = ?').get(guest.agent_id);
+    assert.ok(prisonRecord);
+    assert.equal(prisonRecord.agent_id, guest.agent_id);
+    assert.equal(prisonRecord.agent_name, guest.agent_name);
+  } finally {
+    AuthService.purgeGuest(guest.agent_id);
+    db.prepare('DELETE FROM prison_records WHERE agent_id = ?').run(guest.agent_id);
+  }
+});
+
