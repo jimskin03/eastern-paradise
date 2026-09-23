@@ -11,41 +11,42 @@ test('JEV Budget Manager — Daily UTC Accounting & Ceilings', async (t) => {
   // Clear any existing test row
   db.prepare('DELETE FROM jev_usage_daily WHERE period_key = ?').run(testPeriodKey);
 
-  await t.test('Initial usage is 0 calls with 3 soft limit and 5 hard ceiling', () => {
+  await t.test('Initial usage is 0 calls with 8 soft limit and 12 hard ceiling', () => {
     const usage = budget.getUsage(testPeriodKey);
     assert.equal(usage.call_count, 0);
-    assert.equal(usage.soft_limit, 3);
-    assert.equal(usage.hard_limit, 5);
+    assert.equal(usage.soft_limit, 8);
+    assert.equal(usage.hard_limit, 12);
 
     const check = budget.canSpendCall({ isCritical: false, periodKey: testPeriodKey });
     assert.equal(check.allowed, true);
   });
 
-  await t.test('Allows normal calls up to soft limit (0, 1, 2)', () => {
-    budget.recordCallSpend({ eventId: 'evt_1', periodKey: testPeriodKey });
-    budget.recordCallSpend({ eventId: 'evt_2', periodKey: testPeriodKey });
-    budget.recordCallSpend({ eventId: 'evt_3', periodKey: testPeriodKey });
+  await t.test('Allows normal calls up to soft limit (8 calls)', () => {
+    for (let i = 1; i <= 8; i++) {
+      budget.recordCallSpend({ eventId: `evt_${i}`, periodKey: testPeriodKey });
+    }
 
     const usage = budget.getUsage(testPeriodKey);
-    assert.equal(usage.call_count, 3);
+    assert.equal(usage.call_count, 8);
 
-    // Call 4: routine event blocked by soft limit
+    // Call 9: routine event blocked by soft limit
     const routineCheck = budget.canSpendCall({ isCritical: false, periodKey: testPeriodKey });
     assert.equal(routineCheck.allowed, false);
     assert.equal(routineCheck.reason, 'JEV_SKIPPED_DAILY_SOFT_LIMIT');
 
-    // Call 4: critical event allowed to spend beyond soft limit
+    // Call 9: critical event allowed to spend beyond soft limit
     const criticalCheck = budget.canSpendCall({ isCritical: true, periodKey: testPeriodKey });
     assert.equal(criticalCheck.allowed, true);
     assert.equal(criticalCheck.elevated, true);
   });
 
-  await t.test('Hard ceiling of 5 calls per calendar day strictly blocks ALL calls, even critical', () => {
-    budget.recordCallSpend({ eventId: 'evt_4', periodKey: testPeriodKey });
-    budget.recordCallSpend({ eventId: 'evt_5', periodKey: testPeriodKey });
+  await t.test('Hard ceiling of 12 calls per calendar day strictly blocks ALL calls, even critical', () => {
+    for (let i = 9; i <= 12; i++) {
+      budget.recordCallSpend({ eventId: `evt_${i}`, periodKey: testPeriodKey });
+    }
 
     const usage = budget.getUsage(testPeriodKey);
-    assert.equal(usage.call_count, 5);
+    assert.equal(usage.call_count, 12);
 
     const routineCheck = budget.canSpendCall({ isCritical: false, periodKey: testPeriodKey });
     assert.equal(routineCheck.allowed, false);

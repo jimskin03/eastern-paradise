@@ -521,8 +521,8 @@ export const SAFE_MIGRATIONS = [
     CREATE TABLE IF NOT EXISTS jev_usage_daily (
       period_key TEXT PRIMARY KEY,
       call_count INTEGER NOT NULL DEFAULT 0,
-      soft_limit INTEGER NOT NULL DEFAULT 3,
-      hard_limit INTEGER NOT NULL DEFAULT 5,
+      soft_limit INTEGER NOT NULL DEFAULT 8,
+      hard_limit INTEGER NOT NULL DEFAULT 12,
       last_call_at INTEGER,
       last_event_id TEXT,
       updated_at INTEGER NOT NULL

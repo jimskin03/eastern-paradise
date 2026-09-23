@@ -11,8 +11,8 @@ export const JEV_MODEL = process.env.JEV_MODEL || 'typesafe/jev-1.13';
 export const JEV_API_URL = process.env.JEV_API_URL || 'https://openrouter.ai/api/alpha/decisions';
 export const JEV_API_KEY = process.env.OPENROUTER_API_KEY || process.env.JEV_API_KEY || null;
 
-export const JEV_DAILY_SOFT_LIMIT = parseInt(process.env.JEV_DAILY_SOFT_LIMIT, 10) || 3;
-export const JEV_DAILY_HARD_LIMIT = parseInt(process.env.JEV_DAILY_HARD_LIMIT, 10) || 5;
+export const JEV_DAILY_SOFT_LIMIT = parseInt(process.env.JEV_DAILY_SOFT_LIMIT, 10) || 8;
+export const JEV_DAILY_HARD_LIMIT = parseInt(process.env.JEV_DAILY_HARD_LIMIT, 10) || 12;
 
 export const JEV_GLOBAL_COOLDOWN_MS = parseInt(process.env.JEV_GLOBAL_COOLDOWN_MS, 10) || (30 * 60 * 1000); // 30 minutes
 export const JEV_RESIDENT_COOLDOWN_MS = parseInt(process.env.JEV_RESIDENT_COOLDOWN_MS, 10) || (4 * 60 * 60 * 1000); // 4 hours
