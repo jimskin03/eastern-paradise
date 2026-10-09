@@ -323,7 +323,7 @@ test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', (
     assert.equal(closeAttack.target_id, 'resident_daoming');
     assert.equal(closeAttack.merit_penalty, 50);
     assert.equal(closeAttack.karma_penalty, 50);
-    assert.equal(closeAttack.new_karma, -50); // Guest starts at 0 karma -> drops to -50
+    assert.equal(closeAttack.new_karma, -30); // Guest karma is capped at the Dark Sanctuary floor
     assert.equal(closeAttack.imprisoned, true); // Sentenced to Dark Sanctuary!
     assert.ok(closeAttack.imprisoned_until > Date.now());
 
