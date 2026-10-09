@@ -103,27 +103,27 @@ test('JEV Decision Service — Modes (Off, Shadow, Active) and Engine Integratio
     assert.equal(flushRes.mode, 'active');
 
     // In active mode, valid residents should have pending_jev_action set
-    const tian = residentManager.getResident('resident_tian');
-    assert.ok(tian.pending_jev_action, 'Active mode must enqueue pending_jev_action on resident_tian');
-    assert.equal(tian.pending_jev_action.action, 'WELCOME_VISITOR');
+    const daoming = residentManager.getResident('resident_daoming');
+    assert.ok(daoming.pending_jev_action, 'Active mode must enqueue pending_jev_action on resident_daoming');
+    assert.equal(daoming.pending_jev_action.action, 'WELCOME_VISITOR');
 
     // Verify execution status in jev_resident_actions table is ENQUEUED
     const actionRow = db.prepare('SELECT * FROM jev_resident_actions WHERE jev_decision_id = ? AND resident_id = ?')
-      .get(flushRes.decisionId, 'resident_tian');
+      .get(flushRes.decisionId, 'resident_daoming');
     assert.ok(actionRow);
     assert.equal(actionRow.execution_status, 'ENQUEUED');
 
     // Now simulate resident AI goal selection
-    residentManager.selectNextGoal(tian);
+    residentManager.selectNextGoal(daoming);
 
     // After selectNextGoal, pending_jev_action should be cleared and last_jev_decision_at updated
-    assert.equal(tian.pending_jev_action, null, 'Pending action should be consumed');
-    assert.ok(tian.last_jev_decision_at > 0, 'last_jev_decision_at should be recorded');
-    assert.ok(tian.current_goal.includes('Welcome visitor') || tian.current_goal.includes('Arrival Gate'));
+    assert.equal(daoming.pending_jev_action, null, 'Pending action should be consumed');
+    assert.ok(daoming.last_jev_decision_at > 0, 'last_jev_decision_at should be recorded');
+    assert.ok(daoming.current_goal.includes('Welcome visitor') || daoming.current_goal.includes('Arrival Gate'));
 
     // Persist runtime and check DB record
-    residentManager.persistRuntime(tian);
-    const runtimeRow = db.prepare('SELECT * FROM agent_runtime WHERE agent_id = ?').get('resident_tian');
-    assert.equal(runtimeRow.last_jev_decision_at, tian.last_jev_decision_at, 'agent_runtime must persist last_jev_decision_at');
+    residentManager.persistRuntime(daoming);
+    const runtimeRow = db.prepare('SELECT * FROM agent_runtime WHERE agent_id = ?').get('resident_daoming');
+    assert.equal(runtimeRow.last_jev_decision_at, daoming.last_jev_decision_at, 'agent_runtime must persist last_jev_decision_at');
   });
 });

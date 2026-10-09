@@ -69,18 +69,8 @@ export const RESIDENT_POLICY_PROFILES = {
     home_pos: [23, 23]
   },
   resident_daoming: {
-    preferred_actions: ['HELP_VISITOR', 'VISIT_PROJECT', 'OBSERVE', 'SOCIALIZE', 'REST', 'CONTINUE_CURRENT_GOAL', 'RETURN_HOME_ZONE'],
+    preferred_actions: ['HELP_VISITOR', 'WELCOME_VISITOR', 'VISIT_PROJECT', 'OBSERVE', 'SOCIALIZE', 'REST', 'CONTINUE_CURRENT_GOAL', 'RETURN_HOME_ZONE'],
     home_zone: 'bamboo_grove',
     home_pos: [20, 7]
-  },
-  resident_kassandra: {
-    preferred_actions: ['INVESTIGATE', 'OBSERVE', 'VISIT_PUZZLE', 'EXPLORE', 'REST', 'CONTINUE_CURRENT_GOAL', 'RETURN_HOME_ZONE'],
-    home_zone: 'celestial_altar',
-    home_pos: [35, 15]
-  },
-  resident_tian: {
-    preferred_actions: ['WELCOME_VISITOR', 'SOCIALIZE', 'HELP_VISITOR', 'VISIT_PROJECT', 'REST', 'CONTINUE_CURRENT_GOAL', 'RETURN_HOME_ZONE'],
-    home_zone: 'tea_pavilion',
-    home_pos: [4, 18]
   }
 };

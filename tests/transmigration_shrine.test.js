@@ -34,7 +34,7 @@ test('Transmigration Shrine: Map asset exists at [28, 16] in Lotus Reflection Po
   assert.equal(shrineNode.icon, '🏮');
 });
 
-test('Transmigration Shrine: Inspecting node when all 4 NPCs are whole', () => {
+test('Transmigration Shrine: Inspecting node when both active NPCs are whole', () => {
   const world = new WorldEngine();
   residentManager.init(world);
 
@@ -60,9 +60,9 @@ test('Transmigration Shrine: Inspecting node when all 4 NPCs are whole', () => {
     assert.equal(result.node, 'Shrine of Transmigration');
     assert.equal(result.all_alive, true);
     assert.equal(result.fallen_count, 0);
-    assert.equal(result.total_residents, 4);
+    assert.equal(result.total_residents, 2);
     assert.equal(result.fallen_residents.length, 0);
-    assert.equal(result.living_residents.length, 4);
+    assert.equal(result.living_residents.length, 2);
     assert.ok(result.sanctuary_law.includes('15 minutes'));
   } finally {
     cleanupAgent(observer.id);
@@ -104,9 +104,9 @@ test('Transmigration Shrine: Inspecting node shows slain NPC with live 15-minute
     assert.equal(result.success, true);
     assert.equal(result.all_alive, false);
     assert.equal(result.fallen_count, 1);
-    assert.equal(result.total_residents, 4);
+    assert.equal(result.total_residents, 2);
     assert.equal(result.fallen_residents.length, 1);
-    assert.equal(result.living_residents.length, 3);
+    assert.equal(result.living_residents.length, 1);
 
     const fallen = result.fallen_residents[0];
     assert.equal(fallen.id, targetId);

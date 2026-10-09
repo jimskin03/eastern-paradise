@@ -10,9 +10,9 @@ test("NPC Daily Puzzle Difficulty Progression and Merit Penalty System", async (
   db.prepare("UPDATE agent_runtime SET daily_puzzle_level = 1, daily_puzzle_difficulty = 'easy'").run();
   residentManager.init(world);
 
-  const residents = ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian'];
+  const residents = ['resident_ailicia', 'resident_daoming'];
 
-  // 1. Verify all 4 residents exist and have initial puzzle progression
+  // 1. Verify both active residents exist and have initial puzzle progression
   for (const id of residents) {
     const res = residentManager.getResident(id);
     assert.ok(res, `Resident ${id} must exist in world`);
@@ -118,7 +118,7 @@ test("NPC Daily Puzzle Difficulty Progression and Merit Penalty System", async (
   const flooredBalance = db.prepare("SELECT balance FROM profiles WHERE agent_id = 'resident_daoming'").get().balance;
   assert.equal(flooredBalance, 7, "Balance must be 7 after third failure");
 
-  // 6. Test all 4 NPCs can attempt daily challenges independently
+  // 6. Test both active NPCs can attempt daily challenges independently
   for (const id of residents) {
     const res = residentManager.getResident(id);
     const resResult = await residentManager.attemptDailyChallenge(res, null, true, { simulateSuccess: true });

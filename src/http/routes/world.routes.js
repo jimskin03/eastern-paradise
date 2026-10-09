@@ -96,7 +96,7 @@ export async function handleWorldRoutes(ctx) {
       return sendJson(res, 400, {
         success: false,
         error: 'missing_target',
-        message: "Missing 'target_id' parameter. Specify target resident (e.g. 'resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian')."
+        message: "Missing 'target_id' parameter. Specify target resident (e.g. 'resident_ailicia', 'resident_daoming')."
       });
     }
 

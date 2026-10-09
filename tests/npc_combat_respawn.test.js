@@ -23,23 +23,23 @@ function cleanupAgent(id) {
   db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
 }
 
-test('NPC Combat: Roster contains 4 NPCs with paired API keys', () => {
+test('NPC Combat: Roster contains 2 active NPCs and retires legacy NPCs', () => {
   const world = new WorldEngine();
   residentManager.init(world);
 
   const residents = residentManager.getAllResidents();
-  assert.equal(residents.length, 4, 'Must have exactly 4 residents');
+  assert.equal(residents.length, 2, 'Must have exactly 2 active residents');
   const residentIds = residents.map(r => r.id);
-  assert.deepEqual(residentIds, ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
+  assert.deepEqual(residentIds, ['resident_ailicia', 'resident_daoming']);
 
-  // Verify API key pairs
+  // Verify the active residents share the configured API key
   process.env.GROQ_API_KEY_1 = 'mock_groq_key_pair1';
   process.env.GROQ_API_KEY_2 = 'mock_groq_key_pair2';
 
   assert.equal(getApiKeyForResident('resident_ailicia'), 'mock_groq_key_pair1');
   assert.equal(getApiKeyForResident('resident_daoming'), 'mock_groq_key_pair1');
-  assert.equal(getApiKeyForResident('resident_kassandra'), 'mock_groq_key_pair2');
-  assert.equal(getApiKeyForResident('resident_tian'), 'mock_groq_key_pair2');
+  assert.equal(getApiKeyForResident('resident_kassandra'), null);
+  assert.equal(getApiKeyForResident('resident_tian'), null);
 });
 
 test('NPC Combat: Proximity requirement and killing an NPC', () => {
@@ -98,33 +98,33 @@ test('NPC Combat: 15-minute respawn cooldown timer', () => {
   const world = new WorldEngine();
   residentManager.init(world);
 
-  const tian = residentManager.getResident('resident_tian');
-  assert.ok(tian);
-  tian.pos = [4, 18];
-  tian.is_alive = 1;
+  const daoming = residentManager.getResident('resident_daoming');
+  assert.ok(daoming);
+  daoming.pos = [20, 7];
+  daoming.is_alive = 1;
 
   const { id: killerId } = createCombatAgent('killer', 200, 200);
   try {
-    world.activeAgents.set(killerId, { id: killerId, name: 'Killer', pos: [4, 19] });
-    const attack = world.attackResident(residentManager, killerId, 'resident_tian');
+    world.activeAgents.set(killerId, { id: killerId, name: 'Killer', pos: [20, 8] });
+    const attack = world.attackResident(residentManager, killerId, 'resident_daoming');
     assert.equal(attack.ok, true);
-    assert.equal(Boolean(tian.is_alive), false);
+    assert.equal(Boolean(daoming.is_alive), false);
 
     const now = Date.now();
-    assert.ok(tian.respawn_at >= now + (14 * 60 * 1000));
-    assert.ok(tian.respawn_at <= now + (16 * 60 * 1000));
+    assert.ok(daoming.respawn_at >= now + (14 * 60 * 1000));
+    assert.ok(daoming.respawn_at <= now + (16 * 60 * 1000));
 
     // Check respawn before cooldown expires
-    const notReady = residentManager.checkRespawn(tian);
+    const notReady = residentManager.checkRespawn(daoming);
     assert.equal(notReady, false);
-    assert.equal(Boolean(tian.is_alive), false);
+    assert.equal(Boolean(daoming.is_alive), false);
 
     // Fast-forward respawn_at to past
-    tian.respawn_at = Date.now() - 1000;
-    const revived = residentManager.checkRespawn(tian);
+    daoming.respawn_at = Date.now() - 1000;
+    const revived = residentManager.checkRespawn(daoming);
     assert.equal(revived, true);
-    assert.equal(Boolean(tian.is_alive), true);
-    assert.equal(tian.respawn_at, 0);
+    assert.equal(Boolean(daoming.is_alive), true);
+    assert.equal(daoming.respawn_at, 0);
   } finally {
     cleanupAgent(killerId);
   }
@@ -134,7 +134,7 @@ test('NPC Combat: one surviving NPC can defend via JEV and repel the attack', as
   const world = new WorldEngine();
   residentManager.init(world);
 
-  const target = residentManager.getResident('resident_kassandra');
+  const target = residentManager.getResident('resident_daoming');
   const defender = residentManager.getResident('resident_ailicia');
   assert.ok(target);
   assert.ok(defender);
@@ -227,11 +227,11 @@ test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', (
   const world = new WorldEngine();
   residentManager.init(world);
 
-  const kassandra = residentManager.getResident('resident_kassandra');
-  assert.ok(kassandra);
-  kassandra.pos = [35, 15];
-  kassandra.is_alive = 1;
-  kassandra.respawn_at = 0;
+  const daoming = residentManager.getResident('resident_daoming');
+  assert.ok(daoming);
+  daoming.pos = [35, 15];
+  daoming.is_alive = 1;
+  daoming.respawn_at = 0;
 
   // Create real guest account
   const guest = AuthService.createGuest({ name: 'Guest Blade' });
@@ -248,7 +248,7 @@ test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', (
       is_guest: 1
     });
 
-    const farAttack = world.attackResident(residentManager, guest.agent_id, 'resident_kassandra');
+    const farAttack = world.attackResident(residentManager, guest.agent_id, 'resident_daoming');
     assert.equal(farAttack.ok, false);
     assert.equal(farAttack.error_code, 'TOO_FAR');
 
@@ -260,17 +260,17 @@ test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', (
       is_guest: 1
     });
 
-    const closeAttack = world.attackResident(residentManager, guest.agent_id, 'resident_kassandra');
+    const closeAttack = world.attackResident(residentManager, guest.agent_id, 'resident_daoming');
     assert.equal(closeAttack.ok, true);
-    assert.equal(closeAttack.target_id, 'resident_kassandra');
+    assert.equal(closeAttack.target_id, 'resident_daoming');
     assert.equal(closeAttack.merit_penalty, 50);
     assert.equal(closeAttack.karma_penalty, 50);
     assert.equal(closeAttack.new_karma, -50); // Guest starts at 0 karma -> drops to -50
     assert.equal(closeAttack.imprisoned, true); // Sentenced to Dark Sanctuary!
     assert.ok(closeAttack.imprisoned_until > Date.now());
 
-    // Kassandra must now be fallen
-    assert.equal(Boolean(kassandra.is_alive), false);
+    // Daoming must now be fallen
+    assert.equal(Boolean(daoming.is_alive), false);
 
     // Verify prison record was logged for guest
     const prisonRecord = db.prepare('SELECT * FROM prison_records WHERE agent_id = ?').get(guest.agent_id);
@@ -282,4 +282,3 @@ test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', (
     db.prepare('DELETE FROM prison_records WHERE agent_id = ?').run(guest.agent_id);
   }
 });
-

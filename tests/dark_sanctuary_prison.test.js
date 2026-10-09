@@ -28,17 +28,17 @@ test('Dark Sanctuary: Negative karma sentences agent to 3 hours imprisonment', (
   const world = new WorldEngine();
   residentManager.init(world);
 
-  const kassandra = residentManager.getResident('resident_kassandra');
-  assert.ok(kassandra);
-  kassandra.pos = [35, 15];
-  kassandra.is_alive = 1;
+  const daoming = residentManager.getResident('resident_daoming');
+  assert.ok(daoming);
+  daoming.pos = [20, 7];
+  daoming.is_alive = 1;
 
   // Agent with 20 karma: killing an NPC will reduce karma by 50 to -30 (< 0)
   const agent = createPrisonTester('felon', 100, 20);
   try {
-    world.activeAgents.set(agent.id, { id: agent.id, name: agent.name, pos: [35, 16], zone_name: 'celestial_overlook' });
+    world.activeAgents.set(agent.id, { id: agent.id, name: agent.name, pos: [20, 8], zone_name: 'bamboo_grove' });
 
-    const result = world.attackResident(agent.id, 'resident_kassandra', residentManager);
+    const result = world.attackResident(agent.id, 'resident_daoming', residentManager);
     assert.equal(result.ok, true);
     assert.equal(result.imprisoned, true);
     assert.equal(result.new_karma, -30);

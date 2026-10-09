@@ -4,21 +4,21 @@ import { JevPolicyValidator } from '../../src/jev/policy.js';
 
 test('JEV Policy Validator — Safety Checks & Cooldown Enforcement', async (t) => {
   const resident = {
-    id: 'resident_tian',
-    name: 'Elder Tian',
+    id: 'resident_daoming',
+    name: 'Master Daoming',
     is_alive: true,
     imprisoned: false
   };
 
   const runtime = {
-    agent_id: 'resident_tian',
+    agent_id: 'resident_daoming',
     is_alive: 1,
     last_jev_decision_at: 0
   };
 
   await t.test('Approves valid decision within bounded actions and outside cooldown', () => {
     const decision = {
-      resident_id: 'resident_tian',
+      resident_id: 'resident_daoming',
       action: 'WELCOME_VISITOR',
       target_id: 'NONE',
       priority: 0.8
@@ -36,7 +36,7 @@ test('JEV Policy Validator — Safety Checks & Cooldown Enforcement', async (t) 
 
   await t.test('Rejects arbitrary action outside bounded vocabulary', () => {
     const decision = {
-      resident_id: 'resident_tian',
+      resident_id: 'resident_daoming',
       action: 'CAST_FIREBALL',
       target_id: 'NONE',
       priority: 0.9
@@ -60,7 +60,7 @@ test('JEV Policy Validator — Safety Checks & Cooldown Enforcement', async (t) 
     };
 
     const decision = {
-      resident_id: 'resident_tian',
+      resident_id: 'resident_daoming',
       action: 'REST',
       target_id: 'NONE',
       priority: 0.5
@@ -90,7 +90,7 @@ test('JEV Policy Validator — Safety Checks & Cooldown Enforcement', async (t) 
   await t.test('Rejects unavailable resident (fallen or imprisoned)', () => {
     const deadResident = { ...resident, is_alive: false };
     const decision = {
-      resident_id: 'resident_tian',
+      resident_id: 'resident_daoming',
       action: 'REST',
       target_id: 'NONE'
     };
@@ -121,7 +121,7 @@ test('JEV Policy Validator — Safety Checks & Cooldown Enforcement', async (t) 
     };
 
     const decision = {
-      resident_id: 'resident_tian',
+      resident_id: 'resident_daoming',
       action: 'OBSERVE',
       target_id: 'ghost_entity_999'
     };

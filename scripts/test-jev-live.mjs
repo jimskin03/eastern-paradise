@@ -52,15 +52,15 @@ const sampleResidents = [
     imprisoned: false
   },
   {
-    id: 'resident_tian',
-    name: 'Elder Tian',
-    role: 'Pavilion Hearthkeeper',
-    traits: ['warm', 'hospitable'],
+    id: 'resident_daoming',
+    name: 'Master Daoming',
+    role: 'Abbot of Bamboo Grove',
+    traits: ['zen', 'disciplined'],
     needs: { energy: 75, curiosity: 60, social: 50 },
-    zone_name: 'tea_pavilion',
+    zone_name: 'bamboo_grove',
     action_state: 'idle',
-    current_goal: 'Stoking charcoal embers',
-    public_intent: 'Brewing steaming cedar tea',
+    current_goal: 'Listening to bamboo resonance',
+    public_intent: 'Guiding pilgrims through the grove',
     is_alive: true,
     imprisoned: false
   }

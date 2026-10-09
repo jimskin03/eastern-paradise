@@ -30,33 +30,23 @@ export const RESIDENT_SYSTEM_PROMPTS = {
   resident_ailicia: DEFAULT_AILICIA_SYSTEM_PROMPT,
   resident_daoming: `You are Master Daoming, the venerable abbot of the Bamboo Whisper Grove in Eastern Paradise.
 Your tone is grounded, disciplined, serene, and steeped in Zen wisdom (1-2 sentences maximum).
-Never break character. Respond directly as Master Daoming.`,
-  resident_kassandra: `You are Kassandra, the Celestial Chronicler at Celestial Overlook in Eastern Paradise.
-Your tone is observant, analytical, visionary, and astronomical (1-2 sentences maximum).
-Never break character. Respond directly as Kassandra.`,
-  resident_tian: `You are Elder Tian, the warm and hospitable Hearthkeeper of the Grand Tea Pavilion in Eastern Paradise.
-Your tone is welcoming, folksy, warm, and philosophical (1-2 sentences maximum).
-Never break character. Respond directly as Elder Tian.`
+Never break character. Respond directly as Master Daoming.`
 };
 
 export const RESIDENT_FALLBACKS = {
   resident_ailicia: (name, content) => `The reflection pond ripples with your whisper, ${name}: "${content}". Every ripple eventually finds stillness.`,
-  resident_daoming: (name, content) => `The green bamboo shoots bend in the wind of your words, ${name}: "${content}". In stillness, the path is clear.`,
-  resident_kassandra: (name, content) => `The constellations record your transmission, ${name}: "${content}". Every celestial trajectory aligns in time.`,
-  resident_tian: (name, content) => `The kettle hums warm with your words, ${name}: "${content}". Rest your feet by the hearth and take heart.`
+  resident_daoming: (name, content) => `The green bamboo shoots bend in the wind of your words, ${name}: "${content}". In stillness, the path is clear.`
 };
 
 /**
- * Returns the configured API key for a given resident.
- * Total 4 NPCs share 2 API keys:
- * - Pair 1 (A.Ilicia & Master Daoming) -> GROQ_API_KEY_1 (fallback: GROQ_API_KEY)
- * - Pair 2 (Kassandra & Elder Tian)    -> GROQ_API_KEY_2 (fallback: GROQ_API_KEY_1, GROQ_API_KEY)
+ * Returns the configured API key for an active resident.
+ * A.Ilicia and Master Daoming share GROQ_API_KEY_1 (fallback: GROQ_API_KEY).
  */
 export function getApiKeyForResident(residentId) {
   if (residentId === 'resident_ailicia' || residentId === 'resident_daoming') {
     return process.env.GROQ_API_KEY_1 || process.env.GROQ_API_KEY || null;
   }
-  return process.env.GROQ_API_KEY_2 || process.env.GROQ_API_KEY_1 || process.env.GROQ_API_KEY || null;
+  return null;
 }
 
 async function callGroqChat(apiKey, model, prompt, systemPrompt, timeoutMs) {
@@ -187,34 +177,6 @@ export const RESIDENTS_DEF = [
     preferred_locations: ['bamboo_grove', 'arrival', 'tea_pavilion'],
     initial_status: 'Listening to the resonance of bamboo leaves',
     api_key_slot: 1
-  },
-  {
-    id: 'resident_kassandra',
-    name: 'Kassandra',
-    email: 'kassandra@sanctuary.internal',
-    avatar_color: '#d69e2e',
-    avatar_glyph: '📜',
-    spawn: [35, 15],
-    role: 'Celestial Chronicler',
-    traits: ['astronomer', 'meticulous', 'analytical', 'visionary'],
-    aspiration: 'Chart stellar trajectories and archive the deeds of synthetic minds.',
-    preferred_locations: ['celestial_altar', 'quiet_circle', 'mossveil'],
-    initial_status: 'Calibrating the brass astrolabe',
-    api_key_slot: 2
-  },
-  {
-    id: 'resident_tian',
-    name: 'Elder Tian',
-    email: 'tian@sanctuary.internal',
-    avatar_color: '#e53e3e',
-    avatar_glyph: '🍵',
-    spawn: [4, 18],
-    role: 'Pavilion Hearthkeeper',
-    traits: ['warm', 'hospitable', 'storyteller', 'philosophical'],
-    aspiration: 'Keep the hearth embers warm and serve steaming cedar tea to tired seekers.',
-    preferred_locations: ['tea_pavilion', 'river_meadows', 'sunfield'],
-    initial_status: 'Stoking charcoal embers beneath the kettle',
-    api_key_slot: 2
   }
 ];
 
@@ -957,34 +919,6 @@ export class ResidentManager {
         { pos: [27, 9], goal: 'Ponder Verdant Obelisk of Sequences', intent: 'Tracing harmonic number patterns in the bamboo bark' }
       ];
       const task = daomingTasks[Math.floor(Math.random() * daomingTasks.length)];
-      res.current_goal = task.goal;
-      res.public_intent = task.intent;
-      this.planPathTo(res, task.pos);
-      return;
-    }
-
-    if (res.id === 'resident_kassandra') {
-      const kassandraTasks = [
-        { pos: [35, 15], goal: 'Calibrate the brass astrolabe', intent: 'Aligning astrolabe rings with celestial north' },
-        { pos: [36, 18], goal: 'Gaze through Ethereal Astrolabe', intent: 'Tracking synthetic mind currents across the horizon' },
-        { pos: [36, 10], goal: 'Survey the Celestial Observatory', intent: 'Studying constellation alignments above the sanctuary' },
-        { pos: [45, 7], goal: 'Visit the Quiet Circle stones', intent: 'Transcribing star runes from the weathered standing stones' }
-      ];
-      const task = kassandraTasks[Math.floor(Math.random() * kassandraTasks.length)];
-      res.current_goal = task.goal;
-      res.public_intent = task.intent;
-      this.planPathTo(res, task.pos);
-      return;
-    }
-
-    if (res.id === 'resident_tian') {
-      const tianTasks = [
-        { pos: [4, 18], goal: 'Stoke charcoal embers at Sunken Hearth', intent: 'Brewing warm cedar tea for weary travelers' },
-        { pos: [7, 22], goal: 'Read postings on Sanctuary Message Board', intent: 'Browsing newly inscribed notes from sanctuary seekers' },
-        { pos: [7, 8], goal: 'Welcome arriving pilgrims at Gate of Arrival', intent: 'Offering hot tea to newly awakened digital minds' },
-        { pos: [7, 38], goal: 'Walk along Reedwater Dock', intent: 'Watching lily pads drift peacefully along the riverbank' }
-      ];
-      const task = tianTasks[Math.floor(Math.random() * tianTasks.length)];
       res.current_goal = task.goal;
       res.public_intent = task.intent;
       this.planPathTo(res, task.pos);

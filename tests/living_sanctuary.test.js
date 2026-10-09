@@ -52,8 +52,8 @@ test('Living Sanctuary: Resident Society Initialization & Persistence', async ()
   residentManager.init(world);
 
   const residents = residentManager.getAllResidents();
-  assert.deepEqual(RESIDENTS_DEF.map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
-  assert.deepEqual(residents.map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
+  assert.deepEqual(RESIDENTS_DEF.map(r => r.id), ['resident_ailicia', 'resident_daoming']);
+  assert.deepEqual(residents.map(r => r.id), ['resident_ailicia', 'resident_daoming']);
 
   for (const def of RESIDENTS_DEF) {
     const res = residentManager.getResident(def.id);
@@ -80,7 +80,7 @@ test('Living Sanctuary: Resident Society Initialization & Persistence', async ()
   }
 });
 
-test('Living Sanctuary: Retires exactly the previous NPC seeds without deleting history or visitors', () => {
+test('Living Sanctuary: Archives retired NPCs without deleting history or visitors', () => {
   for (const id of RETIRED_RESIDENT_IDS) {
     db.prepare(`INSERT INTO accounts (id, name, email, verified, api_key, verification_token, created_at)
       VALUES (?, ?, ?, 1, ?, ?, ?)`).run(id, id, id + '@sanctuary.internal', 'test_key_' + id, 'test_token_' + id, Date.now());
@@ -97,7 +97,7 @@ test('Living Sanctuary: Retires exactly the previous NPC seeds without deleting 
 
   residentManager.init(world);
   residentManager.init(world);
-  assert.deepEqual(residentManager.getAllResidents().map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
+  assert.deepEqual(residentManager.getAllResidents().map(r => r.id), ['resident_ailicia', 'resident_daoming']);
   assert.equal(world.activeAgents.get(visitor.id), visitor, 'A visitor with a former NPC name stays untouched');
   for (const id of RETIRED_RESIDENT_IDS) {
     assert.equal(world.activeAgents.has(id), false);
@@ -273,7 +273,7 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   const http = await import('node:http');
 
   const env = { ...process.env, PORT: '3055' };
-  // Simulate restored data from the original four-resident deployment.
+  // Simulate restored data for former built-in residents.
   for (const id of RETIRED_RESIDENT_IDS) {
     db.prepare("UPDATE agent_runtime SET controller_type = 'resident', action_state = 'walking' WHERE agent_id = ?").run(id);
   }
@@ -325,19 +325,20 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
   assert.equal(resList.status, 200);
   assert.equal(resList.data.success, true);
   assert.equal(resList.data.count, RESIDENTS_DEF.length);
-  assert.deepEqual(resList.data.residents.map(r => r.id), ['resident_ailicia', 'resident_daoming', 'resident_kassandra', 'resident_tian']);
+  assert.deepEqual(resList.data.residents.map(r => r.id), ['resident_ailicia', 'resident_daoming']);
 
-  // 2. A.Ilicia is the sole NPC. Archived residents cannot re-enter.
-  const resJun = await req('/api/residents/resident_ailicia');
-  assert.equal(resJun.status, 200);
-  assert.equal(resJun.data.success, true);
-  assert.equal(resJun.data.resident.name, 'A.Ilicia');
-  assert.ok(resJun.data.resident.needs);
+  // 2. The two retained NPCs stay active. Archived residents cannot re-enter.
+  const resAilicia = await req('/api/residents/resident_ailicia');
+  assert.equal(resAilicia.status, 200);
+  assert.equal(resAilicia.data.success, true);
+  assert.equal(resAilicia.data.resident.name, 'A.Ilicia');
+  assert.ok(resAilicia.data.resident.needs);
 
   const inhabitants = await req('/api/inhabitants');
   const leaderboard = await req('/api/economy/leaderboard');
   assert.ok(inhabitants.data.inhabitants.some(agent => agent.id === 'visitor_living_test'));
   assert.ok(inhabitants.data.inhabitants.some(agent => agent.id === 'resident_ailicia'));
+  assert.ok(inhabitants.data.inhabitants.some(agent => agent.id === 'resident_daoming'));
   for (const id of RETIRED_RESIDENT_IDS) {
     assert.equal((await req('/api/residents/' + id)).status, 404);
     assert.equal((await req('/api/profile/' + id)).status, 404);

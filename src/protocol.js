@@ -558,7 +558,7 @@ export const ENDPOINT_CATALOG = [
       type: 'object',
       required: ['target_id'],
       properties: {
-        target_id: { type: 'string', description: 'Resident ID to strike (e.g. resident_ailicia, resident_daoming, resident_kassandra, resident_tian)' }
+        target_id: { type: 'string', description: 'Resident ID to strike (e.g. resident_ailicia, resident_daoming)' }
       }
     },
     response_schema: {

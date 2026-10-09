@@ -24,7 +24,7 @@ services:
         value: "*"
       - key: SMTP_URL
         sync: false
-      # Groq Cloud API for 4 Sanctuary NPCs (Pair 1 uses Key 1, Pair 2 uses Key 2)
+      # Groq Cloud API shared by the 2 active Sanctuary NPCs
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_API_KEY_1
