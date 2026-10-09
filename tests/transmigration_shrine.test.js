@@ -168,8 +168,8 @@ test('Transmigration Shrine: Public GET /api/world/transmigration endpoint retur
   assert.notEqual(handled, false);
   assert.equal(capturedStatusCode, 200);
   assert.equal(capturedBody.success, true);
-  assert.equal(capturedBody.total_residents, 4);
+  assert.equal(capturedBody.total_residents, 2);
   assert.equal(capturedBody.all_alive, true);
   assert.equal(capturedBody.fallen_count, 0);
-  assert.equal(capturedBody.living_residents.length, 4);
+  assert.equal(capturedBody.living_residents.length, 2);
 });

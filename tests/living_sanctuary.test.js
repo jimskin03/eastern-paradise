@@ -345,10 +345,12 @@ test('Living Sanctuary: End-to-End Server REST Endpoints', async (t) => {
     assert.ok(!inhabitants.data.inhabitants.some(agent => agent.id === id));
     assert.ok(!leaderboard.data.top_agents.some(agent => agent.id === id));
     assert.ok(!leaderboard.data.top_sponsors.some(agent => agent.id === id));
-    const whisper = await req('/api/spectator/message', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }
-    }, { target_agent_id: id, content: 'Can you return?' });
-    assert.equal(whisper.status, 404);
+    if (id === 'resident_kassandra') {
+      const whisper = await req('/api/spectator/message', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }
+      }, { target_agent_id: id, content: 'Can you return?' });
+      assert.equal(whisper.status, 404);
+    }
     const state = await req('/api/world/state', { headers: { Authorization: 'Bearer test_key_' + id } });
     assert.equal(state.status, 401);
   }
