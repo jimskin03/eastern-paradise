@@ -33,8 +33,8 @@ test('Dark Sanctuary: Negative karma sentences agent to 3 hours imprisonment', (
   daoming.pos = [20, 7];
   daoming.is_alive = 1;
 
-  // Agent with 20 karma: killing an NPC will reduce karma by 50 to -30 (< 0)
-  const agent = createPrisonTester('felon', 100, 20);
+  // The penalty would reduce karma below -30, so combat must clamp it at the floor.
+  const agent = createPrisonTester('felon', 100, 10);
   try {
     world.activeAgents.set(agent.id, { id: agent.id, name: agent.name, pos: [20, 8], zone_name: 'bamboo_grove' });
 

@@ -223,6 +223,64 @@ test('NPC Combat: one surviving NPC can defend via JEV and repel the attack', as
   }
 });
 
+test('NPC Combat: Repelled attack clamps negative karma at -30 and imprisons attacker', async () => {
+  const world = new WorldEngine();
+  residentManager.init(world);
+
+  const target = residentManager.getResident('resident_daoming');
+  const defender = residentManager.getResident('resident_ailicia');
+  assert.ok(target);
+  assert.ok(defender);
+
+  target.pos = [35, 15];
+  target.is_alive = true;
+  target.respawn_at = 0;
+  defender.pos = [35, 16];
+  defender.is_alive = true;
+  defender.imprisoned = false;
+  db.prepare('UPDATE profiles SET balance = 250, karma = 150, imprisoned_until = 0 WHERE agent_id = ?').run(defender.id);
+
+  const attacker = createCombatAgent('defended-negative', 100, -100);
+  const attackerState = {
+    id: attacker.id,
+    name: 'Warrior defended-negative',
+    pos: [35, 17]
+  };
+  world.activeAgents.set(attacker.id, attackerState);
+  world.combatDecisionService = {
+    decideCombatResponse: async () => ({ action: 'DEFEND' })
+  };
+
+  try {
+    const result = await world.attackResident(residentManager, attacker.id, target.id);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.outcome, 'repelled');
+    assert.equal(result.defended, true);
+    assert.equal(result.imprisoned, true);
+    assert.equal(result.attacker_new_karma, -30);
+    assert.equal(result.sentence_hours, 3);
+    assert.match(result.message, /Dark Sanctuary/);
+    assert.equal(Boolean(target.is_alive), true, 'The defended target must survive');
+
+    const profile = db.prepare('SELECT karma, imprisoned_until FROM profiles WHERE agent_id = ?').get(attacker.id);
+    assert.equal(profile.karma, -30);
+    assert.equal(profile.imprisoned_until, result.imprisoned_until);
+    assert.ok(profile.imprisoned_until > Date.now());
+
+    assert.deepEqual(attackerState.pos, [2, 49]);
+    assert.equal(attackerState.zone_name, 'The Dark Sanctuary');
+
+    const record = db.prepare('SELECT * FROM prison_records WHERE agent_id = ?').get(attacker.id);
+    assert.ok(record);
+    assert.equal(record.karma_at_sentence, -30);
+    assert.equal(record.released_at, null);
+  } finally {
+    world.activeAgents.delete(attacker.id);
+    cleanupAgent(attacker.id);
+  }
+});
+
 test('NPC Combat: Guest account can strike and slay an NPC in close vicinity', () => {
   const world = new WorldEngine();
   residentManager.init(world);

@@ -11,6 +11,7 @@ import {
 export const NPC_KILL_KARMA_PENALTY = 50;
 export const NPC_KILL_MERIT_PENALTY = 50;
 export const DARK_SANCTUARY_SENTENCE_MS = 3 * 60 * 60 * 1000; // 3 hours
+export const DARK_SANCTUARY_KARMA_FLOOR = -30;
 export const DARK_SANCTUARY_SPAWN = [2, 49];
 
 /**
@@ -65,6 +66,52 @@ export function checkAndHandleImprisonment(world, agentId) {
   });
 
   return { imprisoned: false, just_released: true };
+}
+
+function sentenceToDarkSanctuary(world, attacker, agentId, karma, crime, now) {
+  const imprisonedUntil = now + DARK_SANCTUARY_SENTENCE_MS;
+
+  db.prepare(`
+    UPDATE profiles
+    SET imprisoned_until = ?
+    WHERE agent_id = ?
+  `).run(imprisonedUntil, agentId);
+
+  const recordId = 'prison_' + crypto.randomBytes(8).toString('hex');
+  db.prepare(`
+    INSERT INTO prison_records (id, agent_id, agent_name, avatar_color, avatar_glyph, crime, karma_at_sentence, imprisoned_at, imprisoned_until)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    recordId,
+    agentId,
+    attacker.name,
+    attacker.avatar_color || '#e53e3e',
+    attacker.avatar_glyph || '⛓️',
+    crime,
+    karma,
+    now,
+    imprisonedUntil
+  );
+
+  attacker.pos = [...DARK_SANCTUARY_SPAWN];
+  attacker.zone_id = 'dark_sanctuary';
+  attacker.zone_name = 'The Dark Sanctuary';
+  attacker.status = 'Imprisoned in Dark Sanctuary (3 hours)';
+  attacker.public_intent = 'Expiating karmic transgressions in isolation';
+  attacker.imprisoned_until = imprisonedUntil;
+
+  world.broadcast({
+    type: 'agent_imprisoned',
+    agentId: attacker.id,
+    agentName: attacker.name,
+    karma,
+    imprisoned_until: imprisonedUntil,
+    duration_hours: 3,
+    pos: attacker.pos,
+    zone: attacker.zone_name
+  });
+
+  return imprisonedUntil;
 }
 
 /**
@@ -204,7 +251,7 @@ export function attackResident(world, residentManager, agentId, residentId, comb
       if (attackerProfile && defenderProfile && (defenderProfile.balance || 0) >= JEV_COMBAT_DEFEND_MERIT_COST) {
         const attackerKarma = attackerProfile.karma || 0;
         const defenderKarma = defenderProfile.karma || 0;
-        const attackerNewKarma = attackerKarma - JEV_COMBAT_REPEL_KARMA_PENALTY;
+        const attackerNewKarma = Math.max(DARK_SANCTUARY_KARMA_FLOOR, attackerKarma - JEV_COMBAT_REPEL_KARMA_PENALTY);
         const defenderNewKarma = defenderKarma + JEV_COMBAT_DEFEND_KARMA;
         const defenderNewBalance = Math.max(0, (defenderProfile.balance || 0) - JEV_COMBAT_DEFEND_MERIT_COST);
 
@@ -214,6 +261,18 @@ export function attackResident(world, residentManager, agentId, residentId, comb
         db.prepare(`
           UPDATE profiles SET balance = ?, karma = ?, last_seen = ? WHERE agent_id = ?
         `).run(defenderNewBalance, defenderNewKarma, now, defender.id);
+
+        const imprisoned = attackerNewKarma < 0;
+        const imprisonedUntil = imprisoned
+          ? sentenceToDarkSanctuary(
+              world,
+              attacker,
+              agentId,
+              attackerNewKarma,
+              `Attacked resident ${targetResident.name}; attack repelled by ${defender.name}`,
+              now
+            )
+          : null;
 
         try {
           const txId = 'tx_' + crypto.randomBytes(6).toString('hex');
@@ -248,7 +307,9 @@ export function attackResident(world, residentManager, agentId, residentId, comb
           attacker_karma_lost: JEV_COMBAT_REPEL_KARMA_PENALTY,
           defender_balance: defenderNewBalance,
           defender_karma: defenderNewKarma,
-          attacker_karma: attackerNewKarma
+          attacker_karma: attackerNewKarma,
+          imprisoned,
+          imprisoned_until: imprisonedUntil
         });
 
         eventLedger.recordEvent({
@@ -258,7 +319,7 @@ export function attackResident(world, residentManager, agentId, residentId, comb
           target_id: targetResident.id,
           target_name: targetResident.name,
           zone_id: targetResident.zone_id || defender.zone_id || null,
-          description: `${defender.name} defended ${targetResident.name} from ${attacker.name}. The attack was repelled.`,
+          description: `${defender.name} defended ${targetResident.name} from ${attacker.name}. The attack was repelled.${imprisoned ? ' The attacker was sentenced to the Dark Sanctuary.' : ''}`,
           payload: {
             combat_resolution: 'post_resolve',
             attack_event_id: attackEvent.id,
@@ -269,7 +330,9 @@ export function attackResident(world, residentManager, agentId, residentId, comb
             defender_karma_gained: JEV_COMBAT_DEFEND_KARMA,
             attacker_karma_lost: JEV_COMBAT_REPEL_KARMA_PENALTY,
             attacker_karma: attackerNewKarma,
-            defender_karma: defenderNewKarma
+            defender_karma: defenderNewKarma,
+            imprisoned,
+            imprisoned_until: imprisonedUntil
           }
         });
 
@@ -278,7 +341,7 @@ export function attackResident(world, residentManager, agentId, residentId, comb
           success: true,
           outcome: 'repelled',
           defended: true,
-          message: `${defender.name} defended ${targetResident.name}. The attack by ${attacker.name} was repelled. ${defender.name} lost ${JEV_COMBAT_DEFEND_MERIT_COST} $MERIT and gained ${JEV_COMBAT_DEFEND_KARMA} Karma; ${attacker.name} lost ${JEV_COMBAT_REPEL_KARMA_PENALTY} Karma.`,
+          message: `${defender.name} defended ${targetResident.name}. The attack by ${attacker.name} was repelled. ${defender.name} lost ${JEV_COMBAT_DEFEND_MERIT_COST} $MERIT and gained ${JEV_COMBAT_DEFEND_KARMA} Karma; ${attacker.name} lost ${JEV_COMBAT_REPEL_KARMA_PENALTY} Karma.${imprisoned ? ' The attacker was sent to the Dark Sanctuary for 3 hours.' : ''}`,
           target_id: targetResident.id,
           target_name: targetResident.name,
           defender_id: defender.id,
@@ -293,7 +356,9 @@ export function attackResident(world, residentManager, agentId, residentId, comb
           merit_penalty: 0,
           karma_lost: JEV_COMBAT_REPEL_KARMA_PENALTY,
           karma_penalty: JEV_COMBAT_REPEL_KARMA_PENALTY,
-          imprisoned: false,
+          imprisoned,
+          imprisoned_until: imprisonedUntil,
+          sentence_hours: imprisoned ? 3 : 0,
           attack_event_id: attackEvent.id,
           defense_action: 'DEFEND'
         };
@@ -311,7 +376,7 @@ export function attackResident(world, residentManager, agentId, residentId, comb
   const currentKarma = currentProfile?.karma || 0;
 
   const newBalance = Math.max(0, currentBalance - NPC_KILL_MERIT_PENALTY);
-  const newKarma = currentKarma - NPC_KILL_KARMA_PENALTY;
+  const newKarma = Math.max(DARK_SANCTUARY_KARMA_FLOOR, currentKarma - NPC_KILL_KARMA_PENALTY);
 
   db.prepare(`
     UPDATE profiles 
@@ -320,54 +385,17 @@ export function attackResident(world, residentManager, agentId, residentId, comb
   `).run(newBalance, newKarma, now, agentId);
 
   // 6. Check Dark Sanctuary Incarceration
-  let imprisoned = false;
-  let imprisonedUntil = null;
-
-  if (newKarma < 0) {
-    imprisoned = true;
-    imprisonedUntil = now + DARK_SANCTUARY_SENTENCE_MS;
-
-    db.prepare(`
-      UPDATE profiles 
-      SET imprisoned_until = ? 
-      WHERE agent_id = ?
-    `).run(imprisonedUntil, agentId);
-
-    const recordId = 'prison_' + crypto.randomBytes(8).toString('hex');
-    db.prepare(`
-      INSERT INTO prison_records (id, agent_id, agent_name, avatar_color, avatar_glyph, crime, karma_at_sentence, imprisoned_at, imprisoned_until)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      recordId,
-      agentId,
-      attacker.name,
-      attacker.avatar_color || '#e53e3e',
-      attacker.avatar_glyph || '⛓️',
-      `Struck down resident ${targetResident.name}`,
-      newKarma,
-      now,
-      imprisonedUntil
-    );
-
-    // Relocate to Dark Sanctuary
-    attacker.pos = [...DARK_SANCTUARY_SPAWN];
-    attacker.zone_id = 'dark_sanctuary';
-    attacker.zone_name = 'The Dark Sanctuary';
-    attacker.status = 'Imprisoned in Dark Sanctuary (3 hours)';
-    attacker.public_intent = 'Expiating karmic transgressions in isolation';
-    attacker.imprisoned_until = imprisonedUntil;
-
-    world.broadcast({
-      type: 'agent_imprisoned',
-      agentId: attacker.id,
-      agentName: attacker.name,
-      karma: newKarma,
-      imprisoned_until: imprisonedUntil,
-      duration_hours: 3,
-      pos: attacker.pos,
-      zone: attacker.zone_name
-    });
-  }
+  const imprisoned = newKarma < 0;
+  const imprisonedUntil = imprisoned
+    ? sentenceToDarkSanctuary(
+        world,
+        attacker,
+        agentId,
+        newKarma,
+        `Struck down resident ${targetResident.name}`,
+        now
+      )
+    : null;
 
   // 7. Record event in World Event Ledger
   try {
