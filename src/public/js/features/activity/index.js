@@ -1,4 +1,5 @@
 import { apiFetch } from '../../api/client.js';
+import { startVisiblePolling } from '../../api/visible-polling.js';
 
 function elapsedLabel(createdAt) {
   if (!createdAt) return 'quiet now';
@@ -68,8 +69,5 @@ window.addEventListener('keydown', event => {
 });
 
 export function initHappeningNow() {
-  refreshHappeningNow();
-  // Refresh occasionally while the page is open, without turning this card
-  // into a polling dashboard.
-  window.setInterval(refreshHappeningNow, 60 * 1000);
+  startVisiblePolling(refreshHappeningNow, 60 * 1000);
 }

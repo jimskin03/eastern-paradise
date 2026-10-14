@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { createLifecycle } from '../src/runtime/lifecycle.js';
-import { shouldRecordActivity } from '../src/http/router.js';
+import { createRequestHandler, shouldRecordActivity } from '../src/http/router.js';
 import { handleAdminRoutes } from '../src/http/routes/admin.routes.js';
 
 test('Lifecycle serializes ticks while preserving idle, spectator-aware wake, and status behavior', async t => {
@@ -60,7 +60,7 @@ test('Lifecycle serializes ticks while preserving idle, spectator-aware wake, an
 
   lifecycle.markActivity();
   assert.equal(lifecycle.getState(), 'ACTIVE');
-  assert.equal(calls.broadcasts, 1);
+  assert.equal(calls.broadcasts, 2);
   assert.equal(scheduledCallbacks.length, 2);
 
   spectatorCount = 1;
@@ -113,6 +113,38 @@ test('Only meaningful API traffic is counted as lifecycle activity', () => {
   assert.equal(shouldRecordActivity('/api/metrics'), false);
   assert.equal(shouldRecordActivity('/healthz'), false);
   assert.equal(shouldRecordActivity('/js/app.js'), false);
+});
+
+test('Only successful API routes wake the simulation', async () => {
+  let activity = 0;
+  let limited = false;
+  const handler = createRequestHandler({
+    services: {
+      buildAgentCard: () => ({ name: 'Test' }),
+      AuthService: { authenticate: () => null }
+    },
+    runtime: { markActivity: () => activity++ },
+    limits: { checkRateLimit: () => ({ limited, retryAfter: 1 }) },
+    publicDir: '/tmp/nonexistent-eastern-paradise-public'
+  });
+  async function request(url) {
+    const response = {
+      statusCode: 200,
+      writeHead(status) { this.statusCode = status; this.headersSent = true; },
+      end() { this.writableEnded = true; }
+    };
+    await handler({ url, method: 'GET', headers: { host: 'localhost' } }, response);
+    return response.statusCode;
+  }
+  assert.equal(await request('/api/agent-card'), 200);
+  assert.equal(activity, 1);
+  assert.equal(await request('/api/economy/balance'), 401);
+  assert.equal(activity, 1);
+  assert.equal(await request('/api/does-not-exist'), 404);
+  assert.equal(activity, 1);
+  limited = true;
+  assert.equal(await request('/api/agent-card'), 429);
+  assert.equal(activity, 1);
 });
 
 test('Admin routes preserve disabled endpoint guards', async t => {
@@ -257,6 +289,7 @@ test('WebSocket /ws/world preserves init, ping/pong, world events, and disconnec
   }
 
   await once(ws, 'open');
+  assert.match(ws.extensions, /permessage-deflate/);
   const init = await nextMessage(message => message.type === 'init_world');
   assert.ok(Array.isArray(init.data.agents));
   assert.ok(Array.isArray(init.data.zones));

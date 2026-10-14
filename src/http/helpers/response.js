@@ -6,7 +6,7 @@ export function sendJson(res, statusCode, data, extraHeaders = {}) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Agent-Key, Idempotency-Key',
     ...extraHeaders
   });
-  res.end(JSON.stringify(data, null, 2));
+  res.end(JSON.stringify(data));
 }
 
 export function sendApiError(res, statusCode, errorCode, message, suggestedAction, extra = {}, extraHeaders = {}) {

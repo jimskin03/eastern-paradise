@@ -32,11 +32,20 @@ export function attachWorldWebSocket({ server, world, db, lifecycle }) {
   }
 
   world.onEvent(event => {
+    if (spectatorClients.size === 0) return;
     const payload = JSON.stringify(event);
     for (const client of spectatorClients) safeSend(client, payload);
   });
 
-  const wss = new WebSocketServer({ server, path: '/ws/world' });
+  const wss = new WebSocketServer({
+    server,
+    path: '/ws/world',
+    perMessageDeflate: {
+      threshold: 1024,
+      serverNoContextTakeover: true,
+      clientNoContextTakeover: true
+    }
+  });
   wss.on('error', err => {
     console.error('[WebSocketServer] Error:', err.message);
   });

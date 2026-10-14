@@ -69,7 +69,6 @@ export function createRequestHandler({ services, runtime, limits, publicDir }) {
 
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
-    if (shouldRecordActivity(pathname)) runtime.markActivity();
 
     if (pathname === '/privacy' || pathname === '/privacy/') {
       res.writeHead(302, { Location: 'https://cryptgregresearch.org/privacy/' });
@@ -99,7 +98,12 @@ export function createRequestHandler({ services, runtime, limits, publicDir }) {
     try {
       for (const handler of routeHandlers) {
         const handled = await handler(ctx);
-        if (handled === true || res.writableEnded || res.headersSent) return;
+        if (handled === true || res.writableEnded || res.headersSent) {
+          // Failed authentication, unknown paths, and rate-limited probes are
+          // not visitors and must not wake an otherwise empty sanctuary.
+          if (res.statusCode < 400 && shouldRecordActivity(pathname)) runtime.markActivity();
+          return;
+        }
       }
 
       if (serveStaticFile({ pathname, req, res, publicDir })) return;

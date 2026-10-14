@@ -1,6 +1,5 @@
 import { TABLE_PK } from '../sync-config.js';
 import { shouldRetainCloudRow } from './filters.js';
-import { ensureCloudSchema } from './schema.js';
 
 function createDeleteStatement(tableName, rowPk, pkDef) {
   if (Array.isArray(pkDef)) {
@@ -21,16 +20,8 @@ export async function pushToCloud({ db, cloudClient }) {
   if (!cloudClient) return { synced: 0 };
 
   try {
-    // Backfill any puzzle_interaction_logs records into _sync_changes if unqueued
-    try {
-      db.prepare(`
-        INSERT INTO _sync_changes (table_name, row_pk, op, created_at)
-        SELECT 'puzzle_interaction_logs', id, 'UPSERT', ?
-        FROM puzzle_interaction_logs
-        WHERE id NOT IN (SELECT row_pk FROM _sync_changes WHERE table_name = 'puzzle_interaction_logs')
-      `).run(Date.now());
-    } catch (_) {}
-
+    // All synced tables, including puzzle logs, have change-tracking triggers.
+    // Re-enqueuing existing rows here would upload them again after every ack.
     const dirtyRows = db.prepare(`
       SELECT id, table_name, row_pk, op
       FROM _sync_changes
