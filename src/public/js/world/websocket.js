@@ -6,41 +6,51 @@
 import {
   worldData, setWorldData, agents, serverState, setServerState,
   sanctuaryCirculation, setSanctuaryCirculation, canvas, escapeHtml, logActivity,
-  addBubble, triggerShrineWave, setWs, getWs
+  addBubble, triggerShrineWave, setWs
 } from './state.js';
 import { soundSystem } from './audio.js';
 import { fitTerrariumCamera, updateCanvasDimensions } from './camera.js';
+import { createWorldConnection } from './connection.js';
+
+let connection = null;
+let journalRefreshTimer = null;
 
 function connectWebSocket() {
+  if (connection) return connection.connect();
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/world`;
 
-  setWs(new WebSocket(wsUrl));
+  connection = createWorldConnection({
+    url: wsUrl,
+    onSocket: setWs,
+    onOpen: () => {
+      console.log('[Spectator] Connected to Eastern Paradise Isometric Live Stream.');
+      const watermark = document.getElementById('feedSyncWatermark');
+      if (watermark) watermark.textContent = `last-synced: ${new Date().toLocaleTimeString()} (live)`;
+      const banner = document.getElementById('feedOfflineBanner');
+      if (banner) banner.style.display = 'none';
+    },
 
-  getWs().onopen = () => {
-    console.log('[Spectator] Connected to Eastern Paradise Isometric Live Stream.');
-    const watermark = document.getElementById('feedSyncWatermark');
-    if (watermark) watermark.textContent = `last-synced: ${new Date().toLocaleTimeString()} (live)`;
-    const banner = document.getElementById('feedOfflineBanner');
-    if (banner) banner.style.display = 'none';
-  };
+    onMessage: (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg);
+      } catch (err) {
+        console.error('[Spectator] Error parsing message:', err);
+      }
+    },
 
-  getWs().onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      handleServerMessage(msg);
-    } catch (err) {
-      console.error('[Spectator] Error parsing message:', err);
+    onClose: () => {
+      const watermark = document.getElementById('feedSyncWatermark');
+      if (watermark) watermark.textContent = 'last-synced: offline (reconnecting...)';
+      const banner = document.getElementById('feedOfflineBanner');
+      if (banner) banner.style.display = 'block';
+    },
+    onPause: () => {
+      const watermark = document.getElementById('feedSyncWatermark');
+      if (watermark) watermark.textContent = 'Live feed paused while this tab is hidden';
     }
-  };
-
-  getWs().onclose = () => {
-    const watermark = document.getElementById('feedSyncWatermark');
-    if (watermark) watermark.textContent = 'last-synced: offline (reconnecting...)';
-    const banner = document.getElementById('feedOfflineBanner');
-    if (banner) banner.style.display = 'block';
-    setTimeout(connectWebSocket, 3000);
-  };
+  });
 }
 
 function handleServerMessage(msg) {
@@ -248,9 +258,7 @@ function handleServerMessage(msg) {
         } else if (evt.event_type === 'chime_ringing') {
           soundSystem.play('chime');
         }
-        if (typeof refreshJournal === 'function') {
-          refreshJournal();
-        }
+        scheduleJournalRefresh();
       }
       break;
     }
@@ -268,15 +276,13 @@ function handleServerMessage(msg) {
         soundSystem.play('shrine_blessing');
         triggerShrineWave();
       }
-      if (typeof refreshJournal === 'function') {
-        refreshJournal();
-      }
+      scheduleJournalRefresh();
       break;
     }
 
     case 'board_updated':
-      if (typeof refreshBoard === 'function') {
-        refreshBoard();
+      if (isPaneVisible('boardTab') && typeof window.refreshBoard === 'function') {
+        window.refreshBoard();
       }
       break;
 
@@ -290,6 +296,20 @@ function handleServerMessage(msg) {
       break;
     }
   }
+}
+
+function isPaneVisible(id) {
+  return !document.hidden
+    && document.getElementById('consoleDrawer')?.classList.contains('open')
+    && document.getElementById(id)?.classList.contains('active');
+}
+
+function scheduleJournalRefresh() {
+  if (journalRefreshTimer || !isPaneVisible('journalTab')) return;
+  journalRefreshTimer = setTimeout(() => {
+    journalRefreshTimer = null;
+    if (isPaneVisible('journalTab')) window.refreshJournal?.();
+  }, 5000);
 }
 
 function updateServerStatus(state) {

@@ -41,6 +41,7 @@ export function createLifecycle({ world, residentManager }) {
       if (!hasSpectators && !hasRecentActivity) {
         serverState = 'IDLE';
         lastTickAt = null;
+        realtimeGateway?.broadcastServerStatus();
         console.log('[Lifecycle] No visitors or active connections. Server entering IDLE SLEEP (ticks suspended).');
         return false;
       }

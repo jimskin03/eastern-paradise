@@ -1,4 +1,5 @@
 import { apiFetch } from '../../api/client.js';
+import { startVisiblePolling } from '../../api/visible-polling.js';
 
 const grids = new Map();
 
@@ -87,5 +88,4 @@ export async function editLandPlot(gridId) {
 }
 
 window.EasternParadiseLand = { refreshLand, getLandGrid, drawLandOverlay, purchaseLandGrid, editLandPlot };
-refreshLand();
-setInterval(refreshLand, 60_000);
+startVisiblePolling(refreshLand, 60_000);
