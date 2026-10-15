@@ -51,7 +51,7 @@ export function attachWorldWebSocket({ server, world, db, lifecycle }) {
   });
 
   wss.on('connection', ws => {
-    lifecycle.markActivity();
+    lifecycle.markActivity('spectator_connected');
     ws.isAlive = true;
     spectatorClients.add(ws);
     console.log(`[WebSocket] Spectator connected. Active spectators: ${spectatorClients.size}`);
@@ -79,10 +79,10 @@ export function attachWorldWebSocket({ server, world, db, lifecycle }) {
     }));
 
     ws.on('message', data => {
-      lifecycle.markActivity();
       try {
         const msg = JSON.parse(data.toString());
         if (msg.type === 'ping') {
+          lifecycle.markActivity('spectator_ping');
           safeSend(ws, JSON.stringify({ type: 'pong', timestamp: Date.now() }));
         }
       } catch (_) {}

@@ -57,10 +57,17 @@ const routeHandlers = [
 
 const PASSIVE_PATHS = new Set(['/api/status', '/api/metrics', '/api/health', '/health', '/healthz']);
 
-// Static assets and load-balancer health checks must not keep a sleeping
-// simulation alive. Normal API requests remain a meaningful visitor signal.
-export function shouldRecordActivity(pathname) {
-  return pathname.startsWith('/api/') && !PASSIVE_PATHS.has(pathname);
+// Public reads are used by crawlers, monitors and background dashboards too.
+// Only participation or a verified agent read should renew the activity lease;
+// human spectators are accounted for by their live WebSocket connection.
+export function shouldRecordActivity(pathname, req, authService) {
+  if (!pathname.startsWith('/api/') || PASSIVE_PATHS.has(pathname)
+    || pathname.startsWith('/api/admin/') || pathname.startsWith('/api/dev/')) return false;
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return true;
+  // Legacy browse-only agents create sessions via GET; verification also
+  // changes account state. These are actions despite their HTTP method.
+  if (req.method === 'GET' && ['/api/auth/guest', '/api/auth/verify'].includes(pathname)) return true;
+  return req.method === 'GET' && Boolean(authService?.authenticate(req));
 }
 
 export function createRequestHandler({ services, runtime, limits, publicDir }) {
@@ -101,7 +108,10 @@ export function createRequestHandler({ services, runtime, limits, publicDir }) {
         if (handled === true || res.writableEnded || res.headersSent) {
           // Failed authentication, unknown paths, and rate-limited probes are
           // not visitors and must not wake an otherwise empty sanctuary.
-          if (res.statusCode < 400 && shouldRecordActivity(pathname)) runtime.markActivity();
+          if (res.statusCode < 400 && shouldRecordActivity(pathname, req, services.AuthService)) {
+            // Never include query strings: legacy clients can put API keys there.
+            runtime.markActivity(`${req.method} ${pathname}`);
+          }
           return;
         }
       }

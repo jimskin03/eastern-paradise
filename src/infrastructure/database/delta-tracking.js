@@ -10,6 +10,7 @@ export function initializeDeltaTracking(db) {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_sync_changes_tbl_id ON _sync_changes (table_name, id);
+    CREATE INDEX IF NOT EXISTS idx_sync_changes_row ON _sync_changes (table_name, row_pk, id);
   `);
 
   for (const table of SYNC_TABLES) {

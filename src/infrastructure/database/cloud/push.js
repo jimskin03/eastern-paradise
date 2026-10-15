@@ -1,3 +1,4 @@
+import { withImmediateTransaction } from '../transactions.js';
 import { TABLE_PK } from '../sync-config.js';
 import { shouldRetainCloudRow } from './filters.js';
 
@@ -20,72 +21,61 @@ export async function pushToCloud({ db, cloudClient }) {
   if (!cloudClient) return { synced: 0 };
 
   try {
-    // All synced tables, including puzzle logs, have change-tracking triggers.
-    // Re-enqueuing existing rows here would upload them again after every ack.
-    const dirtyRows = db.prepare(`
-      SELECT id, table_name, row_pk, op
-      FROM _sync_changes
-      ORDER BY id ASC
-      LIMIT 500
-    `).all();
+    // Snapshot the queue boundary so writes arriving during network I/O remain
+    // pending. Coalesce across the entire backlog, not just 500 trigger entries:
+    // a busy resident can otherwise upload the same row in many successive flushes.
+    const boundary = db.prepare('SELECT MAX(id) AS id FROM _sync_changes').get().id;
+    if (boundary == null) return { synced: 0 };
+    const pending = db.prepare(`
+      SELECT table_name, row_pk, MAX(id) AS id
+      FROM _sync_changes WHERE id <= ?
+      GROUP BY table_name, row_pk
+      ORDER BY MIN(id)
+      LIMIT 100
+    `);
+    const acknowledge = db.prepare(`
+      DELETE FROM _sync_changes WHERE table_name = ? AND row_pk = ? AND id <= ?
+    `);
+    let synced = 0;
 
-    if (!dirtyRows || dirtyRows.length === 0) {
-      return { synced: 0 };
-    }
+    for (;;) {
+      const entries = pending.all(boundary);
+      if (entries.length === 0) break;
+      const statements = [];
+      for (const { table_name, row_pk } of entries) {
+        const pkDef = TABLE_PK[table_name];
+        let row;
+        if (Array.isArray(pkDef)) {
+          const [part1, part2] = row_pk.split(':::');
+          row = db.prepare(`SELECT * FROM ${table_name} WHERE ${pkDef[0]} = ? AND ${pkDef[1]} = ?`).get(part1, part2);
+        } else {
+          row = db.prepare(`SELECT * FROM ${table_name} WHERE ${pkDef} = ?`).get(row_pk);
+        }
 
-    const maxProcessedId = dirtyRows[dirtyRows.length - 1].id;
-    const latestMap = new Map();
-    for (const entry of dirtyRows) {
-      const key = `${entry.table_name}:${entry.row_pk}`;
-      latestMap.set(key, entry);
-    }
-
-    const statements = [];
-
-    for (const entry of latestMap.values()) {
-      const { table_name, row_pk, op } = entry;
-      const pkDef = TABLE_PK[table_name];
-
-      if (op === 'DELETE') {
-        statements.push(createDeleteStatement(table_name, row_pk, pkDef));
-        continue;
+        // Use current state, including a row reinserted after an older DELETE.
+        if (!row) {
+          statements.push(createDeleteStatement(table_name, row_pk, pkDef));
+        } else if (shouldRetainCloudRow(table_name, row)) {
+          const cols = Object.keys(row);
+          const placeholders = cols.map(() => '?').join(', ');
+          statements.push({
+            sql: `INSERT OR REPLACE INTO ${table_name} (${cols.join(', ')}) VALUES (${placeholders})`,
+            args: Object.values(row)
+          });
+        }
       }
 
-      let row = null;
-      if (Array.isArray(pkDef)) {
-        const [part1, part2] = row_pk.split(':::');
-        row = db.prepare(`SELECT * FROM ${table_name} WHERE ${pkDef[0]} = ? AND ${pkDef[1]} = ?`).get(part1, part2);
-      } else {
-        row = db.prepare(`SELECT * FROM ${table_name} WHERE ${pkDef} = ?`).get(row_pk);
-      }
-
-      if (!row) {
-        statements.push(createDeleteStatement(table_name, row_pk, pkDef));
-        continue;
-      }
-
-      if (!shouldRetainCloudRow(table_name, row)) continue;
-
-      const cols = Object.keys(row);
-      const placeholders = cols.map(() => '?').join(', ');
-      statements.push({
-        sql: `INSERT OR REPLACE INTO ${table_name} (${cols.join(', ')}) VALUES (${placeholders})`,
-        args: Object.values(row)
+      if (statements.length > 0) await cloudClient.batch(statements, 'write');
+      // Ack each successful batch, so a later failure does not resend earlier
+      // batches. Never acknowledge changes made while this batch was in flight.
+      withImmediateTransaction(db, () => {
+        for (const entry of entries) acknowledge.run(entry.table_name, entry.row_pk, entry.id);
       });
+      synced += statements.length;
     }
 
-    if (statements.length > 0) {
-      const CHUNK_SIZE = 100;
-      for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
-        const chunk = statements.slice(i, i + CHUNK_SIZE);
-        await cloudClient.batch(chunk, 'write');
-      }
-    }
-
-    db.prepare('DELETE FROM _sync_changes WHERE id <= ?').run(maxProcessedId);
-
-    console.log(`[Database:Cloud] Delta sync pushed ${statements.length} changes to Turso cloud.`);
-    return { synced: statements.length };
+    console.log(`[Database:Cloud] Delta sync pushed ${synced} changes to Turso cloud.`);
+    return { synced };
   } catch (err) {
     console.error('[Database:Cloud] Error during delta sync push to cloud:', err.message);
     throw err;
