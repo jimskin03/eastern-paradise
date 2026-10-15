@@ -12,7 +12,7 @@ function tokenMatches(provided, expected) {
 }
 
 export async function handleAdminRoutes(ctx) {
-  const { req, res, pathname, services, runtime } = ctx;
+  const { req, res, pathname, services } = ctx;
   const { db, CloudStorage } = services;
 
   if (pathname === '/api/admin/snapshot' && req.method === 'GET') {
@@ -25,7 +25,6 @@ export async function handleAdminRoutes(ctx) {
       return sendJson(res, 401, { success: false, message: 'Invalid snapshot token.' });
     }
     try {
-      runtime.markActivity();
       const tmpPath = path.join(os.tmpdir(), `paradise-snapshot-${process.pid}-${Date.now()}.db`);
       await backup(db, tmpPath);
       const readStream = fs.createReadStream(tmpPath);
@@ -54,7 +53,6 @@ export async function handleAdminRoutes(ctx) {
       return sendJson(res, 401, { success: false, message: 'Invalid admin token.' });
     }
     try {
-      runtime.markActivity();
       const wipeResult = await CloudStorage.wipeNonAiliciaLogs();
       return sendJson(res, 200, { success: true, ...wipeResult });
     } catch (wipeErr) {

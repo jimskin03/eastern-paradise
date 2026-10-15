@@ -108,14 +108,14 @@ test('Lifecycle does not begin a second simulation while the first is awaiting I
 });
 
 test('Only meaningful API traffic is counted as lifecycle activity', () => {
-  assert.equal(shouldRecordActivity('/api/auth/guest'), true);
+  assert.equal(shouldRecordActivity('/api/auth/guest', { method: 'POST' }), true);
   assert.equal(shouldRecordActivity('/api/status'), false);
   assert.equal(shouldRecordActivity('/api/metrics'), false);
   assert.equal(shouldRecordActivity('/healthz'), false);
   assert.equal(shouldRecordActivity('/js/app.js'), false);
 });
 
-test('Only successful API routes wake the simulation', async () => {
+test('Anonymous reads, failed authentication, missing routes and rate limits do not wake the simulation', async () => {
   let activity = 0;
   let limited = false;
   const handler = createRequestHandler({
@@ -137,14 +137,14 @@ test('Only successful API routes wake the simulation', async () => {
     return response.statusCode;
   }
   assert.equal(await request('/api/agent-card'), 200);
-  assert.equal(activity, 1);
+  assert.equal(activity, 0);
   assert.equal(await request('/api/economy/balance'), 401);
-  assert.equal(activity, 1);
+  assert.equal(activity, 0);
   assert.equal(await request('/api/does-not-exist'), 404);
-  assert.equal(activity, 1);
+  assert.equal(activity, 0);
   limited = true;
   assert.equal(await request('/api/agent-card'), 429);
-  assert.equal(activity, 1);
+  assert.equal(activity, 0);
 });
 
 test('Admin routes preserve disabled endpoint guards', async t => {

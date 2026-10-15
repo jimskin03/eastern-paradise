@@ -92,6 +92,7 @@ const EXPECTED_INDEXES = [
   'idx_hypothesis_revisions_hypothesis',
   'idx_world_rumors_updated',
   'idx_economy_audit_created',
+  'idx_sync_changes_row',
   'idx_sync_changes_tbl_id',
   'idx_memorial_subjects_alias',
   'idx_memorial_subjects_account',

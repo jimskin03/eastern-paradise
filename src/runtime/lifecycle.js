@@ -9,6 +9,7 @@ const SIMULATION_INTERVAL_MS = 3 * 1000;
 export function createLifecycle({ world, residentManager }) {
   let serverState = 'ACTIVE';
   let lastActivityTime = Date.now();
+  let lastActivitySource = 'startup';
   let lastTickAt = null;
   let tickTimer = null;
   let tickInFlight = false;
@@ -78,8 +79,9 @@ export function createLifecycle({ world, residentManager }) {
     scheduleNextTick();
   }
 
-  function markActivity() {
+  function markActivity(source = 'external') {
     lastActivityTime = Date.now();
+    lastActivitySource = source;
     if (serverState === 'IDLE') {
       serverState = 'ACTIVE';
       lastTickAt = Date.now();
@@ -101,6 +103,9 @@ export function createLifecycle({ world, residentManager }) {
     },
     getLastActivityTime() {
       return lastActivityTime;
+    },
+    getLastActivitySource() {
+      return lastActivitySource;
     },
     getIdleTimeoutMs() {
       return IDLE_TIMEOUT_MS;
